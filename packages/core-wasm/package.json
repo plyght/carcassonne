@@ -1,0 +1,21 @@
+{
+  "name": "@carcassonne/core-wasm",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core.wasm": "./core.wasm"
+  },
+  "scripts": {
+    "build:wasm": "cd ../core && zig build wasm && cp zig-out/bin/core.wasm ../core-wasm/core.wasm",
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@carcassonne/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@carcassonne/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

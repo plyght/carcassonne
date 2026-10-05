@@ -116,6 +116,17 @@
       "name": "@carcassonne/config",
       "version": "0.0.0",
     },
+    "packages/core-wasm": {
+      "name": "@carcassonne/core-wasm",
+      "dependencies": {
+        "@carcassonne/protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@carcassonne/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/db": {
       "name": "@carcassonne/db",
       "dependencies": {
@@ -277,6 +288,8 @@
     "@carcassonne/auth": ["@carcassonne/auth@workspace:packages/auth"],
 
     "@carcassonne/config": ["@carcassonne/config@workspace:packages/config"],
+
+    "@carcassonne/core-wasm": ["@carcassonne/core-wasm@workspace:packages/core-wasm"],
 
     "@carcassonne/db": ["@carcassonne/db@workspace:packages/db"],
 
