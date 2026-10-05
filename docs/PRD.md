@@ -224,7 +224,7 @@ Adaptive ambient soundscape (birds, wind, river near river tiles), tile and meep
 | Hard | MCTS (determinized over the remaining tile bag) with a heuristic rollout policy | ~1 s |
 | Expert | MCTS + deeper search + opponent modelling, multi-threaded on desktop | ~2–3 s |
 
-The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on a background thread on desktop, and, for bots in online rooms, in the **host player's client** (§7.3). This keeps Expert MCTS off Vercel's 4 CPU-hour free allowance.
+The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web and on a background thread on desktop. For bots in online rooms it runs **server-side in a Vercel Queues consumer**, with think time capped to fit the free CPU budget (§7.3).
 
 ## 7. Architecture
 
@@ -256,11 +256,11 @@ Everything must fit the free tier. **On Hobby, going over a limit pauses the dep
 | Function memory | Fixed **2 GB** | 360 GB-hrs / 2 GB = **180 instance-hours/month**. A held WebSocket pins an instance, so a 4-player game spread over up to 4 instances could burn 4 instance-hours per hour of play. That is too tight, so **we don't hold sockets on Vercel** |
 | Active CPU | **4 CPU-hrs/month** | Engine moves are cheap (WASM, about 1 ms), but MCTS bots are not, so bots run on clients |
 | Invocations | 1M/month | About 300 per game, so plenty |
-| Cron | Once per day | No per-minute sweeps. Timeouts are enforced lazily or triggered by clients |
+| Cron | Once per day (±59 min) | Useless for clocks, so turn timers use **Vercel Queues delayed messages** (1M operations/month free on Hobby) |
 | Use | Non-commercial | Fine (private project) |
 
 **Shape: HTTP for writes, Ably for push, Postgres as the source of truth**
-- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays, stats, and the game calls `submitIntent{gameId, ply, intent}`, `claimTimeout{gameId, ply}`, `submitBotMove{gameId, ply, move}`, `react{gameId, emoji}`. The desktop app calls the same tRPC HTTP endpoints. They are plain JSON over HTTP, so a small Zig client is enough.
+- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays, stats, and `submitIntent{gameId, ply, intent}`. Elysia deploys zero-config on Vercel via `export default app` (`app.listen` isn't supported there). Elysia's `.ws()` routes aren't used. The desktop app calls the same tRPC HTTP endpoints: plain JSON over HTTP, so a small Zig client is enough.
 - **Stateless rooms.** The authoritative state is the **move log in Neon Postgres**. Each call:
   1. loads `(seed, ruleset, moves[])` and replays them with core-wasm (about 100 plies takes well under a millisecond, so **no Redis cache is needed**),
   2. validates and applies the intent,
@@ -268,18 +268,28 @@ Everything must fit the free tier. **On Hobby, going over a limit pauses the dep
   4. publishes the resulting events to the Ably channel `game:{id}` through Ably's REST API.
 - **Push via Ably (free).** A tRPC call issues each client an Ably token with **subscribe + presence** capability (no publish) on its game, lobby and matchmaking channels. Clients can't publish, so they can't forge events. Ably's channel *rewind/history* covers short disconnects. On a longer gap, the client calls `getGame{sincePly}` over HTTP. Ably *presence* drives "who's connected" and AFK indicators.
   - Budget: about 300 events × 5 recipients (players and spectators) ≈ 1,500 messages per game, which is roughly 4,000 games/month on the free tier. 200 concurrent connections means about 40 simultaneous full tables.
-- **Clocks without a server process.** Each move stores `turnDeadline` (server time). Clients count down locally. When the deadline passes, every connected client calls `claimTimeout{gameId, ply}`. The server checks the deadline against server time and auto-plays (Easy-AI tile, no meeple), and the unique ply key makes exactly one claim succeed. If nobody is connected, any later call on that game applies the expired timeouts first. Abandoned games are swept by the daily cron.
-- **Bots in online rooms** are computed by the **host player's client** (a WASM worker on web, a native thread on desktop) and sent with `submitBotMove`. The server checks legality like any other move. If the host disconnects, another connected player's client takes over bot duty. If nobody is connected, the server plays the bot at Easy level (cheap). **Ranked games have no bots.**
-- **Matchmaking (3p/4p queues):** a `queue_ticket` table in Postgres. Each `joinQueue` call tries to form a match in one transaction (`SELECT … FOR UPDATE SKIP LOCKED`, using the Neon serverless driver's WebSocket pool for transactions), creates the room and publishes `match_found` on each player's Ably channel. Clients in the queue re-call `pollQueue` every 15 s as a backstop.
-- **Emoji reactions:** `react` is a cheap call (rate-limited per user in Postgres or in memory per instance, best-effort), published to `game:{id}:react`.
+- **Turn clocks with Vercel Queues.** Each committed move stores `turnDeadline` in Postgres and enqueues one **delayed message** `{gameId, ply}` due at the deadline (Queues supports delays of up to 7 days and pushes the message to a function). When it fires, the consumer does nothing if `ply` has already advanced. Otherwise it auto-plays (Easy-AI tile, no meeple) through the same compare-and-set path. That is about 3–4 operations per turn, roughly 30K/month at 100 games, against a 1M allowance. Clients only *display* the countdown. Fallback: Upstash QStash delays (1,000 messages/day free). Vercel Workflow (`sleep` racing a hook) would be the cleanest code, but at about 600 events per game it overruns Hobby's 50K events/month.
+- **Bots in online rooms run server-side via Queues.** After a move that hands the turn to a bot seat, the server enqueues `{gameId, ply, tier}`. A Queues consumer function loads the game, runs `core/ai` (WASM) and commits the move. **CPU budget:** Hobby includes 4 Active-CPU-hours a month, shared with everything else. Server bots are capped at about **1 s of think time** (Hard and Expert use iteration-limited MCTS tuned to that cap). A monthly bot-CPU counter in Postgres drops bots to Medium when it reaches about 2.5 h, so the account never pauses. Offline/local games still get full-strength Expert on the client. **Ranked games have no bots.**
+- **Matchmaking (3p/4p queues):** a `queue_ticket` table in Postgres. Each `joinQueue` call tries to form a match in one transaction (`SELECT … FOR UPDATE SKIP LOCKED`, using the Neon serverless driver's WebSocket pool for transactions), creates the room and publishes `match_found` on each player's Ably channel. If no match forms, it enqueues a **delayed Queues retry** (e.g. 15 s) instead of having clients poll. Tickets expire after 10 minutes.
+- **Emoji reactions:** clients get a token that **can publish only** to `game:{id}:react` and publish straight to Ably, so reactions cost no Vercel invocations. Rate-limiting happens client-side, and receivers drop floods. Fine for a private game.
 - **Neon free tier:** scales to zero when idle, with compute hours well within the allowance for personal use. Keep the Neon region next to the Vercel function region (e.g. `iad1` ↔ `us-east-1`).
+
+**Monthly free-tier budget (estimate: 100 games × 4 players, some spectators)**
+| Resource | Estimate | Hobby/free limit |
+|---|---|---|
+| Vercel invocations | ~40K | 1M |
+| Vercel Active CPU | ~0.1 h (moves) + ≤2.5 h (server bots, capped) | 4 h |
+| Vercel provisioned memory | ~20–40 GB-hrs (short requests only) | 360 GB-hrs |
+| Vercel Queues | ~30K operations | 1M |
+| Ably | ~300K messages, ~30 peak connections | 6M messages / 200 connections |
+| Neon | ~20 CU-hours | 100 CU-hours |
 
 **Transport abstraction.** `RoomTransport` (publish/subscribe) has implementations for **Ably (default)**, **Vercel WebSockets** (if the project ever moves to Pro, where the 800 s duration makes it viable), and a self-hosted Elysia WS (the Docker image still builds). Game logic never touches the transport directly.
 
 ### 7.4 Desktop (zpui)
 - **Native UI in zpui:** main menu, lobby/room, in-game HUD, settings, replay viewer, tutorial overlays. Assets (fonts, icons, audio, glTF, textures) are shared from `packages/assets`.
 - **Native 3D:** a new zpui 3D module (`Surface3D` element + mesh/material/camera/light API) on Vulkan and Metal. It draws `core/geo` meshes and the glTF prop kit, and plays the `core/anim` timeline. Research and design: `docs/research/zpui-3d.md`.
-- **Research result (`docs/research/zpui-3d.md`):** zui, upstream gpui and the gpui community have **no 3D** (no depth buffer, projection or mesh pipeline), so nothing can be ported. The plan is a native `Scene3D` subsystem in zpui. It renders offscreen (HDR, MSAA, depth), then tonemaps and composites the result through a new `viewport3d` scene primitive, the same pattern zpui already uses for vector paths. It is built on both Vulkan and Metal.
+- **Research result (`docs/research/zpui-3d.md`):** zui, upstream gpui and the gpui community have **no 3D** (no depth buffer, projection or mesh pipeline), so nothing can be ported. The plan is a native `Scene3D` subsystem in zpui. It renders offscreen (HDR, MSAA, depth), then tonemaps and composites the result through a new `viewport3d` scene primitive, the same pattern zpui already uses for vector paths. It is built on both Vulkan and Metal. **A Vulkan spike already works** (lavapipe, zero validation errors): a lit cube and meeple on a table plane composited under a blurred HUD strip, with a new 3D golden image test (`docs/research/zpui-3d-spike.png`, patch `docs/research/zpui-3d-spike.patch`). Metal, glTF loading, shadows and the window element are next. Estimate for phases 1–4: about a quarter of focused work, plus art.
 - **Fallback if native 3D slips:** embed a webview running `render-three` for the board only, with the zpui HUD staying native. This is a good fallback on macOS (WKWebView), but **weak on Linux** (zpui's WebKitGTK helper renders frames offscreen). That makes the native path the priority.
 - **Networking:** the same tRPC HTTP calls as web (a small Zig JSON/HTTP client) for actions. Push comes through Ably's **SSE endpoint** (plain HTTP streaming, so no Ably Zig SDK is needed), (Ably's REST API can only *read* presence, so desktop clients mark themselves online with a `heartbeat` tRPC call every 30 s, about 120 invocations per hour). Uses the same `core/proto` event schema. Auth uses the device flow (§6.5).
 - **Offline:** hot-seat, AI, tutorial and local replays with no network.
@@ -335,14 +345,15 @@ M6 can run in parallel with M2–M5.
 | Hobby limits pause the whole deployment when exceeded | No held sockets on Vercel. Push goes through Ably. Bots run on clients. Usage alerts at 50% and 80% |
 | Ably free caps (200 connections / 200 channels) | Fine at personal scale. Reuse one channel per game for players and spectators. `RoomTransport` allows swapping providers |
 | Concurrent intents land on different instances | Unique `(gameId, ply)` compare-and-set, and the deterministic engine rebuilds state from the log on every call |
-| Host-computed bot moves could be manipulated | Only legality is checked server-side. That is acceptable for a private game, and ranked games have no bots |
+| Server bots exhausting the 4 CPU-hour Hobby budget | 1 s think-time cap, monthly bot-CPU counter with a Medium fallback at about 2.5 h, usage alerts |
+| Vercel Queues is in public beta; Elysia on the Bun runtime is beta | Queues sits behind a `Scheduler` interface with QStash as the fallback. Elysia can run on the Node runtime on Vercel if Bun has problems |
 
 ## 12. Decisions log
 | # | Question | Decision |
 |---|---|---|
 | 1 | The Abbot + gardens in v1? | **Yes**, on by default (§5.6) |
 | 2 | Ranked queues | **3–4 player FFA** (separate 3p and 4p queues), no 1v1 ranked |
-| 3 | Server hosting | **Vercel Hobby (free)**: HTTP-only functions, **Ably free** for push, **Neon free** Postgres. No Redis (§7.3) |
+| 3 | Server hosting | **Vercel Hobby (free)**: HTTP functions + **Vercel Queues** (turn clocks, bots, matchmaking retries), **Ably free** for push, **Neon free** Postgres. No Redis. Vercel WebSockets were evaluated and rejected for Hobby: 300 s cap, idle sockets bill memory, no cross-instance broadcast (§7.3) |
 | 4 | Chat | **Emoji reactions only** (§6.8) |
 | 5 | Spectating ranked | **Live**, no delay |
 
