@@ -1,11 +1,11 @@
-// End-to-end: core.wasm (build it first: `cd packages/core && zig build wasm`)
+// End-to-end: the committed core.wasm in packages/core-wasm (rebuild with `bun run build:wasm` there)
 // -> CoreGeo wrapper -> decoders.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CoreGeo } from "../src";
 
-const wasmPath = resolve(import.meta.dir, "../../core/zig-out/bin/core.wasm");
+const wasmPath = resolve(import.meta.dir, "../../core-wasm/core.wasm");
 const has = existsSync(wasmPath);
 
 describe.skipIf(!has)("core-geo over core.wasm", async () => {
