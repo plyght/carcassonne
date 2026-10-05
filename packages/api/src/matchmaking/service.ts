@@ -17,7 +17,7 @@ export const RANKED_CLOCK: ClockJson = { type: "turn", turnSeconds: 45 };
 export const RETRY_SECONDS = 15;
 
 /** Rating window (display points) grows with the oldest ticket's wait. */
-export const ratingWindow = (waitMs: number) => Math.min(1000, 150 + (waitMs / 1000) * 10);
+export const ratingWindow = (waitMs: number) => Math.min(1000, 150 + (Math.max(0, waitMs) / 1000) * 10);
 
 export async function displayRating(deps: Pick<Deps, "db">, userId: string, queue: RankedQueue) {
   const [r] = await deps.db
@@ -29,7 +29,7 @@ export async function displayRating(deps: Pick<Deps, "db">, userId: string, queu
 
 export async function joinQueue(deps: Deps, userId: string, queue: RankedQueue) {
   const r = await displayRating(deps, userId, queue);
-  await deps.db.insert(queueTicket).values({ userId, queue, rating: r }).onConflictDoNothing();
+  await deps.db.insert(queueTicket).values({ userId, queue, rating: r, createdAt: new Date(deps.now()) }).onConflictDoNothing();
   await tryMatch(deps, queue);
   await retryIfWaiting(deps, queue);
   return queueStatus(deps, userId);
