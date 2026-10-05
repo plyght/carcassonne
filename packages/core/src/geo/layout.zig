@@ -660,10 +660,36 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
         }
     }
 
+    // Spring / lake of a single dead-end river: planned before the cloister so
+    // the two never overlap (a cloister pushes the lake toward its river).
+    var has_cloister = false;
+    for (feats) |f| if (f.kind == .cloister) {
+        has_cloister = true;
+    };
+    var pond_c = V2.init(0.5, 0.5);
+    var pond_r: F = switch (def.special) {
+        .lake => LAKE_R,
+        else => SPRING_R,
+    };
+    if (dead_river.items.len == 1) {
+        if (has_cloister) {
+            pond_c = pond_c.sub(vec.sideInward(portSide(dead_river.items[0].p)).scale(0.13));
+            pond_r = @min(pond_r, 0.16);
+        }
+    }
+
     // 3. Cloister placement (avoid water, cities, through roads) -------------
     for (feats, 0..) |f, fi| {
         if (f.kind != .cloister) continue;
-        var best = V2.init(0.5, 0.5);
+        // A road into the cloister that separates two fields must cross
+        // something (a river) on the way: bias the cloister to the far side.
+        var bias = V2.init(0.5, 0.5);
+        for (dead_road.items) |d| {
+            const s3: u4 = @as(u4, portSide(d.p)) * 3;
+            if (dead_road.items.len == 1 and L.owner[s3] != L.owner[s3 + 2])
+                bias = V2.init(0.5, 0.5).add(vec.sideInward(portSide(d.p)).scale(0.27));
+        }
+        var best = bias;
         var best_s: F = -std.math.inf(F);
         var gy: usize = 0;
         while (gy <= 20) : (gy += 1) {
@@ -676,7 +702,8 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
                     clear = @min(clear, d);
                 }
                 if (L.isCity(p)) clear = -1;
-                const s = @min(clear, CLOISTER_HALF * 1.6 + 0.03) - 0.5 * p.dist(V2.init(0.5, 0.5));
+                if (dead_river.items.len == 1) clear = @min(clear, p.dist(pond_c) - pond_r - CLOISTER_HALF * 0.45);
+                const s = @min(clear, CLOISTER_HALF * 1.6 + 0.03) - 0.5 * p.dist(bias);
                 if (s > best_s + 1e-12) {
                     best_s = s;
                     best = p;
@@ -705,7 +732,7 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
             const p0 = portPoint(d.p);
             const n0 = vec.sideInward(portSide(d.p));
             const s: u4 = portSide(d.p);
-            var target = center;
+            var target = if (is_river and list.len == 1) pond_c else center;
             var to_cloister = false;
             if (list.len >= 2) {
                 target = junction;
@@ -714,6 +741,14 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
                     target = b.center;
                     to_cloister = true;
                 };
+            }
+            if (list.len == 1 and !to_cloister and !is_river and L.owner[s * 3] != L.owner[s * 3 + 2]) {
+                // A dead end that separates two fields must reach a city wall
+                // (e.g. a road over a bridge into a city gate): head across the
+                // tile and stop at the first wall it meets.
+                const opp: u4 = ((s + 2) % 4) * 3 + 1;
+                const across = try curveToPoint(a, p0, n0, portPoint(opp).add(n0.scale(-0.02)));
+                if (firstWallHit(walls, across) != null) target = portPoint(opp).add(n0.scale(-0.02));
             }
             var pts = try curveToPoint(a, p0, n0, target);
             jitter(pts, 0.006, vec.mix(L.seed, 2000 + @as(u64, d.f)));
@@ -733,11 +768,7 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
             }
             try L.lines.append(a, .{ .feature = d.f, .kind = lk, .hw = hw, .pts = pts, .gpts = gpts });
             if (list.len == 1 and is_river) {
-                const r: F = switch (def.special) {
-                    .lake => LAKE_R,
-                    .spring => SPRING_R,
-                    else => SPRING_R,
-                };
+                const r = pond_r;
                 const e = pts[pts.len - 1];
                 try L.ponds.append(a, .{ .feature = d.f, .center = e, .r = r, .pts = try circlePoly(a, e, r, 32) });
             }
