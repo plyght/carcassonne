@@ -1,0 +1,1314 @@
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/build.zig /home/user/research/zpui-3d-spike/build.zig
+--- /home/user/plyght/zpui/build.zig	2026-10-05 16:20:49.175789065 +0000
++++ /home/user/research/zpui-3d-spike/build.zig	2026-10-05 16:39:13.384113833 +0000
+@@ -130,6 +130,9 @@
+         "path_sprite.vert",        "path_sprite.frag",
+         "blur_pass.vert",          "blur_pass.frag",
+         "backdrop_blur.vert",      "backdrop_blur.frag",
++        // [three spike]
++        "mesh.vert",               "mesh.frag",
++        "viewport3d.vert",         "viewport3d.frag",
+     };
+     const wf = b.addWriteFiles();
+     var index: std.ArrayList(u8) = .empty;
+@@ -166,6 +169,23 @@
+     run.addPassthruArgs();
+     const step = b.step("render-test", "Render the showcase scene offscreen to zig-out/render-test.png and compare with tests/golden");
+     step.dependOn(&run.step);
++
++    // [three spike] 3D viewport golden test.
++    const render_test_3d = b.addExecutable(.{
++        .name = "render-test-3d",
++        .root_module = b.createModule(.{
++            .root_source_file = b.path("examples/render_test_3d.zig"),
++            .target = target,
++            .optimize = optimize,
++            .imports = &.{.{ .name = "zpui", .module = zpui }},
++        }),
++    });
++    b.installArtifact(render_test_3d);
++    const run3d = b.addRunArtifact(render_test_3d);
++    run3d.setCwd(b.path("."));
++    run3d.addPassthruArgs();
++    const step3d = b.step("render-test-3d", "Render the 3D viewport spike offscreen to zig-out/render-test-3d.png and compare with tests/golden");
++    step3d.dependOn(&run3d.step);
+ }
+ 
+ /// Linux platform backend (src/platform/linux/): wayland-scanner protocol
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/examples/render_test_3d.zig /home/user/research/zpui-3d-spike/examples/render_test_3d.zig
+--- /home/user/plyght/zpui/examples/render_test_3d.zig	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/examples/render_test_3d.zig	2026-10-05 16:39:13.372020857 +0000
+@@ -0,0 +1,230 @@
++//! [three spike] Golden-image harness for the 3D viewport (`zig build render-test-3d`).
++//!
++//! A zpui scene with a wood-toned panel, a rounded `viewport3d` showing a lit
++//! cube on a ground plane (fixed rotation, so the output is deterministic), and
++//! 2D UI drawn *over* the viewport (a translucent HUD chip and a frosted
++//! backdrop blur) to prove draw-order compositing. Renders offscreen, writes
++//! zig-out/render-test-3d.png and compares it with tests/golden/render-test-3d.png.
++//! Then "spins" the cube through 30 frames on a headless swapchain.
++//!
++//! Flags: `--update-golden` overwrites the golden image with this render.
++
++const std = @import("std");
++const zpui = @import("zpui");
++const png = @import("png.zig");
++
++const scene_mod = zpui.scene;
++const three = scene_mod.three;
++const M = three.math.Mat4;
++const V = three.math.Vec3;
++const Scene = zpui.Scene;
++const Hsla = zpui.Hsla;
++const color = zpui.color;
++const Bounds = zpui.Bounds(f32);
++const Renderer = zpui.renderer.Renderer;
++
++const scale: f32 = 2;
++const logical_w = 480;
++const logical_h = 320;
++const golden_path = if (zpui.renderer.backend == .metal) "tests/golden/render-test-3d-metal.png" else "tests/golden/render-test-3d.png";
++const output_path = "zig-out/render-test-3d.png";
++const channel_tolerance = 6;
++const max_diff_fraction = 0.005;
++
++pub fn main(init: std.process.Init) !void {
++    const gpa = init.gpa;
++    const io = init.io;
++    const argv = try init.minimal.args.toSlice(init.arena.allocator());
++    var update_golden = false;
++    for (argv[1..]) |a| {
++        if (std.mem.eql(u8, a, "--update-golden")) update_golden = true;
++    }
++
++    const size: zpui.Size(zpui.DevicePixels) = .{ .width = logical_w * scale, .height = logical_h * scale };
++    var renderer = try Renderer.init(gpa, .{ .size = size, .transparent = true, .validation = true });
++    defer renderer.deinit();
++
++    var s3: three.Scene3D = .{};
++    defer s3.deinit(gpa);
++    try build3D(gpa, &s3, 0.6);
++
++    var scene: Scene = .{};
++    defer scene.deinit(gpa);
++    try buildScene(gpa, &scene, &s3);
++    scene.finish();
++
++    try renderer.drawScene(&scene, size, scale, color.transparent_black);
++    try renderer.drawScene(&scene, size, scale, color.transparent_black);
++    const pixels = try renderer.readPixels(gpa);
++    defer gpa.free(pixels);
++    unpremultiply(pixels);
++
++    const w: u32 = @intCast(size.width);
++    const h: u32 = @intCast(size.height);
++    const encoded = try png.encode(gpa, w, h, pixels);
++    defer gpa.free(encoded);
++    const cwd = std.Io.Dir.cwd();
++    try cwd.createDirPath(io, "zig-out");
++    try cwd.writeFile(io, .{ .sub_path = output_path, .data = encoded });
++    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, w, h });
++
++    var failed = false;
++    const validation_errors = renderer.validationErrors();
++    if (validation_errors != 0) {
++        std.debug.print("FAIL: {d} Vulkan validation errors\n", .{validation_errors});
++        failed = true;
++    }
++    // Sanity: the cube's center pixel must be lit (not background, not black).
++    {
++        const cx: usize = @intFromFloat(240 * scale);
++        const cy: usize = @intFromFloat(150 * scale);
++        const p = pixels[(cy * w + cx) * 4 ..][0..4];
++        std.debug.print("center pixel rgba = {d},{d},{d},{d}\n", .{ p[0], p[1], p[2], p[3] });
++        if (p[3] != 255 or (@as(u32, p[0]) + p[1] + p[2]) < 60) {
++            std.debug.print("FAIL: viewport center is not a lit opaque surface\n", .{});
++            failed = true;
++        }
++    }
++
++    if (update_golden) {
++        try cwd.createDirPath(io, "tests/golden");
++        try cwd.writeFile(io, .{ .sub_path = golden_path, .data = encoded });
++        std.debug.print("updated {s}\n", .{golden_path});
++    } else if (cwd.readFileAlloc(io, golden_path, gpa, .limited(64 << 20))) |golden_bytes| {
++        defer gpa.free(golden_bytes);
++        var golden = try png.decode(gpa, golden_bytes);
++        defer golden.deinit(gpa);
++        if (golden.width != w or golden.height != h) {
++            std.debug.print("FAIL: golden is {d}x{d}, render is {d}x{d}\n", .{ golden.width, golden.height, w, h });
++            failed = true;
++        } else {
++            var differing: usize = 0;
++            var max_delta: u8 = 0;
++            for (0..pixels.len / 4) |i| {
++                var px_delta: u8 = 0;
++                for (0..4) |ch| {
++                    const a = pixels[i * 4 + ch];
++                    const b = golden.pixels[i * 4 + ch];
++                    px_delta = @max(px_delta, if (a > b) a - b else b - a);
++                }
++                max_delta = @max(max_delta, px_delta);
++                if (px_delta > channel_tolerance) differing += 1;
++            }
++            const fraction = @as(f64, @floatFromInt(differing)) / @as(f64, @floatFromInt(pixels.len / 4));
++            std.debug.print("golden diff: {d} pixels over tolerance ({d:.4}%), max channel delta {d}\n", .{ differing, fraction * 100, max_delta });
++            if (fraction > max_diff_fraction) failed = true;
++        }
++    } else |err| switch (err) {
++        error.FileNotFound => std.debug.print("no golden at {s}; run with --update-golden to create it\n", .{golden_path}),
++        else => return err,
++    }
++
++    if (zpui.renderer.backend == .vulkan) spin(gpa) catch |err| {
++        std.debug.print("FAIL: swapchain spin: {s}\n", .{@errorName(err)});
++        failed = true;
++    };
++    if (renderer.validationErrors() != 0) {
++        std.debug.print("FAIL: {d} Vulkan validation errors total\n", .{renderer.validationErrors()});
++        failed = true;
++    }
++    if (failed) std.process.exit(1);
++}
++
++/// Spin the cube through 30 frames on a headless swapchain (with a resize midway).
++fn spin(gpa: std.mem.Allocator) !void {
++    const size: zpui.Size(zpui.DevicePixels) = .{ .width = logical_w * scale, .height = logical_h * scale };
++    var r = try Renderer.init(gpa, .{ .size = size, .surface = .{ .vulkan = Renderer.headless_surface }, .transparent = true, .validation = true });
++    defer r.deinit();
++    var s3: three.Scene3D = .{};
++    defer s3.deinit(gpa);
++    var scene: Scene = .{};
++    defer scene.deinit(gpa);
++    for (0..30) |i| {
++        s3.draws.clearRetainingCapacity();
++        try build3D(gpa, &s3, @as(f32, @floatFromInt(i)) * 0.1);
++        scene.clear(gpa);
++        try buildScene(gpa, &scene, &s3);
++        scene.finish();
++        const sz: zpui.Size(zpui.DevicePixels) = if (i == 15) .{ .width = 800, .height = 600 } else size;
++        try r.drawScene(&scene, sz, scale, color.transparent_black);
++    }
++    std.debug.print("swapchain path: spun 30 frames (with resize)\n", .{});
++}
++
++fn build3D(gpa: std.mem.Allocator, s3: *three.Scene3D, angle: f32) !void {
++    s3.camera = .{ .eye = .new(2.2, 1.8, 2.8), .target = .new(0, 0.35, 0), .fov_y = std.math.pi / 4.0 };
++    s3.light = .{ .direction = .new(-0.5, -1, -0.35), .intensity = 3.2 };
++    s3.ambient = .new(0.35, 0.37, 0.42);
++    // Ground: a warm "table" plane.
++    try s3.draw(gpa, .{
++        .mesh = &three.plane,
++        .model = M.scaling(.new(4, 1, 4)),
++        .material = .{ .base_color = .{ 0.42, 0.24, 0.12, 1 }, .roughness = 0.7 },
++    });
++    // Cube: a "cardboard tile"-ish slab spinning about Y, resting on the table.
++    try s3.draw(gpa, .{
++        .mesh = &three.cube,
++        .model = M.translation(.new(0, 0.5, 0)).mul(M.rotationY(angle)),
++        .material = .{ .base_color = .{ 0.75, 0.62, 0.38, 1 }, .roughness = 0.45 },
++    });
++    // A small glossy "meeple" block.
++    try s3.draw(gpa, .{
++        .mesh = &three.cube,
++        .model = M.translation(.new(0.9, 0.15, 0.6)).mul(M.rotationY(-angle * 2)).mul(M.scaling(.new(0.3, 0.3, 0.3))),
++        .material = .{ .base_color = .{ 0.7, 0.05, 0.04, 1 }, .roughness = 0.25 },
++    });
++}
++
++fn rect(x: f32, y: f32, w: f32, h: f32) Bounds {
++    return .{ .origin = .{ .x = x * scale, .y = y * scale }, .size = .{ .width = w * scale, .height = h * scale } };
++}
++
++fn corners(r: f32) zpui.Corners(f32) {
++    return .{ .top_left = r * scale, .top_right = r * scale, .bottom_right = r * scale, .bottom_left = r * scale };
++}
++
++const full_mask: scene_mod.ContentMask = .{ .bounds = .{ .origin = .zero, .size = .{ .width = logical_w * scale, .height = logical_h * scale } } };
++
++fn hex(v: u32) Hsla {
++    return color.rgb(v).toHsla();
++}
++
++fn buildScene(gpa: std.mem.Allocator, scene: *Scene, s3: *const three.Scene3D) !void {
++    const solid = color.solidBackground;
++    // Panel behind the viewport.
++    try scene.insertQuad(gpa, .{
++        .bounds = rect(8, 8, logical_w - 16, logical_h - 16),
++        .content_mask = full_mask,
++        .background = color.linearGradient(180, .{ .color = hex(0x3b2a1e), .percentage = 0 }, .{ .color = hex(0x1f1610), .percentage = 1 }),
++        .corner_radii = corners(16),
++    });
++    // The 3D viewport, rounded, inset in the panel.
++    try scene.insertViewport3D(gpa, .{
++        .bounds = rect(24, 24, logical_w - 48, logical_h - 48),
++        .content_mask = full_mask,
++        .corner_radii = corners(12),
++        .scene3d = s3,
++    });
++    // UI over the 3D content: frosted strip (backdrop blur; transparent shadow splitter like
++    // Window.paintBackdropBlur) and a translucent HUD chip.
++    try scene.insertShadow(gpa, .{ .bounds = rect(24, 236, logical_w - 48, 60), .content_mask = full_mask, .color = color.transparent_black });
++    try scene.insertBackdropBlur(gpa, .{ .blur_radius = 8 * scale, .bounds = rect(24, 236, logical_w - 48, 60), .content_mask = full_mask, .corner_radii = .{ .top_left = 0, .top_right = 0, .bottom_right = 12 * scale, .bottom_left = 12 * scale } });
++    try scene.insertQuad(gpa, .{
++        .bounds = rect(40, 40, 120, 32),
++        .content_mask = full_mask,
++        .background = solid(hex(0xffffff).opacity(0.75)),
++        .corner_radii = corners(8),
++    });
++}
++
++/// Premultiplied framebuffer -> straight-alpha PNG pixels.
++fn unpremultiply(pixels: []u8) void {
++    var i: usize = 0;
++    while (i < pixels.len) : (i += 4) {
++        const a = pixels[i + 3];
++        if (a == 0 or a == 255) continue;
++        for (pixels[i..][0..3]) |*ch| {
++            ch.* = @intCast(@min(255, (@as(u32, ch.*) * 255 + a / 2) / a));
++        }
++    }
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/metal/renderer.zig /home/user/research/zpui-3d-spike/src/renderer/metal/renderer.zig
+--- /home/user/plyght/zpui/src/renderer/metal/renderer.zig	2026-10-05 16:20:49.196809207 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/metal/renderer.zig	2026-10-05 16:36:27.717009227 +0000
+@@ -279,7 +279,7 @@
+     /// Consecutive frames rendered without any backdrop blur / any path.
+     blur_free_frames: u32 = 0,
+     path_free_frames: u32 = 0,
+-    warned_unsupported: std.EnumSet(enum { surfaces, subpixel, mps }) = .empty,
++    warned_unsupported: std.EnumSet(enum { surfaces, subpixel, mps, viewport3d }) = .empty,
+ 
+     const atlas_kind_count = @typeInfo(AtlasTextureKind).@"enum".field_names.len;
+ 
+@@ -735,6 +735,8 @@
+                 .subpixel_sprite => self.warnOnce(.subpixel, "subpixel sprites are not supported on Metal; skipped"),
+                 // TODO: CVPixelBuffer surfaces (CVMetalTextureCache) are not ported yet.
+                 .surface => self.warnOnce(.surfaces, "surfaces are not supported yet; skipped"),
++                // [three spike] Metal 3D pass not written yet (see docs: zpui-3d.md).
++                .viewport3d => self.warnOnce(.viewport3d, "3D viewports are not supported by the Metal renderer yet; skipped"),
+             }
+         }
+         // Blurs after the last batch still blur what was painted below them.
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/Renderer.zig /home/user/research/zpui-3d-spike/src/renderer/vulkan/Renderer.zig
+--- /home/user/plyght/zpui/src/renderer/vulkan/Renderer.zig	2026-10-05 16:20:49.197501844 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/Renderer.zig	2026-10-05 16:38:26.735568270 +0000
+@@ -29,6 +29,7 @@
+ const color = @import("../../color.zig");
+ 
+ const Scene = scene_mod.Scene;
++const three = scene_mod.three;
+ const Atlas = atlas_mod.Atlas;
+ const AtlasTextureId = atlas_mod.AtlasTextureId;
+ const AtlasTextureKind = atlas_mod.AtlasTextureKind;
+@@ -73,6 +74,10 @@
+ blur_b: vk.Image = .{},
+ readback: vk.Buffer = .{},
+ warned_surface: bool = false,
++/// [three spike] pipeline layout for mesh pipelines (push constants only).
++three_layout: c.VkPipelineLayout = null,
++/// [three spike] offscreen targets, one per `scene.viewports3d` index.
++three_targets: std.ArrayList(Target3D) = .empty,
+ 
+ const Frame = struct {
+     cmd: c.VkCommandBuffer = null,
+@@ -86,6 +91,30 @@
+     const SetEntry = struct { view: c.VkImageView, set: c.VkDescriptorSet };
+ };
+ 
++/// [three spike] Offscreen 3D target: HDR color (MSAA) + depth (MSAA) + 1x resolve.
++const Target3D = struct {
++    color: vk.Image = .{},
++    depth: vk.Image = .{},
++    resolve: vk.Image = .{},
++
++    fn destroy(t: *Target3D, dev: c.VkDevice) void {
++        t.color.destroy(dev);
++        t.depth.destroy(dev);
++        t.resolve.destroy(dev);
++    }
++};
++
++const hdr_format = c.VK_FORMAT_R16G16B16A16_SFLOAT;
++const depth_format = c.VK_FORMAT_D32_SFLOAT;
++
++/// [three spike] Push constants for mesh pipelines; mirrors `Push3D` in three_common.glsl.
++const Push3D = extern struct {
++    vertices: u64,
++    indices: u64,
++    frame: u64,
++    draw: u64,
++};
++
+ const GpuTexture = struct {
+     image: vk.Image = .{},
+     generation: u32 = 0,
+@@ -104,6 +133,8 @@
+     path_sprite: c.VkPipeline = null,
+     blur_pass: c.VkPipeline = null,
+     backdrop_blur: c.VkPipeline = null,
++    mesh: c.VkPipeline = null,
++    viewport3d: c.VkPipeline = null,
+ };
+ 
+ /// Push constants shared by every pipeline; mirrors `PUSH_CONSTANTS` in shaders/common.glsl.
+@@ -207,11 +238,14 @@
+         self.blur_a.destroy(dev);
+         self.blur_b.destroy(dev);
+         self.readback.destroy(dev);
++        for (self.three_targets.items) |*t| t.destroy(dev);
++        self.three_targets.deinit(self.gpa);
+         inline for (@typeInfo(Pipelines).@"struct".field_names) |name| {
+             const p = @field(self.pipelines, name);
+             if (p != null) c.vkDestroyPipeline(dev, p, null);
+         }
+         if (self.pipeline_layout != null) c.vkDestroyPipelineLayout(dev, self.pipeline_layout, null);
++        if (self.three_layout != null) c.vkDestroyPipelineLayout(dev, self.three_layout, null);
+         if (self.set_layout != null) c.vkDestroyDescriptorSetLayout(dev, self.set_layout, null);
+         if (self.sampler != null) c.vkDestroySampler(dev, self.sampler, null);
+         if (self.command_pool != null) c.vkDestroyCommandPool(dev, self.command_pool, null);
+@@ -310,6 +344,16 @@
+         .pushConstantRangeCount = 1,
+         .pPushConstantRanges = &range,
+     }, null, &self.pipeline_layout));
++    const range3d: c.VkPushConstantRange = .{
++        .stageFlags = c.VK_SHADER_STAGE_VERTEX_BIT | c.VK_SHADER_STAGE_FRAGMENT_BIT,
++        .offset = 0,
++        .size = @sizeOf(Push3D),
++    };
++    try vk.check(c.vkCreatePipelineLayout(dev, &.{
++        .sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
++        .pushConstantRangeCount = 1,
++        .pPushConstantRanges = &range3d,
++    }, null, &self.three_layout));
+     try self.createPipelines();
+ 
+     for (&self.frames) |*f| {
+@@ -345,6 +389,11 @@
+     frag: []const u8,
+     blend: Blend,
+     samples: c.VkSampleCountFlagBits = c.VK_SAMPLE_COUNT_1_BIT,
++    // [three spike] overrides for 3D pipelines.
++    layout: c.VkPipelineLayout = null,
++    color_format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
++    depth: bool = false,
++    cull_back: bool = false,
+ };
+ 
+ fn createPipelines(self: *Renderer) !void {
+@@ -368,6 +417,22 @@
+     p.path_sprite = try self.createPipeline(.{ .vert = &shaders.path_sprite_vert, .frag = &shaders.path_sprite_frag, .blend = .premultiplied });
+     p.blur_pass = try self.createPipeline(.{ .vert = &shaders.blur_pass_vert, .frag = &shaders.blur_pass_frag, .blend = .none });
+     p.backdrop_blur = try self.createPipeline(.{ .vert = &shaders.backdrop_blur_vert, .frag = &shaders.backdrop_blur_frag, .blend = .none });
++    p.mesh = try self.createPipeline(.{
++        .vert = &shaders.mesh_vert,
++        .frag = &shaders.mesh_frag,
++        .blend = .none,
++        .samples = self.threeSamples(),
++        .layout = self.three_layout,
++        .color_format = hdr_format,
++        .depth = true,
++        .cull_back = true,
++    });
++    p.viewport3d = try self.createPipeline(.{ .vert = &shaders.viewport3d_vert, .frag = &shaders.viewport3d_frag, .blend = .premultiplied });
++}
++
++fn threeSamples(self: *const Renderer) c.VkSampleCountFlagBits {
++    const l = self.device.limits;
++    return if (l.framebufferColorSampleCounts & l.framebufferDepthSampleCounts & c.VK_SAMPLE_COUNT_4_BIT != 0) c.VK_SAMPLE_COUNT_4_BIT else c.VK_SAMPLE_COUNT_1_BIT;
+ }
+ 
+ fn pathSampleCount(self: *const Renderer) u32 {
+@@ -407,7 +472,7 @@
+     const raster: c.VkPipelineRasterizationStateCreateInfo = .{
+         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+         .polygonMode = c.VK_POLYGON_MODE_FILL,
+-        .cullMode = c.VK_CULL_MODE_NONE,
++        .cullMode = if (desc.cull_back) c.VK_CULL_MODE_BACK_BIT else c.VK_CULL_MODE_NONE,
+         .frontFace = c.VK_FRONT_FACE_COUNTER_CLOCKWISE,
+         .lineWidth = 1,
+     };
+@@ -451,10 +516,19 @@
+         .dynamicStateCount = dynamic_states.len,
+         .pDynamicStates = &dynamic_states,
+     };
++    const color_format = if (desc.color_format != c.VK_FORMAT_UNDEFINED) desc.color_format else self.color_format;
+     const rendering: c.VkPipelineRenderingCreateInfo = .{
+         .sType = c.VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+         .colorAttachmentCount = 1,
+-        .pColorAttachmentFormats = &self.color_format,
++        .pColorAttachmentFormats = &color_format,
++        .depthAttachmentFormat = if (desc.depth) depth_format else c.VK_FORMAT_UNDEFINED,
++    };
++    // Reverse-Z: clear to 0, nearer fragments have larger depth.
++    const depth_state: c.VkPipelineDepthStencilStateCreateInfo = .{
++        .sType = c.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
++        .depthTestEnable = c.VK_TRUE,
++        .depthWriteEnable = c.VK_TRUE,
++        .depthCompareOp = c.VK_COMPARE_OP_GREATER,
+     };
+     var pipeline: c.VkPipeline = null;
+     try vk.check(c.vkCreateGraphicsPipelines(dev, null, 1, &.{
+@@ -468,8 +542,9 @@
+         .pRasterizationState = &raster,
+         .pMultisampleState = &multisample,
+         .pColorBlendState = &blend_state,
++        .pDepthStencilState = if (desc.depth) &depth_state else null,
+         .pDynamicState = &dynamic,
+-        .layout = self.pipeline_layout,
++        .layout = if (desc.layout != null) desc.layout else self.pipeline_layout,
+     }, null, &pipeline));
+     return pipeline;
+ }
+@@ -536,6 +611,9 @@
+         .target = &target,
+         .clear = .{ rgba.r * alpha, rgba.g * alpha, rgba.b * alpha, alpha },
+     };
++    // [three spike] 3D viewports render offscreen before the UI pass (they don't
++    // depend on 2D content), then composite in draw order inside it.
++    try rec.renderViewports3D(scene);
+     target.transition(cmd, c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
+     rec.beginMain(true);
+     try rec.drawBatches(scene);
+@@ -621,6 +699,15 @@
+     }
+     for (scene.paths.items) |p| total += p.vertices.items.len * @sizeOf(scene_mod.PathRasterizationVertex) + @sizeOf(scene_mod.PathSprite);
+     count += 2 * scene.paths.items.len;
++    // [three spike] per viewport: frame uniforms + composite instance; per draw: data + mesh copy.
++    for (scene.viewports3d.items) |v| {
++        total += @sizeOf(three.FrameUniforms) + @sizeOf(scene_mod.Viewport3DInstance);
++        count += 2;
++        for (v.scene3d.draws.items) |d| {
++            total += @sizeOf(three.DrawData) + d.mesh.vertices.len * @sizeOf(three.Vertex) + d.mesh.indices.len * 4;
++            count += 3;
++        }
++    }
+     return total + count * instance_align;
+ }
+ 
+@@ -878,6 +965,17 @@
+                 .polychrome_sprite => |s| if (rec.atlasTexture(s.texture_id)) |t|
+                     try rec.drawInstances(p.poly_sprite, scene_mod.PolychromeSprite, scene.polychrome_sprites.items[range.start..range.end], t),
+                 .path => try rec.drawPaths(scene.paths.items[range.start..range.end]),
++                .viewport3d => for (range.start..range.end) |i| {
++                    if (i >= r.three_targets.items.len) continue;
++                    const v = scene.viewports3d.items[i];
++                    const inst: scene_mod.Viewport3DInstance = .{
++                        .bounds = v.bounds,
++                        .content_mask = v.content_mask,
++                        .corner_radii = v.corner_radii,
++                        .exposure = v.scene3d.exposure,
++                    };
++                    try rec.drawInstances(p.viewport3d, scene_mod.Viewport3DInstance, &.{inst}, &r.three_targets.items[i].resolve);
++                },
+                 .surface => if (!r.warned_surface) {
+                     r.warned_surface = true;
+                     log.warn("surfaces are not supported by the Vulkan renderer yet; skipping", .{});
+@@ -890,6 +988,108 @@
+         }
+     }
+ 
++    /// [three spike] Render every viewport's Scene3D into its offscreen HDR
++    /// target: MSAA color + depth, resolved to a 1x RGBA16F texture that the
++    /// `viewport3d` pipeline composites (tonemap + sRGB) in the main pass.
++    fn renderViewports3D(rec: *Recorder, scene: *const Scene) !void {
++        const r = rec.r;
++        const dev = r.device.handle;
++        const samples = r.threeSamples();
++        const msaa = samples != c.VK_SAMPLE_COUNT_1_BIT;
++        while (r.three_targets.items.len < scene.viewports3d.items.len) try r.three_targets.append(r.gpa, .{});
++        for (scene.viewports3d.items, 0..) |v, vi| {
++            const t = &r.three_targets.items[vi];
++            const w: u32 = @intFromFloat(@max(@ceil(v.bounds.size.width), 1));
++            const h: u32 = @intFromFloat(@max(@ceil(v.bounds.size.height), 1));
++            if (t.resolve.handle == null or t.resolve.width != w or t.resolve.height != h) {
++                if (t.resolve.handle != null) r.device.waitIdle();
++                t.destroy(dev);
++                const mp = &r.device.mem_props;
++                t.resolve = try vk.Image.create(dev, mp, .{ .width = w, .height = h, .format = hdr_format, .usage = c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | c.VK_IMAGE_USAGE_SAMPLED_BIT });
++                if (msaa) t.color = try vk.Image.create(dev, mp, .{ .width = w, .height = h, .format = hdr_format, .usage = c.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | c.VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT, .samples = samples });
++                t.depth = try vk.Image.create(dev, mp, .{ .width = w, .height = h, .format = depth_format, .usage = c.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | c.VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT, .samples = samples, .aspect = c.VK_IMAGE_ASPECT_DEPTH_BIT });
++            }
++            const s3 = v.scene3d;
++            const aspect = @as(f32, @floatFromInt(w)) / @as(f32, @floatFromInt(h));
++            const frame_addr = rec.push(std.mem.asBytes(&s3.frameUniforms(aspect, true)));
++
++            t.resolve.transition(rec.cmd, c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
++            if (msaa) t.color.transition(rec.cmd, c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
++            t.depth.transition(rec.cmd, c.VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, true);
++            var color_att: c.VkRenderingAttachmentInfo = .{
++                .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
++                .imageView = t.resolve.view,
++                .imageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
++                .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
++                .storeOp = c.VK_ATTACHMENT_STORE_OP_STORE,
++                .clearValue = .{ .color = .{ .float32 = s3.clear } },
++            };
++            if (msaa) {
++                color_att.imageView = t.color.view;
++                color_att.storeOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE;
++                color_att.resolveMode = c.VK_RESOLVE_MODE_AVERAGE_BIT;
++                color_att.resolveImageView = t.resolve.view;
++                color_att.resolveImageLayout = c.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
++            }
++            const depth_att: c.VkRenderingAttachmentInfo = .{
++                .sType = c.VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
++                .imageView = t.depth.view,
++                .imageLayout = c.VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
++                .loadOp = c.VK_ATTACHMENT_LOAD_OP_CLEAR,
++                .storeOp = c.VK_ATTACHMENT_STORE_OP_DONT_CARE,
++                .clearValue = .{ .depthStencil = .{ .depth = 0, .stencil = 0 } },
++            };
++            const area: c.VkRect2D = .{ .offset = .{ .x = 0, .y = 0 }, .extent = .{ .width = w, .height = h } };
++            c.vkCmdBeginRendering(rec.cmd, &.{
++                .sType = c.VK_STRUCTURE_TYPE_RENDERING_INFO,
++                .renderArea = area,
++                .layerCount = 1,
++                .colorAttachmentCount = 1,
++                .pColorAttachments = &color_att,
++                .pDepthAttachment = &depth_att,
++            });
++            const vp: c.VkViewport = .{ .x = 0, .y = 0, .width = @floatFromInt(w), .height = @floatFromInt(h), .minDepth = 0, .maxDepth = 1 };
++            c.vkCmdSetViewport(rec.cmd, 0, 1, &vp);
++            c.vkCmdSetScissor(rec.cmd, 0, 1, &area);
++            c.vkCmdBindPipeline(rec.cmd, c.VK_PIPELINE_BIND_POINT_GRAPHICS, r.pipelines.mesh);
++            rec.bound = r.pipelines.mesh;
++
++            // Spike: meshes are copied into the frame buffer (deduplicated per viewport).
++            const Uploaded = struct { mesh: *const three.Mesh, vertices: u64, indices: u64 };
++            var uploaded: [64]Uploaded = undefined;
++            var uploaded_len: usize = 0;
++            for (s3.draws.items) |d| {
++                var found: ?Uploaded = null;
++                for (uploaded[0..uploaded_len]) |u| if (u.mesh == d.mesh) {
++                    found = u;
++                };
++                const u = found orelse blk: {
++                    const nu: Uploaded = .{
++                        .mesh = d.mesh,
++                        .vertices = rec.push(std.mem.sliceAsBytes(d.mesh.vertices)),
++                        .indices = rec.push(std.mem.sliceAsBytes(d.mesh.indices)),
++                    };
++                    if (uploaded_len < uploaded.len) {
++                        uploaded[uploaded_len] = nu;
++                        uploaded_len += 1;
++                    }
++                    break :blk nu;
++                };
++                const data: three.DrawData = .{
++                    .model = d.model,
++                    .base_color = d.material.base_color,
++                    .params = .{ d.material.metallic, d.material.roughness, 0, 0 },
++                };
++                const pc: Push3D = .{ .vertices = u.vertices, .indices = u.indices, .frame = frame_addr, .draw = rec.push(std.mem.asBytes(&data)) };
++                c.vkCmdPushConstants(rec.cmd, r.three_layout, c.VK_SHADER_STAGE_VERTEX_BIT | c.VK_SHADER_STAGE_FRAGMENT_BIT, 0, @sizeOf(Push3D), &pc);
++                c.vkCmdDraw(rec.cmd, @intCast(d.mesh.indices.len), 1, 0, 0);
++            }
++            c.vkCmdEndRendering(rec.cmd);
++            rec.bound = null;
++            t.resolve.transition(rec.cmd, c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, false);
++        }
++    }
++
+     /// Rasterize paths into the MSAA intermediate, then composite (MR:1120-1160).
+     fn drawPaths(rec: *Recorder, paths: []const scene_mod.Path) !void {
+         if (paths.len == 0) return;
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/mesh.frag /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/mesh.frag
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/mesh.frag	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/mesh.frag	2026-10-05 16:36:54.700301388 +0000
+@@ -0,0 +1,44 @@
++#version 450
++#include "three_common.glsl"
++layout(location = 0) in vec3 v_world;
++layout(location = 1) in vec3 v_normal;
++layout(location = 0) out vec4 out_color;
++
++const float PI = 3.14159265;
++
++// glTF metallic-roughness BRDF: GGX NDF, Smith-Schlick-GGX visibility, Schlick Fresnel.
++float d_ggx(float n_h, float a) {
++  float a2 = a * a;
++  float d = n_h * n_h * (a2 - 1.0) + 1.0;
++  return a2 / (PI * d * d);
++}
++float v_smith(float n_v, float n_l, float a) {
++  float k = a * 0.5;
++  return 0.25 / ((n_v * (1.0 - k) + k) * (n_l * (1.0 - k) + k));
++}
++
++void main() {
++  FrameUniforms f = pc.frame.f;
++  DrawData d = pc.draw.d;
++  vec3 n = normalize(v_normal);
++  vec3 v = normalize(f.camera_pos.xyz - v_world);
++  vec3 l = normalize(f.light_dir.xyz);
++  vec3 h = normalize(v + l);
++  float n_l = max(dot(n, l), 0.0);
++  float n_v = max(dot(n, v), 1e-4);
++  float n_h = max(dot(n, h), 0.0);
++  float v_h = max(dot(v, h), 0.0);
++  float metallic = d.params.x;
++  float rough = clamp(d.params.y, 0.04, 1.0);
++  float a = rough * rough;
++  vec3 base = d.base_color.rgb;
++  vec3 f0 = mix(vec3(0.04), base, metallic);
++  vec3 fres = f0 + (1.0 - f0) * pow(1.0 - v_h, 5.0);
++  vec3 spec = fres * d_ggx(n_h, a) * v_smith(n_v, n_l, a);
++  vec3 diffuse = (1.0 - fres) * (1.0 - metallic) * base / PI;
++  vec3 color = (diffuse + spec) * f.light_color.rgb * n_l;
++  // Hemisphere ambient (sky above, darker ground bounce).
++  float sky = 0.5 + 0.5 * n.y;
++  color += base * (1.0 - metallic) * f.ambient.rgb * mix(0.4, 1.0, sky);
++  out_color = vec4(color, 1.0);
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/mesh.vert /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/mesh.vert
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/mesh.vert	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/mesh.vert	2026-10-05 16:36:54.697242958 +0000
+@@ -0,0 +1,15 @@
++#version 450
++#include "three_common.glsl"
++layout(location = 0) out vec3 v_world;
++layout(location = 1) out vec3 v_normal;
++
++void main() {
++  uint index = pc.indices.i[gl_VertexIndex];
++  Vertex3D vert = pc.vertices.v[index];
++  mat4 model = pc.draw.d.model;
++  vec4 world = model * vec4(vert.pos, 1.0);
++  v_world = world.xyz;
++  // Uniform scale assumed in the spike (no inverse-transpose).
++  v_normal = mat3(model) * vert.normal;
++  gl_Position = pc.frame.f.view_proj * world;
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/three_common.glsl /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/three_common.glsl
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/three_common.glsl	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/three_common.glsl	2026-10-05 16:36:54.697166890 +0000
+@@ -0,0 +1,19 @@
++// zpui.three spike: shared 3D definitions. Mirrors src/three/scene3d.zig.
++#extension GL_EXT_buffer_reference : require
++#extension GL_EXT_scalar_block_layout : require
++
++struct Vertex3D { vec3 pos; vec3 normal; };
++struct FrameUniforms { mat4 view_proj; vec4 camera_pos; vec4 light_dir; vec4 light_color; vec4 ambient; };
++struct DrawData { mat4 model; vec4 base_color; vec4 params; };
++
++layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Vertices3D { Vertex3D v[]; };
++layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Indices3D { uint i[]; };
++layout(buffer_reference, scalar, buffer_reference_align = 16) readonly buffer FrameRef { FrameUniforms f; };
++layout(buffer_reference, scalar, buffer_reference_align = 16) readonly buffer DrawRef { DrawData d; };
++
++layout(push_constant, scalar) uniform Push3D {
++  Vertices3D vertices;
++  Indices3D indices;
++  FrameRef frame;
++  DrawRef draw;
++} pc;
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.frag /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.frag
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.frag	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.frag	2026-10-05 16:37:01.662338851 +0000
+@@ -0,0 +1,39 @@
++#version 450
++#include "viewport3d.glsl"
++layout(location = 0) in vec2 v_uv;
++layout(location = 1) flat in uint v_instance;
++layout(location = 2) in vec4 v_clip;
++layout(location = 0) out vec4 out_color;
++
++// Khronos PBR Neutral tone mapper (https://github.com/KhronosGroup/ToneMapping).
++vec3 pbr_neutral(vec3 color) {
++  const float start_compression = 0.8 - 0.04;
++  const float desaturation = 0.15;
++  float x = min(color.r, min(color.g, color.b));
++  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
++  color -= offset;
++  float peak = max(color.r, max(color.g, color.b));
++  if (peak < start_compression) return color;
++  const float d = 1.0 - start_compression;
++  float new_peak = 1.0 - d * d / (peak + d - start_compression);
++  color *= new_peak / peak;
++  float g = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
++  return mix(color, vec3(new_peak), g);
++}
++
++vec3 srgb_oetf(vec3 c) {
++  return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
++}
++
++void main() {
++  if (any(lessThan(v_clip, vec4(0.0)))) discard;
++  Viewport3DInstance vp = pc.instances.items[v_instance];
++  // Resolved MSAA over a transparent clear: rgb is premultiplied by coverage.
++  vec4 hdr = texture(hdr_texture, v_uv);
++  if (hdr.a <= 0.0) discard;
++  vec3 rgb = hdr.rgb / hdr.a * vp.exposure;
++  vec3 encoded = srgb_oetf(clamp(pbr_neutral(rgb), 0.0, 1.0));
++  float coverage = clamp(0.5 - quad_sdf(gl_FragCoord.xy, vp.bounds, vp.corner_radii), 0.0, 1.0);
++  float alpha = hdr.a * coverage;
++  out_color = vec4(encoded * alpha, alpha); // premultiplied
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.glsl /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.glsl
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.glsl	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.glsl	2026-10-05 16:36:54.702019307 +0000
+@@ -0,0 +1,5 @@
++#include "common.glsl"
++struct Viewport3DInstance { Bounds bounds; Bounds content_mask; Corners corner_radii; float exposure; uint pad0; uint pad1; uint pad2; };
++layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Viewport3DInstances { Viewport3DInstance items[]; };
++PUSH_CONSTANTS(Viewport3DInstances)
++layout(set = 0, binding = 0) uniform sampler2D hdr_texture;
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.vert /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.vert
+--- /home/user/plyght/zpui/src/renderer/vulkan/shaders/viewport3d.vert	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/shaders/viewport3d.vert	2026-10-05 16:36:54.703732199 +0000
+@@ -0,0 +1,16 @@
++#version 450
++#include "viewport3d.glsl"
++layout(location = 0) out vec2 v_uv;
++layout(location = 1) flat out uint v_instance;
++layout(location = 2) out vec4 v_clip;
++
++void main() {
++  vec2 unit_vertex = UNIT_VERTICES[gl_VertexIndex];
++  Viewport3DInstance vp = pc.instances.items[gl_InstanceIndex];
++  vec2 p = unit_position(unit_vertex, vp.bounds);
++  gl_Position = to_device_position_impl(p, pc.viewport_size);
++  v_uv = unit_vertex;
++  v_instance = gl_InstanceIndex;
++  Bounds m = vp.content_mask;
++  v_clip = vec4(p.x - m.origin.x, m.origin.x + m.size.x - p.x, p.y - m.origin.y, m.origin.y + m.size.y - p.y);
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/renderer/vulkan/vk.zig /home/user/research/zpui-3d-spike/src/renderer/vulkan/vk.zig
+--- /home/user/plyght/zpui/src/renderer/vulkan/vk.zig	2026-10-05 16:20:49.197779632 +0000
++++ /home/user/research/zpui-3d-spike/src/renderer/vulkan/vk.zig	2026-10-05 16:37:27.939060410 +0000
+@@ -107,6 +107,7 @@
+     height: u32 = 0,
+     format: c.VkFormat = c.VK_FORMAT_UNDEFINED,
+     layout: c.VkImageLayout = c.VK_IMAGE_LAYOUT_UNDEFINED,
++    aspect: c.VkImageAspectFlags = c.VK_IMAGE_ASPECT_COLOR_BIT,
+ 
+     pub const Options = struct {
+         width: u32,
+@@ -114,10 +115,11 @@
+         format: c.VkFormat,
+         usage: c.VkImageUsageFlags,
+         samples: c.VkSampleCountFlagBits = c.VK_SAMPLE_COUNT_1_BIT,
++        aspect: c.VkImageAspectFlags = c.VK_IMAGE_ASPECT_COLOR_BIT,
+     };
+ 
+     pub fn create(device: c.VkDevice, mem_props: *const c.VkPhysicalDeviceMemoryProperties, opts: Options) Error!Image {
+-        var self: Image = .{ .width = opts.width, .height = opts.height, .format = opts.format };
++        var self: Image = .{ .width = opts.width, .height = opts.height, .format = opts.format, .aspect = opts.aspect };
+         errdefer self.destroy(device);
+         try check(c.vkCreateImage(device, &.{
+             .sType = c.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+@@ -140,7 +142,7 @@
+             .memoryTypeIndex = try findMemoryType(mem_props, req.memoryTypeBits, c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+         }, null, &self.memory));
+         try check(c.vkBindImageMemory(device, self.handle, self.memory, 0));
+-        self.view = try createView(device, self.handle, opts.format);
++        self.view = try createViewAspect(device, self.handle, opts.format, opts.aspect);
+         return self;
+     }
+ 
+@@ -155,19 +157,25 @@
+     pub fn transition(self: *Image, cmd: c.VkCommandBuffer, new_layout: c.VkImageLayout, discard: bool) void {
+         // Even when discarding, wait on the previous use (write-after-read hazards).
+         const old_layout: c.VkImageLayout = if (discard) c.VK_IMAGE_LAYOUT_UNDEFINED else self.layout;
+-        barrierFrom(cmd, self.handle, layoutScope(self.layout), old_layout, new_layout);
++        barrierAspect(cmd, self.handle, self.aspect, layoutScope(self.layout), old_layout, new_layout);
+         self.layout = new_layout;
+     }
+ };
+ 
+ pub fn createView(device: c.VkDevice, image: c.VkImage, format: c.VkFormat) Error!c.VkImageView {
++    return createViewAspect(device, image, format, c.VK_IMAGE_ASPECT_COLOR_BIT);
++}
++
++pub fn createViewAspect(device: c.VkDevice, image: c.VkImage, format: c.VkFormat, aspect: c.VkImageAspectFlags) Error!c.VkImageView {
++    var range = color_range;
++    range.aspectMask = aspect;
+     var view: c.VkImageView = null;
+     try check(c.vkCreateImageView(device, &.{
+         .sType = c.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .image = image,
+         .viewType = c.VK_IMAGE_VIEW_TYPE_2D,
+         .format = format,
+-        .subresourceRange = color_range,
++        .subresourceRange = range,
+     }, null, &view));
+     return view;
+ }
+@@ -188,6 +196,10 @@
+             .stage = c.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+             .access = c.VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | c.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+         },
++        c.VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL => .{
++            .stage = c.VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | c.VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
++            .access = c.VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | c.VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
++        },
+         c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL => .{
+             .stage = c.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+             .access = c.VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+@@ -212,6 +224,12 @@
+ }
+ 
+ fn barrierFrom(cmd: c.VkCommandBuffer, image: c.VkImage, src: StageAccess, old_layout: c.VkImageLayout, new_layout: c.VkImageLayout) void {
++    barrierAspect(cmd, image, c.VK_IMAGE_ASPECT_COLOR_BIT, src, old_layout, new_layout);
++}
++
++fn barrierAspect(cmd: c.VkCommandBuffer, image: c.VkImage, aspect: c.VkImageAspectFlags, src: StageAccess, old_layout: c.VkImageLayout, new_layout: c.VkImageLayout) void {
++    var range = color_range;
++    range.aspectMask = aspect;
+     var dst = layoutScope(new_layout);
+     if (new_layout == c.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) dst = .{ .stage = c.VK_PIPELINE_STAGE_2_NONE, .access = 0 };
+     const b: c.VkImageMemoryBarrier2 = .{
+@@ -225,7 +243,7 @@
+         .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+         .image = image,
+-        .subresourceRange = color_range,
++        .subresourceRange = range,
+     };
+     c.vkCmdPipelineBarrier2(cmd, &.{
+         .sType = c.VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/scene.zig /home/user/research/zpui-3d-spike/src/scene.zig
+--- /home/user/plyght/zpui/src/scene.zig	2026-10-05 16:20:49.197779632 +0000
++++ /home/user/research/zpui-3d-spike/src/scene.zig	2026-10-05 16:36:22.903010457 +0000
+@@ -21,6 +21,7 @@
+ const color = @import("color.zig");
+ const atlas = @import("atlas.zig");
+ const BoundsTree = @import("bounds_tree.zig").BoundsTree;
++pub const three = @import("three/scene3d.zig");
+ 
+ pub const ScaledPixels = geometry.ScaledPixels;
+ pub const DevicePixels = geometry.DevicePixels;
+@@ -317,6 +318,26 @@
+     image_buffer: ?*anyopaque = null,
+ };
+ 
++/// A 3D viewport (zpui.three spike): the backend renders `scene3d` offscreen
++/// (HDR + depth + MSAA) before the UI pass and composites it here, in draw order,
++/// clipped to `content_mask` and rounded by `corner_radii`.
++pub const Viewport3D = struct {
++    order: DrawOrder = 0,
++    bounds: Bounds,
++    content_mask: ContentMask,
++    corner_radii: Corners = zero_corners,
++    scene3d: *const three.Scene3D,
++};
++
++/// GPU instance for the viewport3d composite pipeline (64 bytes).
++pub const Viewport3DInstance = extern struct {
++    bounds: Bounds,
++    content_mask: ContentMask,
++    corner_radii: Corners,
++    exposure: f32,
++    pad: [3]u32 = .{ 0, 0, 0 },
++};
++
+ /// Index of a path within `Scene.paths` at insertion time.
+ pub const PathId = usize;
+ 
+@@ -464,6 +485,7 @@
+     assert(@offsetOf(PathRasterizationVertex, "bounds") == 88);
+     assert(@sizeOf(PathSprite) == 16);
+     assert(@sizeOf(SurfaceBounds) == 32);
++    assert(@sizeOf(Viewport3DInstance) == 64);
+     // WGSL storage-buffer rules: every Bounds/AtlasTile/mat2x2 field must sit on an 8-byte boundary,
+     // and every array stride (struct size) must be a multiple of the struct's 8-byte alignment.
+     for (.{ Shadow, Quad, Underline, MonochromeSprite, SubpixelSprite, PolychromeSprite, PathRasterizationVertex }) |T| {
+@@ -490,6 +512,7 @@
+     subpixel_sprite,
+     polychrome_sprite,
+     surface,
++    viewport3d,
+ };
+ 
+ /// Any batched primitive. Backdrop blurs are separate (`Scene.insertBackdropBlur`).
+@@ -502,6 +525,7 @@
+     subpixel_sprite: SubpixelSprite,
+     polychrome_sprite: PolychromeSprite,
+     surface: PaintSurface,
++    viewport3d: Viewport3D,
+ 
+     pub fn bounds(self: *const Primitive) Bounds {
+         return switch (self.*) {
+@@ -546,6 +570,7 @@
+     subpixel_sprite: SpriteRange,
+     polychrome_sprite: SpriteRange,
+     surface: Range,
++    viewport3d: Range,
+ 
+     pub const SpriteRange = struct {
+         texture_id: AtlasTextureId,
+@@ -554,7 +579,7 @@
+ 
+     pub fn range(self: PrimitiveBatch) Range {
+         return switch (self) {
+-            .shadow, .quad, .path, .underline, .surface => |r| r,
++            .shadow, .quad, .path, .underline, .surface, .viewport3d => |r| r,
+             .monochrome_sprite, .subpixel_sprite, .polychrome_sprite => |s| s.range,
+         };
+     }
+@@ -572,6 +597,7 @@
+             .subpixel_sprite => scene.subpixel_sprites.items[start].order,
+             .polychrome_sprite => scene.polychrome_sprites.items[start].order,
+             .surface => scene.surfaces.items[start].order,
++            .viewport3d => scene.viewports3d.items[start].order,
+         };
+     }
+ };
+@@ -591,6 +617,7 @@
+     subpixel_sprites: std.ArrayList(SubpixelSprite) = .empty,
+     polychrome_sprites: std.ArrayList(PolychromeSprite) = .empty,
+     surfaces: std.ArrayList(PaintSurface) = .empty,
++    viewports3d: std.ArrayList(Viewport3D) = .empty,
+     /// Backdrop-blur regions, deliberately OUTSIDE the batch stream: the
+     /// renderer breaks its render pass at each blur's order to snapshot the
+     /// framebuffer, then resumes with the batch whose first order >= blur.order.
+@@ -609,6 +636,7 @@
+         self.subpixel_sprites.deinit(gpa);
+         self.polychrome_sprites.deinit(gpa);
+         self.surfaces.deinit(gpa);
++        self.viewports3d.deinit(gpa);
+         self.backdrop_blurs.deinit(gpa);
+         self.* = undefined;
+     }
+@@ -627,6 +655,7 @@
+         self.subpixel_sprites.clearRetainingCapacity();
+         self.polychrome_sprites.clearRetainingCapacity();
+         self.surfaces.clearRetainingCapacity();
++        self.viewports3d.clearRetainingCapacity();
+         self.backdrop_blurs.clearRetainingCapacity();
+     }
+ 
+@@ -726,6 +755,7 @@
+             .subpixel_sprite => &self.subpixel_sprites,
+             .polychrome_sprite => &self.polychrome_sprites,
+             .surface => &self.surfaces,
++            .viewport3d => &self.viewports3d,
+         };
+     }
+ 
+@@ -751,6 +781,9 @@
+     pub fn insertPolychromeSprite(self: *Scene, gpa: Allocator, v: PolychromeSprite) Allocator.Error!void {
+         return self.insertPrimitive(gpa, .{ .polychrome_sprite = v });
+     }
++    pub fn insertViewport3D(self: *Scene, gpa: Allocator, v: Viewport3D) Allocator.Error!void {
++        return self.insertPrimitive(gpa, .{ .viewport3d = v });
++    }
+     pub fn insertSurface(self: *Scene, gpa: Allocator, v: PaintSurface) Allocator.Error!void {
+         return self.insertPrimitive(gpa, .{ .surface = v });
+     }
+@@ -777,6 +810,7 @@
+         sortSprites(SubpixelSprite, self.subpixel_sprites.items);
+         sortSprites(PolychromeSprite, self.polychrome_sprites.items);
+         sortByOrder(PaintSurface, self.surfaces.items);
++        sortByOrder(Viewport3D, self.viewports3d.items);
+         sortByOrder(BackdropBlur, self.backdrop_blurs.items);
+     }
+ 
+@@ -841,6 +875,7 @@
+             .subpixel_sprite => s.subpixel_sprites.items,
+             .polychrome_sprite => s.polychrome_sprites.items,
+             .surface => s.surfaces.items,
++            .viewport3d => s.viewports3d.items,
+         };
+     }
+ 
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/three/math.zig /home/user/research/zpui-3d-spike/src/three/math.zig
+--- /home/user/plyght/zpui/src/three/math.zig	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/three/math.zig	2026-10-05 16:35:37.121238347 +0000
+@@ -0,0 +1,130 @@
++//! Minimal 3D math for zpui.three (spike). Column-major `Mat4` (m[col][row]),
++//! matching GLSL/MSL `float4x4` memory layout. Right-handed world, camera looks
++//! down -Z, clip depth 0..1 with reverse-Z (near = 1, far/infinity = 0).
++
++const std = @import("std");
++
++pub const Vec3 = extern struct {
++    x: f32 = 0,
++    y: f32 = 0,
++    z: f32 = 0,
++
++    pub fn new(x: f32, y: f32, z: f32) Vec3 {
++        return .{ .x = x, .y = y, .z = z };
++    }
++    pub fn add(a: Vec3, b: Vec3) Vec3 {
++        return .{ .x = a.x + b.x, .y = a.y + b.y, .z = a.z + b.z };
++    }
++    pub fn sub(a: Vec3, b: Vec3) Vec3 {
++        return .{ .x = a.x - b.x, .y = a.y - b.y, .z = a.z - b.z };
++    }
++    pub fn scale(a: Vec3, s: f32) Vec3 {
++        return .{ .x = a.x * s, .y = a.y * s, .z = a.z * s };
++    }
++    pub fn dot(a: Vec3, b: Vec3) f32 {
++        return a.x * b.x + a.y * b.y + a.z * b.z;
++    }
++    pub fn cross(a: Vec3, b: Vec3) Vec3 {
++        return .{ .x = a.y * b.z - a.z * b.y, .y = a.z * b.x - a.x * b.z, .z = a.x * b.y - a.y * b.x };
++    }
++    pub fn length(a: Vec3) f32 {
++        return @sqrt(a.dot(a));
++    }
++    pub fn normalize(a: Vec3) Vec3 {
++        const l = a.length();
++        return if (l == 0) a else a.scale(1 / l);
++    }
++};
++
++pub const Mat4 = extern struct {
++    m: [4][4]f32,
++
++    pub const identity: Mat4 = .{ .m = .{ .{ 1, 0, 0, 0 }, .{ 0, 1, 0, 0 }, .{ 0, 0, 1, 0 }, .{ 0, 0, 0, 1 } } };
++
++    pub fn mul(a: Mat4, b: Mat4) Mat4 {
++        var r: Mat4 = undefined;
++        for (0..4) |col| for (0..4) |row| {
++            var s: f32 = 0;
++            for (0..4) |k| s += a.m[k][row] * b.m[col][k];
++            r.m[col][row] = s;
++        };
++        return r;
++    }
++
++    pub fn translation(t: Vec3) Mat4 {
++        var r = identity;
++        r.m[3] = .{ t.x, t.y, t.z, 1 };
++        return r;
++    }
++
++    pub fn scaling(s: Vec3) Mat4 {
++        var r = identity;
++        r.m[0][0] = s.x;
++        r.m[1][1] = s.y;
++        r.m[2][2] = s.z;
++        return r;
++    }
++
++    pub fn rotationY(rad: f32) Mat4 {
++        const c = @cos(rad);
++        const s = @sin(rad);
++        var r = identity;
++        r.m[0] = .{ c, 0, -s, 0 };
++        r.m[2] = .{ s, 0, c, 0 };
++        return r;
++    }
++
++    pub fn rotationX(rad: f32) Mat4 {
++        const c = @cos(rad);
++        const s = @sin(rad);
++        var r = identity;
++        r.m[1] = .{ 0, c, s, 0 };
++        r.m[2] = .{ 0, -s, c, 0 };
++        return r;
++    }
++
++    pub fn lookAt(eye: Vec3, target: Vec3, up: Vec3) Mat4 {
++        const f = target.sub(eye).normalize();
++        const s = f.cross(up).normalize();
++        const u = s.cross(f);
++        return .{ .m = .{
++            .{ s.x, u.x, -f.x, 0 },
++            .{ s.y, u.y, -f.y, 0 },
++            .{ s.z, u.z, -f.z, 0 },
++            .{ -s.dot(eye), -u.dot(eye), f.dot(eye), 1 },
++        } };
++    }
++
++    /// Infinite reverse-Z perspective. `flip_y` for Vulkan (NDC +y down).
++    pub fn perspectiveReverseZ(fov_y: f32, aspect: f32, near: f32, flip_y: bool) Mat4 {
++        const f = 1 / @tan(fov_y / 2);
++        return .{ .m = .{
++            .{ f / aspect, 0, 0, 0 },
++            .{ 0, if (flip_y) -f else f, 0, 0 },
++            .{ 0, 0, 0, -1 },
++            .{ 0, 0, near, 0 },
++        } };
++    }
++
++    pub fn transformPoint(a: Mat4, p: Vec3) [4]f32 {
++        var r: [4]f32 = undefined;
++        for (0..4) |row| r[row] = a.m[0][row] * p.x + a.m[1][row] * p.y + a.m[2][row] * p.z + a.m[3][row];
++        return r;
++    }
++};
++
++test "reverse-Z maps near to 1 and far toward 0" {
++    const p = Mat4.perspectiveReverseZ(std.math.pi / 3.0, 1, 0.1, false);
++    const near = p.transformPoint(.new(0, 0, -0.1));
++    try std.testing.expectApproxEqAbs(@as(f32, 1), near[2] / near[3], 1e-5);
++    const far = p.transformPoint(.new(0, 0, -1000));
++    try std.testing.expect(far[2] / far[3] < 0.001);
++}
++
++test "lookAt puts the target on -Z" {
++    const v = Mat4.lookAt(.new(3, 4, 5), .new(0, 0, 0), .new(0, 1, 0));
++    const t = v.transformPoint(.new(0, 0, 0));
++    try std.testing.expectApproxEqAbs(@as(f32, 0), t[0], 1e-5);
++    try std.testing.expectApproxEqAbs(@as(f32, 0), t[1], 1e-5);
++    try std.testing.expectApproxEqAbs(-@sqrt(@as(f32, 50)), t[2], 1e-4);
++}
+diff -ruN '--exclude=.git' '--exclude=zig-out' '--exclude=.zig-cache' /home/user/plyght/zpui/src/three/scene3d.zig /home/user/research/zpui-3d-spike/src/three/scene3d.zig
+--- /home/user/plyght/zpui/src/three/scene3d.zig	1970-01-01 00:00:00.000000000 +0000
++++ /home/user/research/zpui-3d-spike/src/three/scene3d.zig	2026-10-05 16:36:04.348123695 +0000
+@@ -0,0 +1,159 @@
++//! zpui.three spike: a CPU-side 3D scene description that a `viewport3d`
++//! primitive points at. Backends render it offscreen (HDR color + depth,
++//! MSAA) before the main UI pass and composite it in draw order.
++//!
++//! Spike limitations: meshes are re-uploaded into the per-frame host buffer
++//! every frame (no persistent GPU resource store yet), one directional light,
++//! no textures, no shadow map.
++
++const std = @import("std");
++pub const math = @import("math.zig");
++const Vec3 = math.Vec3;
++const Mat4 = math.Mat4;
++
++/// 24 bytes, scalar layout (pulled through a buffer address on Vulkan).
++pub const Vertex = extern struct {
++    pos: [3]f32,
++    normal: [3]f32,
++};
++
++pub const Mesh = struct {
++    vertices: []const Vertex,
++    indices: []const u32,
++};
++
++pub const Material = struct {
++    base_color: [4]f32 = .{ 0.8, 0.8, 0.8, 1 },
++    metallic: f32 = 0,
++    roughness: f32 = 0.6,
++};
++
++pub const Draw = struct {
++    mesh: *const Mesh,
++    model: Mat4 = Mat4.identity,
++    material: Material = .{},
++};
++
++pub const Camera = struct {
++    eye: Vec3 = .new(3, 2.5, 4),
++    target: Vec3 = .new(0, 0, 0),
++    up: Vec3 = .new(0, 1, 0),
++    fov_y: f32 = std.math.pi / 4.0,
++    near: f32 = 0.05,
++};
++
++pub const DirectionalLight = struct {
++    /// Direction the light travels (from the light toward the scene).
++    direction: Vec3 = .new(-0.4, -1, -0.3),
++    color: Vec3 = .new(1, 0.95, 0.85),
++    intensity: f32 = 3,
++};
++
++pub const Scene3D = struct {
++    camera: Camera = .{},
++    light: DirectionalLight = .{},
++    ambient: Vec3 = .new(0.08, 0.09, 0.11),
++    /// Linear HDR clear color; alpha 0 lets the UI underneath show through.
++    clear: [4]f32 = .{ 0, 0, 0, 0 },
++    exposure: f32 = 1,
++    draws: std.ArrayList(Draw) = .empty,
++
++    pub fn deinit(self: *Scene3D, gpa: std.mem.Allocator) void {
++        self.draws.deinit(gpa);
++    }
++
++    pub fn draw(self: *Scene3D, gpa: std.mem.Allocator, d: Draw) !void {
++        try self.draws.append(gpa, d);
++    }
++
++    /// `flip_y` = Vulkan clip space (NDC +y down).
++    pub fn frameUniforms(self: *const Scene3D, aspect: f32, flip_y: bool) FrameUniforms {
++        const view = Mat4.lookAt(self.camera.eye, self.camera.target, self.camera.up);
++        const proj = Mat4.perspectiveReverseZ(self.camera.fov_y, aspect, self.camera.near, flip_y);
++        const to_light = self.light.direction.scale(-1).normalize();
++        const lc = self.light.color.scale(self.light.intensity);
++        return .{
++            .view_proj = proj.mul(view),
++            .camera_pos = .{ self.camera.eye.x, self.camera.eye.y, self.camera.eye.z, 1 },
++            .light_dir = .{ to_light.x, to_light.y, to_light.z, 0 },
++            .light_color = .{ lc.x, lc.y, lc.z, 0 },
++            .ambient = .{ self.ambient.x, self.ambient.y, self.ambient.z, 0 },
++        };
++    }
++};
++
++/// Per-viewport uniforms (128 bytes); mirrors `FrameUniforms` in shaders/three_common.glsl.
++pub const FrameUniforms = extern struct {
++    view_proj: Mat4,
++    camera_pos: [4]f32,
++    light_dir: [4]f32,
++    light_color: [4]f32,
++    ambient: [4]f32,
++};
++
++/// Per-draw data (96 bytes); mirrors `DrawData` in shaders/three_common.glsl.
++pub const DrawData = extern struct {
++    model: Mat4,
++    base_color: [4]f32,
++    /// x = metallic, y = roughness.
++    params: [4]f32,
++};
++
++comptime {
++    std.debug.assert(@sizeOf(Vertex) == 24);
++    std.debug.assert(@sizeOf(FrameUniforms) == 128);
++    std.debug.assert(@sizeOf(DrawData) == 96);
++}
++
++/// Unit cube centered at the origin with per-face normals (24 vertices, 36 indices).
++pub const cube: Mesh = blk: {
++    const faces = [6][2][3]f32{
++        .{ .{ 1, 0, 0 }, .{ 0, 1, 0 } },  .{ .{ -1, 0, 0 }, .{ 0, 1, 0 } },
++        .{ .{ 0, 1, 0 }, .{ 0, 0, 1 } },  .{ .{ 0, -1, 0 }, .{ 0, 0, 1 } },
++        .{ .{ 0, 0, 1 }, .{ 0, 1, 0 } },  .{ .{ 0, 0, -1 }, .{ 0, 1, 0 } },
++    };
++    var verts: [24]Vertex = undefined;
++    var idx: [36]u32 = undefined;
++    for (faces, 0..) |f, i| {
++        const n = Vec3.new(f[0][0], f[0][1], f[0][2]);
++        const up = Vec3.new(f[1][0], f[1][1], f[1][2]);
++        const right = up.cross(n);
++        const corners = [4][2]f32{ .{ -1, -1 }, .{ 1, -1 }, .{ 1, 1 }, .{ -1, 1 } };
++        for (corners, 0..) |cr, j| {
++            const p = n.scale(0.5).add(right.scale(0.5 * cr[0])).add(up.scale(0.5 * cr[1]));
++            verts[i * 4 + j] = .{ .pos = .{ p.x, p.y, p.z }, .normal = .{ n.x, n.y, n.z } };
++        }
++        const b: u32 = @intCast(i * 4);
++        // Counter-clockwise seen from outside (right, up, n is right-handed).
++        idx[i * 6 ..][0..6].* = .{ b, b + 1, b + 2, b, b + 2, b + 3 };
++    }
++    const fv = verts;
++    const fi = idx;
++    break :blk .{ .vertices = &fv, .indices = &fi };
++};
++
++/// Unit square in the XZ plane facing +Y.
++pub const plane: Mesh = .{
++    .vertices = &.{
++        .{ .pos = .{ -0.5, 0, -0.5 }, .normal = .{ 0, 1, 0 } },
++        .{ .pos = .{ -0.5, 0, 0.5 }, .normal = .{ 0, 1, 0 } },
++        .{ .pos = .{ 0.5, 0, 0.5 }, .normal = .{ 0, 1, 0 } },
++        .{ .pos = .{ 0.5, 0, -0.5 }, .normal = .{ 0, 1, 0 } },
++    },
++    .indices = &.{ 0, 1, 2, 0, 2, 3 },
++};
++
++test {
++    _ = math;
++}
++
++test "cube winding is counter-clockwise from outside" {
++    for (0..12) |t| {
++        const a = cube.vertices[cube.indices[t * 3]];
++        const b = cube.vertices[cube.indices[t * 3 + 1]];
++        const c = cube.vertices[cube.indices[t * 3 + 2]];
++        const pa = Vec3.new(a.pos[0], a.pos[1], a.pos[2]);
++        const n = Vec3.new(b.pos[0], b.pos[1], b.pos[2]).sub(pa).cross(Vec3.new(c.pos[0], c.pos[1], c.pos[2]).sub(pa));
++        try std.testing.expect(n.dot(.new(a.normal[0], a.normal[1], a.normal[2])) > 0);
++    }
++}
+Binary files /home/user/plyght/zpui/tests/golden/render-test-3d.png and /home/user/research/zpui-3d-spike/tests/golden/render-test-3d.png differ
