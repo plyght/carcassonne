@@ -163,3 +163,69 @@ export fn game_hash(handle: u32) u64 {
 }
 
 // =================================================================== end engine
+
+// ===========================================================================
+// geo / anim exports (owned by the geo workstream; keep this section last so
+// merges with the engine section stay trivial). Formats: src/geo/README.md and
+// src/anim/README.md. Every returned pointer is `[u32 LE length][bytes]` and is
+// released with core_free(ptr, 4 + length); 0 means error.
+// ===========================================================================
+
+const geo = core.geo;
+const anim = core.anim;
+
+fn geoReturn(bytes: []const u8) u32 {
+    const out = gpa.alloc(u8, bytes.len + 4) catch return 0;
+    std.mem.writeInt(u32, out[0..4], @intCast(bytes.len), .little);
+    @memcpy(out[4..], bytes);
+    return @intCast(@intFromPtr(out.ptr));
+}
+
+/// Number of tiles in the geo registry (see geo/registry.zig).
+export fn geo_tile_count() u32 {
+    return @intCast(geo.registry.tiles.len);
+}
+
+/// Registry index of a tile id ("A", "R3", "fx-cap"...), or -1.
+export fn geo_tile_index(id_ptr: [*]const u8, id_len: u32) i32 {
+    const i = geo.registry.indexOf(id_ptr[0..id_len]) orelse return -1;
+    return @intCast(i);
+}
+
+/// Tile id of a registry index as `[u32 len][utf8]`.
+export fn geo_tile_id(index: u32) u32 {
+    const t = geo.registry.byIndex(index) orelse return 0;
+    return geoReturn(t.id);
+}
+
+/// 2D geometry buffer ("CGEO" kind 1) for the tile at `index`.
+export fn geo_tile_2d(index: u32) u32 {
+    const t = geo.registry.byIndex(index) orelse return 0;
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    var lay = geo.layout.build(gpa, t) catch return 0;
+    defer lay.deinit();
+    const bytes = geo.buffer.encode2D(arena.allocator(), &lay) catch return 0;
+    return geoReturn(bytes);
+}
+
+/// 3D geometry buffer ("CGEO" kind 2) for the tile at `index`; `resolution`
+/// is the terrain grid size (quads per side, 4..128, 0 = default 48).
+export fn geo_tile_3d(index: u32, resolution: u32) u32 {
+    const t = geo.registry.byIndex(index) orelse return 0;
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    var lay = geo.layout.build(gpa, t) catch return 0;
+    defer lay.deinit();
+    const bytes = geo.buffer.encode3D(arena.allocator(), &lay, if (resolution == 0) 48 else resolution) catch return 0;
+    return geoReturn(bytes);
+}
+
+/// Animation timeline JSON for a JSON array of engine events.
+/// `opts` is JSON `{style:"realistic"|"cartoon"|"reduced", speed?:number}` (may be empty).
+export fn anim_timeline(events_ptr: [*]const u8, events_len: u32, opts_ptr: [*]const u8, opts_len: u32) u32 {
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    const out = anim.timelineJson(arena.allocator(), events_ptr[0..events_len], opts_ptr[0..opts_len]) catch return 0;
+    return geoReturn(out);
+}

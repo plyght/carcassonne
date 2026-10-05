@@ -1,0 +1,22 @@
+{
+  "name": "@carcassonne/core-geo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "render-fixtures": "bun scripts/render-fixtures.ts",
+    "render-3d": "bun scripts/render-3d.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@carcassonne/config": "workspace:*",
+    "@carcassonne/protocol": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
