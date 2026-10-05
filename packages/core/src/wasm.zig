@@ -242,3 +242,29 @@ export fn anim_timeline(events_ptr: [*]const u8, events_len: u32, opts_ptr: [*]c
     const out = anim.timelineJson(arena.allocator(), events_ptr[0..events_len], opts_ptr[0..opts_len]) catch return 0;
     return geoReturn(out);
 }
+
+// ===========================================================================
+// Public-view exports (owned by the integration workstream; additive only).
+// Online clients never receive the deck seed, so they rebuild a game from the
+// public GameView to ask the engine for legal placements/figures. The handle
+// works with game_view / game_legal_placements / game_legal_figures and is
+// released with game_free. JSON results use the engine framing above.
+// ===========================================================================
+
+const public_view = @import("engine/public_view.zig");
+
+/// Rebuild a game from a GameView JSON document. Returns a handle, 0 on error.
+export fn game_from_view(view_ptr: ?[*]const u8, view_len: u32) u32 {
+    const g = public_view.fromView(gpa, input(view_ptr, view_len)) catch return 0;
+    return addGame(g);
+}
+
+/// The engine tile catalog as JSON (see public_view.writeCatalog).
+export fn tiles_catalog() ?[*]u8 {
+    var out = begin() orelse return null;
+    public_view.writeCatalog(.{ .out = &out, .gpa = gpa }) catch {
+        out.deinit(gpa);
+        return null;
+    };
+    return finish(&out);
+}

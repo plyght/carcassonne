@@ -7,6 +7,8 @@ pub const engine = @import("engine/engine.zig");
 pub const ai = @import("ai/ai.zig");
 pub const geo = @import("geo/geo.zig");
 pub const anim = @import("anim/anim.zig");
+/// Public-view helpers for online clients (integration workstream).
+pub const public_view = @import("engine/public_view.zig");
 
 test {
     @import("std").testing.refAllDecls(@This());

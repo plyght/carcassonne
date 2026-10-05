@@ -223,3 +223,4 @@ export class EngineGame {
 }
 
 export type { ApplyResult, FigureOption, GameView, Move, Placement, Ruleset };
+export * from "./view";
