@@ -60,3 +60,6 @@ temp
 # Zig
 .zig-cache
 zig-out
+
+# Claude Code agent worktrees
+.claude/worktrees/
