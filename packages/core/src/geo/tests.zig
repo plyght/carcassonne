@@ -160,7 +160,7 @@ test "3D: border heights depend only on the edge kind; mesh is valid" {
     for (registry.tiles) |*def| {
         var L = try layout.build(testing.allocator, def);
         defer L.deinit();
-        const m = try mesh.build(a, &L, R);
+        const m = try mesh.build(a, &L, .{ .resolution = R });
         const nv = m.verts.items.len;
         try testing.expect(m.indices.items.len % 3 == 0);
         for (m.indices.items) |i| try testing.expect(i < nv);
@@ -225,7 +225,7 @@ test "determinism: identical bytes on repeated encodes" {
         var L2 = try layout.build(testing.allocator, def);
         defer L2.deinit();
         try testing.expectEqualSlices(u8, try buffer.encode2D(a1.allocator(), &L1), try buffer.encode2D(a2.allocator(), &L2));
-        try testing.expectEqualSlices(u8, try buffer.encode3D(a1.allocator(), &L1, 16), try buffer.encode3D(a2.allocator(), &L2, 16));
+        try testing.expectEqualSlices(u8, try buffer.encode3D(a1.allocator(), &L1, .{ .resolution = 16 }), try buffer.encode3D(a2.allocator(), &L2, .{ .resolution = 16 }));
     }
 }
 
@@ -246,7 +246,7 @@ test "buffer round trip: sections parse and counts match" {
     var total: u32 = 0;
     for (0..paths.count) |i| total += buffer.Reader.u32At(paths.data, i * 4 + 2);
     try testing.expectEqual(pnts.count, total);
-    const b3 = try buffer.encode3D(a, &L, 8);
+    const b3 = try buffer.encode3D(a, &L, .{ .resolution = 8 });
     const r3 = buffer.Reader{ .bytes = b3 };
     try testing.expect(r3.find(buffer.tag("VPOS")).?.count >= 81);
     try testing.expect(std.mem.readInt(u32, b3[8..12], .little) == b3.len);

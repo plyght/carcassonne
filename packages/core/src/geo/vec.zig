@@ -260,3 +260,8 @@ test "rotation maps N edge to E edge" {
     try std.testing.expectApproxEqAbs(@as(F, 1), p.x, 1e-12);
     try std.testing.expectApproxEqAbs(@as(F, 0.5), p.y, 1e-12);
 }
+
+/// Distance from p to the nearest tile edge (0 on the border).
+pub fn borderDistance(p: V2) F {
+    return @min(@min(p.x, p.y), @min(1 - p.x, 1 - p.y));
+}

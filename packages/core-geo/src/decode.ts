@@ -1,6 +1,9 @@
 // Decoder for CGEO buffers (packages/core/src/geo/README.md) into typed arrays.
 import {
   FEATURE_KINDS,
+  FIGURE_KINDS,
+  KIND_FIGURE,
+  POSES,
   KIND_2D,
   KIND_3D,
   MAGIC,
@@ -11,6 +14,8 @@ import {
   TILE_SET,
   TILE_SPECIAL,
   type GeoFeatureKind,
+  type FigurePose,
+  type FigureShape,
   type GeoMaterial,
   type PathRole,
   type PropKind,
@@ -79,12 +84,27 @@ export interface GeoGroup {
 export interface GeoProp {
   prop: PropKind;
   feature: number;
+  /** Model variant; style packs pick `variant % variantsAvailable`. */
   variant: number;
+  /** Palette index for per-instance tint (e.g. roof colours). */
+  tint: number;
   /** x (east), y (up), z (south), canonical tile space. */
   position: [number, number, number];
   /** Radians about +y; 0 faces +z. */
   yaw: number;
   scale: number;
+  /** Extra vertical scale (houses vary in height). */
+  height: number;
+}
+
+export interface GeoAnchor3D {
+  /** x, y (ground / plinth / water surface), z in canonical tile space. */
+  position: [number, number, number];
+  /** Radians about +y; 0 faces +z. */
+  yaw: number;
+  /** Suggested figure height in tile units (figures are chunky). */
+  scale: number;
+  pose: FigurePose;
 }
 
 export interface GeoTile3D {
@@ -98,8 +118,24 @@ export interface GeoTile3D {
   indices: Uint32Array;
   groups: GeoGroup[];
   props: GeoProp[];
-  /** Per-feature 3D meeple anchor, xyz interleaved. */
-  anchors: Float32Array;
+  /** Per-feature 3D meeple anchors (index = feature index). */
+  anchors: GeoAnchor3D[];
+  /** Slab thickness below y = 0 (0 = no slab). */
+  slab: number;
+}
+
+export interface GeoFigure {
+  shape: FigureShape;
+  pose: FigurePose;
+  height: number;
+  thickness: number;
+  bevel: number;
+  /** 2D token outline, interleaved x,y; y down, centred (x ~[-0.5,0.5], y [-0.5,0.5]), height 1. */
+  outline: Float32Array;
+  positions: Float32Array;
+  normals: Float32Array;
+  uvs: Float32Array;
+  indices: Uint32Array;
 }
 
 export class GeoFormatError extends Error {}
@@ -236,14 +272,30 @@ export function decodeGeo3D(input: ArrayBuffer | ArrayBufferView): GeoTile3D {
   if (pr) {
     const dv = new DataView(bytes.buffer, bytes.byteOffset + pr.offset, pr.length);
     for (let i = 0; i < pr.count; i++) {
-      const o = i * 24;
+      const o = i * 28;
       props.push({
         prop: PROPS[dv.getUint8(o)] ?? "tree",
         feature: dv.getUint8(o + 1),
-        variant: dv.getUint16(o + 2, true),
+        variant: dv.getUint8(o + 2),
+        tint: dv.getUint8(o + 3),
         position: [dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true), dv.getFloat32(o + 12, true)],
         yaw: dv.getFloat32(o + 16, true),
         scale: dv.getFloat32(o + 20, true),
+        height: dv.getFloat32(o + 24, true),
+      });
+    }
+  }
+  const anchors: GeoAnchor3D[] = [];
+  const an = need(sections, TAG.ANC3);
+  {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset + an.offset, an.length);
+    for (let i = 0; i < an.count; i++) {
+      const o = i * 24;
+      anchors.push({
+        position: [dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true)],
+        yaw: dv.getFloat32(o + 12, true),
+        scale: dv.getFloat32(o + 16, true),
+        pose: POSES[dv.getUint32(o + 20, true)] ?? "standing",
       });
     }
   }
@@ -257,6 +309,30 @@ export function decodeGeo3D(input: ArrayBuffer | ArrayBufferView): GeoTile3D {
     indices: new Uint32Array(bytes.buffer, bytes.byteOffset + idx.offset, idx.count),
     groups,
     props,
-    anchors: f32(bytes, need(sections, TAG.ANC3)),
+    anchors,
+    slab: (() => {
+      const sl = sections.get(TAG.SLAB);
+      return sl ? new DataView(bytes.buffer, bytes.byteOffset + sl.offset, 4).getFloat32(0, true) : 0;
+    })(),
+  };
+}
+
+export function decodeGeoFigure(input: ArrayBuffer | ArrayBufferView): GeoFigure {
+  const { kind, bytes, sections } = readSections(input);
+  if (kind !== KIND_FIGURE) throw new GeoFormatError(`expected a figure buffer, got kind ${kind}`);
+  const d = need(sections, TAG.FDIM);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset + d.offset, d.length);
+  const idx = need(sections, TAG.INDX);
+  return {
+    shape: FIGURE_KINDS[dv.getUint8(0)] ?? "meeple",
+    pose: POSES[dv.getUint8(1)] ?? "standing",
+    height: dv.getFloat32(4, true),
+    thickness: dv.getFloat32(8, true),
+    bevel: dv.getFloat32(12, true),
+    outline: f32(bytes, need(sections, TAG.OUTL)),
+    positions: f32(bytes, need(sections, TAG.VPOS)),
+    normals: f32(bytes, need(sections, TAG.VNRM)),
+    uvs: f32(bytes, need(sections, TAG.VUV0)),
+    indices: new Uint32Array(bytes.buffer, bytes.byteOffset + idx.offset, idx.count),
   };
 }

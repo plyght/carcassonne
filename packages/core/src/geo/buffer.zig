@@ -7,6 +7,7 @@ const tile = @import("../engine/tile.zig");
 const vec = @import("vec.zig");
 const layout = @import("layout.zig");
 const mesh = @import("mesh.zig");
+const figure = @import("figure.zig");
 const V2 = vec.V2;
 const Allocator = std.mem.Allocator;
 
@@ -14,6 +15,7 @@ pub const MAGIC: u32 = 0x4F454743; // "CGEO"
 pub const VERSION: u16 = 1;
 pub const KIND_2D: u16 = 1;
 pub const KIND_3D: u16 = 2;
+pub const KIND_FIGURE: u16 = 3;
 
 pub fn tag(comptime s: *const [4]u8) u32 {
     return std.mem.readInt(u32, s, .little);
@@ -181,9 +183,8 @@ pub fn encode2D(a: Allocator, L: *const layout.Layout) ![]u8 {
 }
 
 /// 3D payload (Tabletop / Cartoon / Diorama).
-pub fn encode3D(a: Allocator, L: *const layout.Layout, resolution: u32) ![]u8 {
-    var m = try mesh.build(a, L, resolution);
-    _ = &m;
+pub fn encode3D(a: Allocator, L: *const layout.Layout, opts: mesh.Options) ![]u8 {
+    const m = try mesh.build(a, L, opts);
     var b = Builder.init(a, KIND_3D);
     try putMeta(a, &b, L);
     try putFeatures(a, &b, L);
@@ -222,22 +223,67 @@ pub fn encode3D(a: Allocator, L: *const layout.Layout, resolution: u32) ![]u8 {
     for (m.props.items) |p| {
         try putU8(a, prop, @intFromEnum(p.prop));
         try putU8(a, prop, p.feature);
-        try putU16(a, prop, p.variant);
+        try putU8(a, prop, p.variant);
+        try putU8(a, prop, p.tint);
         try putF32(a, prop, p.pos[0]);
         try putF32(a, prop, p.pos[1]);
         try putF32(a, prop, p.pos[2]);
         try putF32(a, prop, p.yaw);
         try putF32(a, prop, p.scale);
+        try putF32(a, prop, p.height);
         prop.count += 1;
     }
 
     const anc = try b.section(tag("ANC3"));
     for (m.anchors) |p| {
-        try putF32(a, anc, p[0]);
-        try putF32(a, anc, p[1]);
-        try putF32(a, anc, p[2]);
+        try putF32(a, anc, p.pos[0]);
+        try putF32(a, anc, p.pos[1]);
+        try putF32(a, anc, p.pos[2]);
+        try putF32(a, anc, p.yaw);
+        try putF32(a, anc, p.scale);
+        try putU32(a, anc, @intFromEnum(p.pose));
         anc.count += 1;
     }
+
+    const slab = try b.section(tag("SLAB"));
+    try putF32(a, slab, opts.slab);
+    slab.count = 1;
+    return b.finish();
+}
+
+/// Figure payload (classic meeple / abbot): 2D outline token + 3D piece.
+pub fn encodeFigure(a: Allocator, kind: figure.Kind, pose: figure.Pose) ![]u8 {
+    const fm = try figure.build(a, kind, pose);
+    var b = Builder.init(a, KIND_FIGURE);
+    const dim = try b.section(tag("FDIM"));
+    try putU8(a, dim, @intFromEnum(kind));
+    try putU8(a, dim, @intFromEnum(pose));
+    try putU16(a, dim, 0);
+    try putF32(a, dim, 1.0); // height
+    try putF32(a, dim, figure.THICKNESS);
+    try putF32(a, dim, figure.BEVEL);
+    dim.count = 1;
+    const ol = try b.section(tag("OUTL"));
+    for (fm.outline) |p| {
+        // 2D token space: y down, centred on the figure (x in ~[-0.5,0.5], y in [-0.5,0.5])
+        try putF32(a, ol, p.x);
+        try putF32(a, ol, 0.5 - p.y);
+        ol.count += 1;
+    }
+    const pos = try b.section(tag("VPOS"));
+    const nrm = try b.section(tag("VNRM"));
+    const uv = try b.section(tag("VUV0"));
+    for (fm.pos.items, fm.nrm.items, fm.uv.items) |p, n, t| {
+        for (p) |x| try putF32(a, pos, x);
+        for (n) |x| try putF32(a, nrm, x);
+        for (t) |x| try putF32(a, uv, x);
+    }
+    pos.count = @intCast(fm.pos.items.len);
+    nrm.count = pos.count;
+    uv.count = pos.count;
+    const idx = try b.section(tag("INDX"));
+    for (fm.indices.items) |i| try putU32(a, idx, i);
+    idx.count = @intCast(fm.indices.items.len);
     return b.finish();
 }
 

@@ -15,29 +15,70 @@ const F = vec.F;
 const Allocator = std.mem.Allocator;
 const NONE = layout.NONE;
 
-pub const CITY_H: F = 0.018;
-pub const WALL_H: F = 0.055;
+pub const CITY_H: F = 0.012;
+pub const WALL_H: F = 0.06;
 pub const WALL_HT: F = 0.011;
 pub const WATER_Y: F = -0.007;
 pub const RIVER_BED: F = -0.022;
-pub const ROAD_Y: F = -0.002;
-pub const RUT_D: F = 0.004;
+pub const ROAD_Y: F = -0.003;
+pub const RUT_D: F = 0.003;
+/// Default tile slab thickness (fraction of the tile width).
+pub const SLAB_DEFAULT: F = 0.09;
+pub const PLINTH_H: F = 0.012;
+/// Suggested meeple height (tile units): chunky next to ~0.04 houses.
+pub const MEEPLE_H: F = 0.16;
 const EDGE_BLEND: F = 0.1;
+const GATE_R: F = 0.045;
 
-pub const Material = enum(u32) { terrain = 0, wall = 1, water = 2 };
+/// Geometry groups; styles map each to a material.
+pub const Material = enum(u32) { terrain = 0, wall = 1, water = 2, slab = 3 };
 
-pub const Prop = enum(u8) { tower, house, chapel, tree, sheep, cow, cart, mill, fountain, crop, duck, bridge };
+pub const Prop = enum(u8) {
+    tower,
+    house,
+    chapel,
+    tree,
+    sheep,
+    cow,
+    cart,
+    mill,
+    fountain,
+    crop,
+    duck,
+    bridge,
+    bush,
+    gatehouse,
+    round_tower,
+    wall_stairs,
+};
 
 pub const Vertex = struct { pos: [3]f32, nrm: [3]f32, uv: [2]f32, feature: u8 };
 pub const Group = struct { start: u32, count: u32, material: Material };
-pub const PropInst = struct { prop: Prop, feature: u8, variant: u16 = 0, pos: [3]f32, yaw: f32, scale: f32 };
+pub const PropInst = struct {
+    prop: Prop,
+    feature: u8,
+    /// Model variant index (style packs pick a model per variant, modulo their count).
+    variant: u8 = 0,
+    /// Tint index into the style's palette for this prop kind.
+    tint: u8 = 0,
+    pos: [3]f32,
+    yaw: f32,
+    scale: f32,
+    /// Extra vertical scale (houses vary in height).
+    height: f32 = 1,
+};
+
+/// Figure pose at an anchor: standing (thief/knight/monk), lying (farmer, 3rd ed.).
+pub const Pose = enum(u8) { standing = 0, lying = 1 };
+
+pub const Anchor3 = struct { pos: [3]f32, yaw: f32, scale: f32, pose: Pose };
 
 pub const Mesh = struct {
     verts: std.ArrayList(Vertex) = .empty,
     indices: std.ArrayList(u32) = .empty,
     groups: std.ArrayList(Group) = .empty,
     props: std.ArrayList(PropInst) = .empty,
-    anchors: [][3]f32 = &.{},
+    anchors: []Anchor3 = &.{},
 };
 
 // ---------------------------------------------------------------------------
@@ -68,7 +109,7 @@ fn applyRiver(h: F, t: F) F {
 fn edgeHeight(def: *const tile.TileDef, side: u2, u: F) F {
     return switch (def.edgeKind(@enumFromInt(side))) {
         .field => 0,
-        .city => CITY_H * vec.smoothstep(0, 0.12, @min(u, 1 - u)),
+        .city => CITY_H * vec.smoothstep(0, 0.05, @min(u, 1 - u)),
         .road => applyRoad(0, (u - 0.5) / layout.ROAD_HW),
         .river => applyRiver(0, (u - 0.5) / layout.RIVER_HW),
     };
@@ -159,12 +200,20 @@ fn v3(x: F, y: F, z: F) [3]f32 {
 
 // ---------------------------------------------------------------------------
 
-pub fn build(a: Allocator, L: *const layout.Layout, resolution: u32) !Mesh {
+pub const Options = struct {
+    /// Terrain grid quads per side (4..128).
+    resolution: u32 = 48,
+    /// Slab thickness below y = 0 (tile units); 0 disables the slab.
+    slab: F = SLAB_DEFAULT,
+};
+
+const Gate = struct { p: V2, dir: V2, road: u8, city: u8 };
+
+pub fn build(a: Allocator, L: *const layout.Layout, opts: Options) !Mesh {
     var m = Mesh{};
-    const R: u32 = std.math.clamp(resolution, 4, 128);
+    const R: u32 = std.math.clamp(opts.resolution, 4, 128);
 
     // Terrain grid ------------------------------------------------------------
-    const start0: u32 = 0;
     for (0..R + 1) |j| for (0..R + 1) |i| {
         const p = V2.init(@as(F, @floatFromInt(i)) / @as(F, @floatFromInt(R)), @as(F, @floatFromInt(j)) / @as(F, @floatFromInt(R)));
         try m.verts.append(a, .{
@@ -181,11 +230,37 @@ pub fn build(a: Allocator, L: *const layout.Layout, resolution: u32) !Mesh {
         const v11 = v01 + 1;
         try m.indices.appendSlice(a, &.{ v00, v01, v10, v10, v01, v11 });
     };
-    try m.groups.append(a, .{ .start = start0, .count = @intCast(m.indices.items.len), .material = .terrain });
+    try m.groups.append(a, .{ .start = 0, .count = @intCast(m.indices.items.len), .material = .terrain });
 
-    // Walls -------------------------------------------------------------------
+    // Gates: where a road meets a city wall --------------------------------
+    var gates: std.ArrayList(Gate) = .empty;
+    for (L.lines.items) |r| {
+        if (r.kind != .road) continue;
+        for (L.lines.items) |w| {
+            if (w.kind != .wall) continue;
+            var i: usize = 0;
+            while (i + 1 < r.gpts.len) : (i += 1) {
+                var j: usize = 0;
+                while (j + 1 < w.pts.len) : (j += 1) {
+                    const hit = vec.segIntersect(r.gpts[i], r.gpts[i + 1], w.pts[j], w.pts[j + 1]) orelse continue;
+                    const p = r.gpts[i].lerp(r.gpts[i + 1], hit.t);
+                    var dup = false;
+                    for (gates.items) |g| if (g.p.dist(p) < 1e-4) {
+                        dup = true;
+                    };
+                    if (!dup) try gates.append(a, .{ .p = p, .dir = r.gpts[i + 1].sub(r.gpts[i]).norm(), .road = r.feature, .city = w.feature });
+                }
+            }
+        }
+    }
+
+    // Masonry: walls, plinths -------------------------------------------------
     const wall_start: u32 = @intCast(m.indices.items.len);
-    for (L.lines.items) |l| if (l.kind == .wall) try addWall(a, &m, L, l);
+    for (L.lines.items) |l| if (l.kind == .wall) try addWall(a, &m, L, l, gates.items);
+    for (L.buildings.items) |b| if (b.kind == .cloister) {
+        const h = b.half * 1.25;
+        try addBox(a, &m, b.center, V2.init(1, 0), h, h, height(L, b.center) - 0.01, height(L, b.center) + PLINTH_H, b.feature, false);
+    };
     if (m.indices.items.len > wall_start)
         try m.groups.append(a, .{ .start = wall_start, .count = @intCast(m.indices.items.len - wall_start), .material = .wall });
 
@@ -196,18 +271,63 @@ pub fn build(a: Allocator, L: *const layout.Layout, resolution: u32) !Mesh {
     if (m.indices.items.len > water_start)
         try m.groups.append(a, .{ .start = water_start, .count = @intCast(m.indices.items.len - water_start), .material = .water });
 
+    // Slab (cut sides + bottom) ------------------------------------------------
+    if (opts.slab > 0) {
+        const slab_start: u32 = @intCast(m.indices.items.len);
+        try addSlab(a, &m, R, opts.slab);
+        try m.groups.append(a, .{ .start = slab_start, .count = @intCast(m.indices.items.len - slab_start), .material = .slab });
+    }
+
+    // Props -------------------------------------------------------------------
+    for (gates.items) |g| {
+        try m.props.append(a, .{ .prop = .gatehouse, .feature = g.city, .pos = v3(g.p.x, height(L, g.p), g.p.y), .yaw = yawOf(g.dir), .scale = 1 });
+    }
     try scatterProps(a, &m, L);
 
     // 3D anchors --------------------------------------------------------------
-    m.anchors = try a.alloc([3]f32, L.anchors.len);
+    m.anchors = try a.alloc(Anchor3, L.anchors.len);
+    var rng = vec.Rng.init(vec.mix(L.seed, 0xA4C));
     for (L.anchors, 0..) |p0, fi| {
+        const k = L.kind(@intCast(fi));
         var p = p0;
-        if (L.kind(@intCast(fi)) == .cloister) p = p.add(V2.init(0, layout.CLOISTER_HALF + 0.035));
+        var pose: Pose = .standing;
         var y = height(L, p);
-        if (L.kind(@intCast(fi)) == .river) y = WATER_Y;
-        m.anchors[fi] = v3(p.x, y, p.y);
+        var yaw: F = rng.range(-0.35, 0.35); // roughly facing the viewer (+z)
+        switch (k) {
+            .cloister => {
+                // in front of the chapel, on the plinth
+                p = p.add(V2.init(0, layout.CLOISTER_HALF + 0.02));
+                y = height(L, p0) + PLINTH_H;
+            },
+            .field => {
+                pose = .lying;
+                yaw = rng.float() * 2 * std.math.pi;
+            },
+            .river => y = WATER_Y,
+            .road => {
+                // stand along the road
+                var best: F = 1;
+                for (L.lines.items) |l| if (l.feature == fi and l.kind == .road) {
+                    var i: usize = 0;
+                    while (i + 1 < l.pts.len) : (i += 1) {
+                        const d = vec.distPointSeg(p, l.pts[i], l.pts[i + 1]);
+                        if (d < best) {
+                            best = d;
+                            yaw = yawOf(l.pts[i + 1].sub(l.pts[i]).norm().perp());
+                        }
+                    }
+                };
+            },
+            else => {},
+        }
+        m.anchors[fi] = .{ .pos = v3(p.x, y, p.y), .yaw = @floatCast(yaw), .scale = @floatCast(MEEPLE_H), .pose = pose };
     }
     return m;
+}
+
+/// Yaw (radians about +y) that turns +z into the 2D direction d (x, y=z).
+fn yawOf(d: V2) f32 {
+    return @floatCast(std.math.atan2(d.x, d.y));
 }
 
 fn clampTile(p: V2) V2 {
@@ -224,11 +344,36 @@ fn pushQuad(a: Allocator, m: *Mesh, q: [4][3]f32, n: [3]f32, uvs: [4][2]f32, f: 
     if (c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0) {
         try m.indices.appendSlice(a, &.{ base, base + 1, base + 3, base + 1, base + 2, base + 3 });
     } else {
-        try m.indices.appendSlice(a, &.{ base, base + 3, base + 1, base + 1, base + 3, base + 2 });
+        try m.indices.appendSlice(a, &.{ base, base + 3, base + 1, base + 1, base + 2, base + 3 });
     }
 }
 
-fn addWall(a: Allocator, m: *Mesh, L: *const layout.Layout, l: layout.Line) !void {
+/// Oriented box: centre c, axis d (unit, along "length"), half extents hl/hw,
+/// from y0 to y1. Sides + top (+ bottom when `bottom`).
+fn addBox(a: Allocator, m: *Mesh, c: V2, d: V2, hl: F, hw: F, y0: F, y1: F, f: u8, bottom: bool) !void {
+    const s = d.perp();
+    const cs = [4]V2{
+        c.add(d.scale(-hl)).add(s.scale(-hw)),
+        c.add(d.scale(hl)).add(s.scale(-hw)),
+        c.add(d.scale(hl)).add(s.scale(hw)),
+        c.add(d.scale(-hl)).add(s.scale(hw)),
+    };
+    for (0..4) |i| {
+        const p0 = cs[i];
+        const p1 = cs[(i + 1) % 4];
+        const mid = p0.lerp(p1, 0.5).sub(c).norm();
+        try pushQuad(a, m, .{ v3(p0.x, y0, p0.y), v3(p1.x, y0, p1.y), v3(p1.x, y1, p1.y), v3(p0.x, y1, p0.y) }, v3(mid.x, 0, mid.y), .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, f);
+    }
+    try pushQuad(a, m, .{ v3(cs[0].x, y1, cs[0].y), v3(cs[1].x, y1, cs[1].y), v3(cs[2].x, y1, cs[2].y), v3(cs[3].x, y1, cs[3].y) }, .{ 0, 1, 0 }, .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, f);
+    if (bottom) try pushQuad(a, m, .{ v3(cs[0].x, y0, cs[0].y), v3(cs[1].x, y0, cs[1].y), v3(cs[2].x, y0, cs[2].y), v3(cs[3].x, y0, cs[3].y) }, .{ 0, -1, 0 }, .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, f);
+}
+
+fn nearGate(gates: []const Gate, p: V2) bool {
+    for (gates) |g| if (g.p.dist(p) < GATE_R) return true;
+    return false;
+}
+
+fn addWall(a: Allocator, m: *Mesh, L: *const layout.Layout, l: layout.Line, gates: []const Gate) !void {
     const n = l.pts.len;
     const left = try a.alloc(V2, n); // city side
     const right = try a.alloc(V2, n); // field side
@@ -246,7 +391,9 @@ fn addWall(a: Allocator, m: *Mesh, L: *const layout.Layout, l: layout.Line) !voi
     }
     const top: F = CITY_H + WALL_H;
     const f = l.feature;
+    const tv: f32 = @floatCast(WALL_H);
     for (0..n - 1) |i| {
+        if (nearGate(gates, l.pts[i].lerp(l.pts[i + 1], 0.5))) continue; // gatehouse opening
         const bl0 = height(L, left[i]) - 0.01;
         const bl1 = height(L, left[i + 1]) - 0.01;
         const br0 = height(L, right[i]) - 0.01;
@@ -255,27 +402,78 @@ fn addWall(a: Allocator, m: *Mesh, L: *const layout.Layout, l: layout.Line) !voi
         const out = dir.perp().scale(-1); // toward the field
         const ua: f32 = @floatCast(arc[i]);
         const ub: f32 = @floatCast(arc[i + 1]);
-        const tv: f32 = @floatCast(WALL_H);
-        // outer face
         try pushQuad(a, m, .{ v3(right[i].x, br0, right[i].y), v3(right[i + 1].x, br1, right[i + 1].y), v3(right[i + 1].x, top, right[i + 1].y), v3(right[i].x, top, right[i].y) }, v3(out.x, 0, out.y), .{ .{ ua, 0 }, .{ ub, 0 }, .{ ub, tv }, .{ ua, tv } }, f);
-        // inner face
         try pushQuad(a, m, .{ v3(left[i].x, bl0, left[i].y), v3(left[i + 1].x, bl1, left[i + 1].y), v3(left[i + 1].x, top, left[i + 1].y), v3(left[i].x, top, left[i].y) }, v3(-out.x, 0, -out.y), .{ .{ ua, 0 }, .{ ub, 0 }, .{ ub, tv }, .{ ua, tv } }, f);
-        // top
         try pushQuad(a, m, .{ v3(right[i].x, top, right[i].y), v3(right[i + 1].x, top, right[i + 1].y), v3(left[i + 1].x, top, left[i + 1].y), v3(left[i].x, top, left[i].y) }, v3(0, 1, 0), .{ .{ ua, 0 }, .{ ub, 0 }, .{ ub, 0.02 }, .{ ua, 0.02 } }, f);
     }
-    // towers: near both ends and spaced along the wall
+    // crenellations: merlons on the field-side half of the wall walk
     const total = arc[n - 1];
-    var rng = vec.Rng.init(vec.mix(L.seed, 0x7077 + @as(u64, f)));
-    const inset: F = 0.05;
-    var s: F = inset;
-    const count: usize = @max(1, @as(usize, @intFromFloat(@floor((total - 2 * inset) / 0.3))));
-    const step = (total - 2 * inset) / @as(F, @floatFromInt(count));
-    for (0..count + 1) |_| {
+    const merlon: F = 0.03;
+    var s: F = merlon * 0.5;
+    while (s < total) : (s += merlon) {
         const at = vec.polylineAt(l.pts, s / total);
-        const p = at.p.add(at.t.perp().scale(WALL_HT * 0.6));
-        try m.props.append(a, .{ .prop = .tower, .feature = f, .variant = @intCast(rng.next() % 3), .pos = v3(p.x, height(L, p), p.y), .yaw = @floatCast(std.math.atan2(at.t.x, at.t.y)), .scale = 1 });
-        s += step;
+        if (nearGate(gates, at.p) or vec.borderDistance(at.p) < 0.02) continue;
+        const outn = at.t.perp().scale(-1);
+        const c = at.p.add(at.t.perp().scale(WALL_HT * 0.6)).add(outn.scale(WALL_HT * 0.55));
+        try addBox(a, m, c, at.t, merlon * 0.27, WALL_HT * 0.45, top, top + 0.011, f, false);
     }
+
+    // towers: near both ends and at joints; square and round alternate
+    var rng = vec.Rng.init(vec.mix(L.seed, 0x7077 + @as(u64, f)));
+    const inset: F = 0.045;
+    const count: usize = @max(1, @as(usize, @intFromFloat(@floor((total - 2 * inset) / 0.24))));
+    const step = (total - 2 * inset) / @as(F, @floatFromInt(count));
+    s = inset;
+    for (0..count + 1) |k| {
+        const at = vec.polylineAt(l.pts, s / total);
+        s += step;
+        const p = at.p.add(at.t.perp().scale(WALL_HT * 0.6));
+        if (nearGate(gates, p)) continue;
+        const round = (k + @as(usize, @intCast(rng.next() % 2))) % 2 == 0;
+        try m.props.append(a, .{ .prop = if (round) .round_tower else .tower, .feature = f, .variant = @intCast(rng.next() % 3), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = yawOf(at.t), .scale = 1, .height = @floatCast(rng.range(0.9, 1.25)) });
+    }
+    // one set of stairs up the inner face of longer walls
+    if (total > 0.5 and rng.float() < 0.7) {
+        const at = vec.polylineAt(l.pts, 0.32);
+        const p = at.p.add(at.t.perp().scale(WALL_HT * 2.4));
+        if (!nearGate(gates, p) and L.classify(p) == f) try m.props.append(a, .{ .prop = .wall_stairs, .feature = f, .pos = v3(p.x, height(L, p), p.y), .yaw = yawOf(at.t), .scale = 1 });
+    }
+}
+
+/// Cut sides + bottom of the tile slab. The top edge follows the terrain
+/// border heights (which depend only on the edge kind), so slabs of
+/// neighbouring tiles meet flush.
+fn addSlab(a: Allocator, m: *Mesh, R: u32, thick: F) !void {
+    const y0: f32 = @floatCast(-thick);
+    const tv: f32 = @floatCast(thick);
+    for (0..4) |side| {
+        for (0..R) |q| {
+            const vi = struct {
+                fn idx(sd: usize, k: usize, r: u32) u32 {
+                    const rr: usize = r;
+                    const ij: [2]usize = switch (sd) {
+                        0 => .{ k, 0 },
+                        1 => .{ rr, k },
+                        2 => .{ rr - k, rr },
+                        else => .{ 0, rr - k },
+                    };
+                    return @intCast(ij[1] * (rr + 1) + ij[0]);
+                }
+            }.idx;
+            const t0 = m.verts.items[vi(side, q, R)].pos;
+            const t1 = m.verts.items[vi(side, q + 1, R)].pos;
+            const n: [3]f32 = switch (side) {
+                0 => .{ 0, 0, -1 },
+                1 => .{ 1, 0, 0 },
+                2 => .{ 0, 0, 1 },
+                else => .{ -1, 0, 0 },
+            };
+            const ua: f32 = @as(f32, @floatFromInt(q)) / @as(f32, @floatFromInt(R));
+            const ub: f32 = @as(f32, @floatFromInt(q + 1)) / @as(f32, @floatFromInt(R));
+            try pushQuad(a, m, .{ .{ t0[0], y0, t0[2] }, .{ t1[0], y0, t1[2] }, t1, t0 }, n, .{ .{ ua, tv }, .{ ub, tv }, .{ ub, 0 }, .{ ua, 0 } }, NONE);
+        }
+    }
+    try pushQuad(a, m, .{ .{ 0, y0, 0 }, .{ 1, y0, 0 }, .{ 1, y0, 1 }, .{ 0, y0, 1 } }, .{ 0, -1, 0 }, .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, NONE);
 }
 
 fn addStrip(a: Allocator, m: *Mesh, pts: []const V2, hw: F, y: F, f: u8) !void {
@@ -294,11 +492,8 @@ fn addStrip(a: Allocator, m: *Mesh, pts: []const V2, hw: F, y: F, f: u8) !void {
     }
     for (0..n - 1) |i| {
         const l0 = base + @as(u32, @intCast(i * 2));
-        const r0 = l0 + 1;
-        const l1 = l0 + 2;
-        const r1 = l0 + 3;
-        try pushTriUp(a, m, l0, r0, l1);
-        try pushTriUp(a, m, l1, r0, r1);
+        try pushTriUp(a, m, l0, l0 + 1, l0 + 2);
+        try pushTriUp(a, m, l0 + 2, l0 + 1, l0 + 3);
     }
 }
 
@@ -338,87 +533,117 @@ fn clearOfLines(L: *const layout.Layout, p: V2, extra: F) bool {
     return true;
 }
 
+/// Keep meeple spots, pennants and buildings free (meeples are big).
 fn clearOfMarks(L: *const layout.Layout, p: V2, r: F) bool {
     for (L.anchors) |q| if (p.dist(q) < r) return false;
-    for (L.pennants.items) |q| if (p.dist(q.p) < r * 0.8) return false;
+    for (L.pennants.items) |q| if (p.dist(q.p) < r * 0.6) return false;
     for (L.buildings.items) |b| if (p.dist(b.center) < b.half * 1.45 + 0.03) return false;
     return true;
 }
 
-fn borderDist(p: V2) F {
-    return @min(@min(p.x, p.y), @min(1 - p.x, 1 - p.y));
+fn wallDist(L: *const layout.Layout, p: V2) F {
+    var dw: F = 1;
+    for (L.lines.items) |l| if (l.kind == .wall) {
+        dw = @min(dw, vec.distPointPolyline(p, l.pts));
+    };
+    return dw;
 }
 
-fn put(a: Allocator, m: *Mesh, L: *const layout.Layout, prop: Prop, f: u8, variant: u16, p: V2, y_off: F, yaw: F, scale: F) !void {
-    try m.props.append(a, .{ .prop = prop, .feature = f, .variant = variant, .pos = v3(p.x, height(L, p) + y_off, p.y), .yaw = @floatCast(yaw), .scale = @floatCast(scale) });
+fn put(a: Allocator, m: *Mesh, L: *const layout.Layout, prop: Prop, f: u8, rng: *vec.Rng, p: V2, yaw: F, scale: F) !void {
+    try m.props.append(a, .{
+        .prop = prop,
+        .feature = f,
+        .variant = @intCast(rng.next() % 4),
+        .tint = @intCast(rng.next() % 4),
+        .pos = v3(p.x, height(L, p), p.y),
+        .yaw = @floatCast(yaw),
+        .scale = @floatCast(scale),
+    });
 }
+
+const House = struct { p: V2, r: F };
 
 fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
     var rng = vec.Rng.init(vec.mix(L.seed, 0x9409));
     const tau = 2 * std.math.pi;
 
-    // buildings first (they matter most)
     for (L.buildings.items) |b| {
         if (b.kind == .cloister) {
             var yaw: F = 0;
             for (L.lines.items) |l| if (l.kind == .road and l.pts[l.pts.len - 1].dist(b.center) < 1e-6) {
-                const dir = l.pts[0].sub(b.center);
-                yaw = std.math.atan2(dir.x, dir.y);
+                yaw = yawOf(l.pts[0].sub(b.center).norm());
             };
-            try put(a, m, L, .chapel, b.feature, 0, b.center, 0, yaw, 1);
+            try m.props.append(a, .{ .prop = .chapel, .feature = b.feature, .pos = v3(b.center.x, height(L, b.center) + PLINTH_H, b.center.y), .yaw = @floatCast(yaw), .scale = @floatCast(b.half * 2 / 0.23) });
         } else {
-            try put(a, m, L, .fountain, b.feature, 0, b.center, 0, 0, 1);
+            try put(a, m, L, .fountain, b.feature, &rng, b.center, 0, 1);
         }
     }
 
-    // houses in cities, on a jittered grid
-    const hs: F = 0.075;
-    var gy: F = hs * 0.5;
-    while (gy < 1) : (gy += hs) {
-        var gx: F = hs * 0.5;
-        while (gx < 1) : (gx += hs) {
-            const p = V2.init(gx + rng.range(-0.018, 0.018), gy + rng.range(-0.018, 0.018));
-            const r = rng.float();
-            const variant: u16 = @intCast(rng.next() % 4);
-            const yaw = @floor(rng.float() * 4) * tau / 4 + rng.range(-0.15, 0.15);
-            const sc = rng.range(0.8, 1.2);
-            const f = L.classify(p);
-            if (f == NONE or L.kind(f) != .city) continue;
-            if (borderDist(p) < 0.035 or r > 0.85) continue;
-            var dw: F = 1;
-            for (L.lines.items) |l| if (l.kind == .wall) {
-                dw = @min(dw, vec.distPointPolyline(p, l.pts));
-            };
-            if (dw < 0.05 or !clearOfLines(L, p, 0.02) or !clearOfMarks(L, p, 0.07)) continue;
-            try put(a, m, L, .house, f, variant, p, 0, yaw, sc);
-        }
+    // Houses: deterministic dart-throwing packing (no overlaps, clear of walls,
+    // roads, the tile border and meeple spots). Footprint radius = 0.029*scale.
+    var houses: std.ArrayList(House) = .empty;
+    var tries: usize = 0;
+    while (tries < 900) : (tries += 1) {
+        const p = V2.init(rng.float(), rng.float());
+        const sc = rng.range(0.75, 1.35);
+        const hgt = rng.range(0.8, 1.6);
+        const yaw_snap = @floor(rng.float() * 4) * tau / 4 + rng.range(-0.25, 0.25);
+        const r = 0.029 * sc;
+        const f = L.classify(p);
+        if (f == NONE or L.kind(f) != .city) continue;
+        if (vec.borderDistance(p) < r * 0.9) continue;
+        if (wallDist(L, p) < r + 0.022 or !clearOfLines(L, p, r * 0.6) or !clearOfMarks(L, p, 0.085)) continue;
+        var ok = true;
+        for (houses.items) |h| if (h.p.dist(p) < h.r + r + 0.003) {
+            ok = false;
+            break;
+        };
+        if (!ok) continue;
+        try houses.append(a, .{ .p = p, .r = r });
+        try m.props.append(a, .{ .prop = .house, .feature = f, .variant = @intCast(rng.next() % 6), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = @floatCast(yaw_snap), .scale = @floatCast(sc), .height = @floatCast(hgt) });
     }
 
-    // fields: trees, sheep, cows, crops
+    // Fields: trees, sheep, cows, crops on a jittered grid
     const fs: F = 0.09;
-    gy = fs * 0.5;
+    var gy: F = fs * 0.5;
     while (gy < 1) : (gy += fs) {
         var gx: F = fs * 0.5;
         while (gx < 1) : (gx += fs) {
             const p = V2.init(gx + rng.range(-0.03, 0.03), gy + rng.range(-0.03, 0.03));
             const r = rng.float();
-            const variant: u16 = @intCast(rng.next() % 4);
             const yaw = rng.float() * tau;
             const sc = rng.range(0.75, 1.25);
             const f = L.classify(p);
             if (f == NONE or L.kind(f) != .field) continue;
-            if (borderDist(p) < 0.04 or !clearOfLines(L, p, 0.03) or !clearOfMarks(L, p, 0.075)) continue;
-            var dw: F = 1;
-            for (L.lines.items) |l| if (l.kind == .wall) {
-                dw = @min(dw, vec.distPointPolyline(p, l.pts));
-            };
-            if (dw < 0.045) continue;
-            const prop: ?Prop = if (r < 0.36) .tree else if (r < 0.46) .sheep else if (r < 0.51) .cow else if (r < 0.64) .crop else null;
-            if (prop) |pp| try put(a, m, L, pp, f, variant, p, 0, yaw, sc);
+            if (vec.borderDistance(p) < 0.04 or !clearOfLines(L, p, 0.03) or !clearOfMarks(L, p, 0.09)) continue;
+            if (wallDist(L, p) < 0.045) continue;
+            const prop: ?Prop = if (r < 0.22) .tree else if (r < 0.32) .sheep else if (r < 0.36) .cow else if (r < 0.46) .crop else null;
+            if (prop) |pp| try put(a, m, L, pp, f, &rng, p, yaw, sc);
         }
     }
 
-    // rivers: a mill or ducks
+    // Bushes: small dark clusters along roads and outside city walls
+    for (L.lines.items) |l| {
+        const off: F = switch (l.kind) {
+            .road => l.hw + 0.022,
+            .wall => 0.034,
+            .river => l.hw + 0.026,
+        };
+        const total = vec.polylineLength(l.pts);
+        var s: F = 0.03 + rng.float() * 0.05;
+        while (s < total) : (s += 0.05 + rng.float() * 0.07) {
+            if (rng.float() < 0.45) continue;
+            const at = vec.polylineAt(l.pts, s / total);
+            const side: F = if (l.kind == .wall) -1 else if (rng.float() < 0.5) 1 else -1;
+            const p = at.p.add(at.t.perp().scale(side * (off + rng.range(-0.006, 0.01))));
+            const f = L.classify(p);
+            if (f == NONE or L.kind(f) != .field) continue;
+            if (vec.borderDistance(p) < 0.02 or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.07) or wallDist(L, p) < 0.025) continue;
+            try put(a, m, L, .bush, f, &rng, p, rng.float() * tau, rng.range(0.7, 1.3));
+        }
+    }
+
+    // Rivers: a mill or ducks
     for (L.lines.items) |l| {
         if (l.kind != .river) continue;
         const through = @popCount(L.def.features[l.feature].ports) >= 2;
@@ -427,8 +652,8 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
             const side: F = if (rng.float() < 0.5) 1 else -1;
             const p = at.p.add(at.t.perp().scale(side * (l.hw + 0.05)));
             const f = L.classify(p);
-            if (f != NONE and L.kind(f) == .field and borderDist(p) > 0.05 and clearOfMarks(L, p, 0.06)) {
-                try put(a, m, L, .mill, l.feature, 0, p, 0, std.math.atan2(at.t.x, at.t.y), 1);
+            if (f != NONE and L.kind(f) == .field and vec.borderDistance(p) > 0.05 and clearOfMarks(L, p, 0.08)) {
+                try put(a, m, L, .mill, l.feature, &rng, p, yawOf(at.t), 1);
                 continue;
             }
         }
@@ -436,7 +661,7 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
         for (0..nd) |k| {
             const at = vec.polylineAt(l.pts, 0.25 + 0.2 * @as(F, @floatFromInt(k)) + rng.range(-0.05, 0.05));
             const p = at.p.add(at.t.perp().scale(rng.range(-0.4, 0.4) * l.hw));
-            if (borderDist(p) < 0.03 or !clearOfMarks(L, p, 0.05)) continue;
+            if (vec.borderDistance(p) < 0.03 or !clearOfMarks(L, p, 0.06)) continue;
             try m.props.append(a, .{ .prop = .duck, .feature = l.feature, .pos = v3(p.x, WATER_Y, p.y), .yaw = @floatCast(rng.float() * tau), .scale = 1 });
         }
     }
@@ -445,17 +670,17 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
         for (0..3) |k| {
             const ang = rng.float() * tau + @as(F, @floatFromInt(k)) * 2.1;
             const p = d.center.add(V2.init(@cos(ang), @sin(ang)).scale(d.r * rng.range(0.25, 0.7)));
-            if (!clearOfMarks(L, p, 0.05)) continue;
+            if (!clearOfMarks(L, p, 0.06)) continue;
             try m.props.append(a, .{ .prop = .duck, .feature = d.feature, .pos = v3(p.x, WATER_Y, p.y), .yaw = @floatCast(rng.float() * tau), .scale = 1 });
         }
     }
 
-    // roads: a cart on some through roads; bridges where roads cross rivers
+    // Roads: a cart on some through roads; bridges where roads cross rivers
     for (L.lines.items) |l| {
         if (l.kind != .road) continue;
-        if (@popCount(L.def.features[l.feature].ports) >= 2 and rng.float() < 0.35) {
+        if (@popCount(L.def.features[l.feature].ports) >= 2 and rng.float() < 0.3) {
             const at = vec.polylineAt(l.pts, 0.3);
-            if (clearOfMarks(L, at.p, 0.06)) try put(a, m, L, .cart, l.feature, 0, at.p, 0, std.math.atan2(at.t.x, at.t.y), 1);
+            if (clearOfMarks(L, at.p, 0.08)) try put(a, m, L, .cart, l.feature, &rng, at.p, yawOf(at.t), 1);
         }
         for (L.lines.items) |r| {
             if (r.kind != .river) continue;
@@ -465,23 +690,22 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
                 while (j + 1 < r.pts.len) : (j += 1) {
                     if (vec.segIntersect(l.pts[i], l.pts[i + 1], r.pts[j], r.pts[j + 1])) |hit| {
                         const p = l.pts[i].lerp(l.pts[i + 1], hit.t);
-                        const dir = l.pts[i + 1].sub(l.pts[i]).norm();
-                        try m.props.append(a, .{ .prop = .bridge, .feature = l.feature, .pos = v3(p.x, ROAD_Y, p.y), .yaw = @floatCast(std.math.atan2(dir.x, dir.y)), .scale = 1 });
+                        try m.props.append(a, .{ .prop = .bridge, .feature = l.feature, .pos = v3(p.x, ROAD_Y, p.y), .yaw = yawOf(l.pts[i + 1].sub(l.pts[i]).norm()), .scale = 1 });
                     }
                 }
             }
         }
     }
 
-    // village houses around junction plazas
+    // Village houses around junction plazas
     for (L.plazas.items) |d| {
         for (0..4) |k| {
             const ang = (@as(F, @floatFromInt(k)) + 0.5) * tau / 4;
             const dir = V2.init(@cos(ang), @sin(ang));
-            const p = d.center.add(dir.scale(d.r + 0.065));
+            const p = d.center.add(dir.scale(d.r + 0.06));
             const f = L.classify(p);
-            if (f == NONE or L.kind(f) != .field or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.06)) continue;
-            try put(a, m, L, .house, f, @intCast(rng.next() % 4), p, 0, std.math.atan2(-dir.x, -dir.y), 0.85);
+            if (f == NONE or L.kind(f) != .field or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.08)) continue;
+            try m.props.append(a, .{ .prop = .house, .feature = f, .variant = @intCast(rng.next() % 6), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = yawOf(dir.scale(-1)), .scale = 0.9, .height = 1.1 });
         }
     }
 }

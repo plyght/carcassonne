@@ -109,6 +109,14 @@ pub const Layout = struct {
         for (self.plazas.items) |d| {
             if (p.dist(d.center) < d.r) return d.feature;
         }
+        // On the tile border the port owner decides (point-in-polygon is
+        // ambiguous exactly on a polygon edge), so seams classify alike.
+        if (vec.onBorder(p, 1e-9)) {
+            const t = vec.perimParam(p);
+            const port: usize = @min(11, @as(usize, @intFromFloat(@floor(t * 3.0))));
+            const o = self.owner[port];
+            if (o != NONE and self.def.features[o].kind == .city) return o;
+        }
         for (self.cities.items) |c| {
             if (vec.pointInPoly(p, c.pts)) return c.feature;
         }

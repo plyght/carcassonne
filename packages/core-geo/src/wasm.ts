@@ -3,7 +3,8 @@
 // engine), so the app ships a single wasm.
 import type { EngineEvent } from "@carcassonne/protocol";
 import type { AnimOptions, AnimTimeline } from "./anim";
-import { decodeGeo2D, decodeGeo3D, type GeoTile2D, type GeoTile3D } from "./decode";
+import { decodeGeo2D, decodeGeo3D, decodeGeoFigure, type GeoFigure, type GeoTile2D, type GeoTile3D } from "./decode";
+import type { FigurePose, FigureShape } from "./format";
 
 export interface CoreGeoExports {
   memory: WebAssembly.Memory;
@@ -13,7 +14,8 @@ export interface CoreGeoExports {
   geo_tile_index(idPtr: number, idLen: number): number;
   geo_tile_id(index: number): number;
   geo_tile_2d(index: number): number;
-  geo_tile_3d(index: number, resolution: number): number;
+  geo_tile_3d(index: number, resolution: number, slabPermille: number): number;
+  geo_figure(kind: number, pose: number): number;
   anim_timeline(evPtr: number, evLen: number, optPtr: number, optLen: number): number;
 }
 
@@ -81,8 +83,10 @@ export class CoreGeo {
     return this.take(this.exports.geo_tile_2d(this.resolve(tile)));
   }
 
-  tile3dBytes(tile: string | number, resolution = 0): Uint8Array {
-    return this.take(this.exports.geo_tile_3d(this.resolve(tile), resolution));
+  /** `slab`: thickness in tile units (default 0.09; 0 = no slab). */
+  tile3dBytes(tile: string | number, resolution = 0, slab?: number): Uint8Array {
+    const permille = slab === undefined ? 0 : slab <= 0 ? 0xffffffff : Math.round(slab * 1000);
+    return this.take(this.exports.geo_tile_3d(this.resolve(tile), resolution, permille));
   }
 
   /** Decoded 2D geometry (cached per tile id; geometry is immutable). */
@@ -96,8 +100,15 @@ export class CoreGeo {
     return g;
   }
 
-  tile3d(tile: string | number, resolution = 0): GeoTile3D {
-    return decodeGeo3D(this.tile3dBytes(tile, resolution));
+  tile3d(tile: string | number, resolution = 0, slab?: number): GeoTile3D {
+    return decodeGeo3D(this.tile3dBytes(tile, resolution, slab));
+  }
+
+  /** Classic meeple / abbot piece: 2D outline token + bevelled 3D mesh (height 1). */
+  figure(shape: FigureShape = "meeple", pose: FigurePose = "standing"): GeoFigure {
+    const k = shape === "abbot" ? 1 : 0;
+    const p = pose === "lying" ? 1 : 0;
+    return decodeGeoFigure(this.take(this.exports.geo_figure(k, p)));
   }
 
   animTimeline(events: EngineEvent[], options: AnimOptions = {}): AnimTimeline {

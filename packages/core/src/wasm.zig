@@ -210,14 +210,27 @@ export fn geo_tile_2d(index: u32) u32 {
 }
 
 /// 3D geometry buffer ("CGEO" kind 2) for the tile at `index`; `resolution`
-/// is the terrain grid size (quads per side, 4..128, 0 = default 48).
-export fn geo_tile_3d(index: u32, resolution: u32) u32 {
+/// is the terrain grid size (quads per side, 4..128, 0 = default 48);
+/// `slab_permille` is the slab thickness in 1/1000 tile (0 = default 90,
+/// 0xFFFFFFFF = no slab).
+export fn geo_tile_3d(index: u32, resolution: u32, slab_permille: u32) u32 {
     const t = geo.registry.byIndex(index) orelse return 0;
     var arena = std.heap.ArenaAllocator.init(gpa);
     defer arena.deinit();
     var lay = geo.layout.build(gpa, t) catch return 0;
     defer lay.deinit();
-    const bytes = geo.buffer.encode3D(arena.allocator(), &lay, if (resolution == 0) 48 else resolution) catch return 0;
+    const slab: f64 = if (slab_permille == 0) geo.mesh.SLAB_DEFAULT else if (slab_permille == 0xFFFFFFFF) 0 else @as(f64, @floatFromInt(slab_permille)) / 1000.0;
+    const bytes = geo.buffer.encode3D(arena.allocator(), &lay, .{ .resolution = if (resolution == 0) 48 else resolution, .slab = slab }) catch return 0;
+    return geoReturn(bytes);
+}
+
+/// Figure buffer ("CGEO" kind 3): kind 0 = meeple, 1 = abbot;
+/// pose 0 = standing (thief/knight/monk), 1 = lying (farmer, 3rd edition).
+export fn geo_figure(kind: u32, pose: u32) u32 {
+    if (kind > 1 or pose > 1) return 0;
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    const bytes = geo.buffer.encodeFigure(arena.allocator(), @enumFromInt(kind), @enumFromInt(pose)) catch return 0;
     return geoReturn(bytes);
 }
 
