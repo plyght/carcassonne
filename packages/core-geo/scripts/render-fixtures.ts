@@ -138,6 +138,17 @@ for (const b of boards) {
   y0 += (maxRow + 1) * S + 40;
 }
 
+// Figure tokens (classic meeple, abbot), as used by the 2D styles
+parts.push(`<text x="${PAD}" y="${y0 - 6}" font-size="14" font-family="sans-serif">figures: classic meeple / 3rd-edition abbot (2D token outlines)</text>`);
+(["meeple", "abbot"] as const).forEach((shape, i) => {
+  const f = geo.figure(shape, "standing");
+  const s = 120;
+  const cx = PAD + 80 + i * 180;
+  const cy = y0 + 70;
+  parts.push(`<path d="${svgPathData(f.outline, true, s, cx, cy)}" fill="${["#c0392b", "#2c5aa0"][i]}" stroke="#222" stroke-width="2"/>`);
+});
+y0 += 170;
+
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sheetW}" height="${y0}" viewBox="0 0 ${sheetW} ${y0}"><rect width="100%" height="100%" fill="#f7f4ec"/>${parts.join("")}</svg>\n`;
 writeFileSync(out, svg);
 console.log(`wrote ${out} (${tiles.length} tiles)`);

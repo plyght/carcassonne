@@ -117,6 +117,16 @@
       "name": "@carcassonne/config",
       "version": "0.0.0",
     },
+    "packages/core-geo": {
+      "name": "@carcassonne/core-geo",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@carcassonne/config": "workspace:*",
+        "@carcassonne/protocol": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/core-wasm": {
       "name": "@carcassonne/core-wasm",
       "dependencies": {
@@ -289,6 +299,8 @@
     "@carcassonne/auth": ["@carcassonne/auth@workspace:packages/auth"],
 
     "@carcassonne/config": ["@carcassonne/config@workspace:packages/config"],
+
+    "@carcassonne/core-geo": ["@carcassonne/core-geo@workspace:packages/core-geo"],
 
     "@carcassonne/core-wasm": ["@carcassonne/core-wasm@workspace:packages/core-wasm"],
 

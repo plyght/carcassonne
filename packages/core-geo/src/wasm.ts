@@ -31,8 +31,8 @@ export class CoreGeo {
   }
 
   static async instantiate(bytes: BufferSource): Promise<CoreGeo> {
-    const { instance } = await WebAssembly.instantiate(bytes, {});
-    return new CoreGeo(instance);
+    const module = await WebAssembly.compile(bytes);
+    return new CoreGeo(await WebAssembly.instantiate(module, {}));
   }
 
   /** Copies a `[u32 len][bytes]` result out of wasm memory and frees it. */
