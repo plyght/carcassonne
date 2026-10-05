@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { FigureOption, GameView, TileId } from "@carcassonne/protocol";
 import type { NodeRef, PlayerColorId, TileCatalog } from "@carcassonne/game-client";
 
-import { FigureToken } from "./figures";
+import { FigureToken, proceduralFigures, type FigureArtSource } from "./figures";
 import { PLAYER_COLORS, playerFill, type BoardPalette } from "./palette";
 import { proceduralArt } from "./procedural-art";
 import { PaletteDefs, TileSvg } from "./tile";
@@ -39,6 +39,8 @@ export interface ClassicBoardProps {
   palette: BoardPalette;
   players: { color: PlayerColorId; name?: string }[];
   art?: TileArtSource;
+  /** Meeple/abbot outlines (core-geo's `geo_figure` later). */
+  figures?: FigureArtSource;
   /** Legal cells for the tile in hand. */
   targets?: Cell[];
   ghost?: GhostTile | null;
@@ -124,6 +126,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
     palette,
     players,
     art = proceduralArt,
+    figures = proceduralFigures,
     targets = [],
     ghost,
     hotspots,
@@ -535,6 +538,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   ink={a.ink}
                   marker={a.marker}
                   outline={palette.figureOutline}
+                  figures={figures}
                   title={`${players[fig.player]?.name ?? `Player ${fig.player + 1}`}: ${fig.figure} on ${kind ?? "feature"}`}
                 />
               );
@@ -606,22 +610,23 @@ export function ClassicBoard(props: ClassicBoardProps) {
                     }}
                   >
                     <title>{h.label ?? `${h.type} on feature ${h.feature}`}</title>
-                    <circle
-                      className="cc-hotspot"
-                      cx={hx + offset}
-                      cy={hy}
-                      r={11}
-                      fill={a.fill}
-                      fillOpacity={0.35}
-                      stroke={a.fill}
-                      strokeWidth={2.5}
-                    />
-                    <circle cx={hx + offset} cy={hy} r={4} fill={a.fill} stroke={palette.figureOutline} strokeWidth={1} />
-                    {h.type === "abbot" ? (
-                      <text x={hx + offset} y={hy - 14} textAnchor="middle" fontSize={9} fontWeight={700} fill={palette.ink}>
-                        abbot
-                      </text>
-                    ) : null}
+                    {/* generous hit area */}
+                    <circle cx={hx + offset} cy={hy - 4} r={15} fill="transparent" pointerEvents="all" />
+                    <g className="cc-hotspot">
+                      <FigureToken
+                        x={hx + offset}
+                        y={hy - 4}
+                        size={26}
+                        kind={h.type}
+                        lying={catalog.get(ghost.tile)?.features[h.feature]?.kind === "field"}
+                        fill={a.fill}
+                        ink={a.ink}
+                        marker={a.marker}
+                        outline={palette.highlight.stroke}
+                        figures={figures}
+                        ghost
+                      />
+                    </g>
                   </g>
                 );
               })

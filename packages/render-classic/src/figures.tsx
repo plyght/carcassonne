@@ -8,6 +8,27 @@ export const MEEPLE_PATH =
 export const ABBOT_PATH =
   "M12 1.2C14.9 1.2 16.8 3.4 16.8 6.1C16.8 7.4 16.3 8.5 15.6 9.3C17.7 10.5 18.7 12.7 19.1 15.1L20.8 22.9L3.2 22.9L4.9 15.1C5.3 12.7 6.3 10.5 8.4 9.3C7.7 8.5 7.2 7.4 7.2 6.1C7.2 3.4 9.1 1.2 12 1.2Z";
 
+/**
+ * Figure outlines (24×24 box, feet at the bottom). The procedural set below is the
+ * classic meeple (round head, arms straight out, legs apart) and a hooded abbot.
+ * core-geo will provide canonical outlines from Zig (`geo_figure`) behind this.
+ */
+export interface FigureArtSource {
+  readonly name: string;
+  /** SVG path for the standing figure. */
+  path(kind: FigureKind): string;
+  /** Path for a farmer lying down; omit to rotate the standing path by 90°. */
+  lyingPath?(kind: FigureKind): string | undefined;
+  /** Where the colour-blind marker sits on the body. */
+  markerAt(kind: FigureKind): readonly [number, number];
+}
+
+export const proceduralFigures: FigureArtSource = {
+  name: "procedural",
+  path: (kind) => (kind === "abbot" ? ABBOT_PATH : MEEPLE_PATH),
+  markerAt: (kind) => (kind === "abbot" ? [12, 15.5] : [12, 13]),
+};
+
 export function MarkerGlyph({ shape, cx, cy, r, fill }: { shape: MarkerShape; cx: number; cy: number; r: number; fill: string }) {
   switch (shape) {
     case "circle":
@@ -37,6 +58,7 @@ export function MarkerGlyph({ shape, cx, cy, r, fill }: { shape: MarkerShape; cx
   }
 }
 
+
 export interface FigureTokenProps {
   x: number;
   y: number;
@@ -50,19 +72,50 @@ export interface FigureTokenProps {
   lying?: boolean;
   title?: string;
   className?: string;
+  /** Outline source; core-geo's figures drop in here. */
+  figures?: FigureArtSource;
+  /** Translucent placement preview. */
+  ghost?: boolean;
+}
+
+function FigureBody({
+  kind,
+  fill,
+  ink,
+  outline,
+  marker,
+  lying,
+  figures,
+  strokeWidth,
+  ghost,
+}: Omit<FigureTokenProps, "x" | "y" | "size" | "title" | "className"> & { strokeWidth: number }) {
+  const src = figures ?? proceduralFigures;
+  const lyingPath = lying ? src.lyingPath?.(kind) : undefined;
+  const [mx, my] = src.markerAt(kind);
+  return (
+    <g transform={lying && !lyingPath ? "rotate(-90 12 13)" : undefined}>
+      <path
+        d={lyingPath ?? src.path(kind)}
+        fill={fill}
+        fillOpacity={ghost ? 0.45 : 1}
+        stroke={outline}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+        strokeDasharray={ghost ? "2 1.5" : undefined}
+      />
+      {ghost ? null : <MarkerGlyph shape={marker} cx={mx} cy={my} r={2.6} fill={ink} />}
+    </g>
+  );
 }
 
 /** A meeple or abbot token centred on (x, y) in board units. */
-export function FigureToken({ x, y, size = 24, kind, fill, ink, outline, marker, lying, title, className }: FigureTokenProps) {
+export function FigureToken({ x, y, size = 24, title, className, ...body }: FigureTokenProps) {
   const k = size / 24;
   return (
     <g transform={`translate(${x - size / 2} ${y - size / 2}) scale(${k})`} className={className} pointerEvents="none">
       {title ? <title>{title}</title> : null}
-      <ellipse cx={12.6} cy={22.6} rx={9} ry={2.2} fill="rgba(0,0,0,0.28)" />
-      <g transform={lying ? "rotate(-90 12 13)" : undefined}>
-        <path d={kind === "abbot" ? ABBOT_PATH : MEEPLE_PATH} fill={fill} stroke={outline} strokeWidth={1.3} strokeLinejoin="round" />
-        <MarkerGlyph shape={marker} cx={12} cy={kind === "abbot" ? 15.5 : 13} r={2.6} fill={ink} />
-      </g>
+      {body.ghost ? null : <ellipse cx={12.6} cy={22.6} rx={9} ry={2.2} fill="rgba(0,0,0,0.28)" />}
+      <FigureBody {...body} strokeWidth={1.3} />
     </g>
   );
 }
@@ -77,6 +130,8 @@ export function FigureIcon({
   size = 18,
   className,
   title,
+  lying,
+  figures,
 }: {
   kind?: FigureKind;
   fill: string;
@@ -86,12 +141,13 @@ export function FigureIcon({
   size?: number;
   className?: string;
   title?: string;
+  lying?: boolean;
+  figures?: FigureArtSource;
 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} role={title ? "img" : undefined} aria-hidden={title ? undefined : true}>
       {title ? <title>{title}</title> : null}
-      <path d={kind === "abbot" ? ABBOT_PATH : MEEPLE_PATH} fill={fill} stroke={outline} strokeWidth={1.2} strokeLinejoin="round" />
-      <MarkerGlyph shape={marker} cx={12} cy={kind === "abbot" ? 15.5 : 13} r={2.6} fill={ink} />
+      <FigureBody kind={kind} fill={fill} ink={ink} outline={outline} marker={marker} lying={lying} figures={figures} strokeWidth={1.2} />
     </svg>
   );
 }
