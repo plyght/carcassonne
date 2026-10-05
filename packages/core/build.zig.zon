@@ -1,0 +1,7 @@
+.{
+    .name = .carcassonne_core,
+    .version = "0.0.1",
+    .fingerprint = 0x430750b9b481798f,
+    .minimum_zig_version = "0.17.0",
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}
