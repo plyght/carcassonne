@@ -114,7 +114,7 @@ docs/
 
 - **Majority:** the player(s) with the most meeples on a feature score it. Ties score full points for everyone tied. Meeples join features by connecting separate features through tile placement; you can never place directly into an occupied feature.
 - A road loop and a road that ends at both ends are both "complete".
-- **1st-edition variant:** a completed two-tile city scores 2 instead of 4 (part of the edition toggle).
+- **1st/2nd-edition variant:** a completed two-tile city scores 2 instead of 4 (part of the edition toggle; the engine's sources say both older editions use it). Rule interpretations are logged in `packages/core/src/engine/RULES_NOTES.md`.
 
 ### 5.4 Field scoring: selectable edition (house-rules menu)
 | Edition | Rule |

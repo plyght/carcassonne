@@ -21,7 +21,8 @@ export interface CoreWasmExports {
   game_legal_figures(handle: number, x: number, y: number, rot: number): number;
   game_snapshot(handle: number): number;
   game_restore(ptr: number, len: number): number;
-  ai_choose(handle: number, tier: number, budgetMs: number, seedLo: number, seedHi: number): number;
+  /** Optional until the AI workstream lands; see `fallbackChoose`. */
+  ai_choose?(handle: number, tier: number, budgetMs: number, seedLo: number, seedHi: number): number;
 }
 
 const TIERS: Record<AiTier, number> = { easy: 0, medium: 1, hard: 2, expert: 3 };
@@ -84,7 +85,16 @@ class WasmGame implements EngineGame {
   }
   aiChoose(tier: AiTier, budgetMs: number, seed: bigint): Move {
     const [lo, hi] = splitSeed(seed);
+    if (!this.abi.x.ai_choose) return this.fallbackChoose(seed);
     return this.abi.takeJson(this.abi.x.ai_choose(this.handle, TIERS[tier], Math.max(1, Math.round(budgetMs)), lo, hi));
+  }
+  /** Seeded random legal placement, no figure. Used for clock timeouts and until core/ai ships. */
+  private fallbackChoose(seed: bigint): Move {
+    const placements = this.legalPlacements();
+    if (placements.length === 0) throw new Error("no legal placement");
+    const n = BigInt(placements.length);
+    const p = placements[Number(((seed % n) + n) % n)]!;
+    return { ...p, figure: null };
   }
   free() {
     if (this.handle) this.abi.x.game_free(this.handle);

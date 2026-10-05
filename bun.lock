@@ -22,6 +22,7 @@
       "dependencies": {
         "@carcassonne/api": "workspace:*",
         "@carcassonne/auth": "workspace:*",
+        "@carcassonne/core-wasm": "workspace:*",
         "@carcassonne/db": "workspace:*",
         "@carcassonne/protocol": "workspace:*",
         "@elysiajs/cors": "^1.4.2",

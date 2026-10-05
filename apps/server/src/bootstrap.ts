@@ -14,7 +14,7 @@ export function getServices(): Services {
     authUrl: ENV.BETTER_AUTH_URL,
     corsOrigin: ENV.CORS_ORIGIN,
     scheduler: ENV.SCHEDULER ?? (process.env.VERCEL ? "vercel" : "local"),
-    engine: engineLoader({ kind: ENV.ENGINE ?? "fake", wasmPath: ENV.CORE_WASM_PATH, version: ENV.ENGINE_VERSION }),
+    engine: engineLoader({ kind: ENV.ENGINE ?? "wasm", wasmPath: ENV.CORE_WASM_PATH, version: ENV.ENGINE_VERSION }),
     flags: createFlags({ forcePolling: ENV.FORCE_POLLING, pauseOnline: ENV.PAUSE_ONLINE, edgeConfig: ENV.EDGE_CONFIG }),
     adminEmails: (ENV.ADMIN_EMAILS ?? "").split(","),
   });

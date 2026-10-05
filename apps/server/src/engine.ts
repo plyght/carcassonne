@@ -1,13 +1,8 @@
 // ENGINE BINDING POINT. The only place that decides which engine the server runs.
 //
-//   ENGINE=fake (default)  → FakeEngine (packages/api/src/game/fake-engine.ts), not real rules.
-//   ENGINE=wasm            → core.wasm loaded from CORE_WASM_PATH and bound through the WASM ABI
-//                            (packages/api/src/game/wasm-engine.ts → loadWasmEngine).
-//
-// When `@carcassonne/core-wasm` merges, point `loadEngine` at the wasm bytes it ships (or its typed
-// wrapper) and make "wasm" the default. On Vercel, add the .wasm file to the function bundle with
-// `includeFiles` in vercel.json.
-import path from "node:path";
+//   ENGINE=wasm (default)  → the real Zig engine: core.wasm shipped by @carcassonne/core-wasm (or
+//                            CORE_WASM_PATH), bound through the WASM ABI (packages/api/src/game/wasm-engine.ts).
+//   ENGINE=fake            → FakeEngine (packages/api/src/game/fake-engine.ts), for tests only.
 
 import { getEngine, setEngine, type Engine } from "@carcassonne/api/game/engine";
 import { loadWasmEngine } from "@carcassonne/api/game/wasm-engine";
@@ -18,7 +13,8 @@ export interface EngineConfig {
   version?: string;
 }
 
-const DEFAULT_WASM = path.join(import.meta.dir, "../../../packages/core/zig-out/bin/core.wasm");
+// Resolved through the package so Vercel's file tracing bundles the committed core.wasm.
+const DEFAULT_WASM = Bun.fileURLToPath(import.meta.resolve("@carcassonne/core-wasm/core.wasm"));
 
 export function engineLoader(cfg: EngineConfig): () => Promise<Engine> {
   let loading: Promise<Engine> | null = null;

@@ -31,7 +31,7 @@ This is the shared contract that parallel workstreams build against. Change it o
   - `B` is the plain cloister and `A` is the cloister with a road.
   - The engine owns the full table and documents it in `packages/core/src/engine/tiles_base.zig`.
 - River: `"R1"`…`"R12"` (`R1` = spring, `R12` = lake).
-- Gardens (3rd edition, Abbot) are `garden` features on the base tiles that carry them.
+- **Garden variants (Abbot):** only one copy of each of E, H, I, M, N, R, U, V shows a garden, so those copies are their own tile ids **`Eg`, `Hg`, `Ig`, `Mg`, `Ng`, `Rg`, `Ug`, `Vg`**, with the garden as the last feature. River tile `R10` also carries a garden. Source: WikiCarpedia "The Abbot". With `abbot: false` the garden feature is inert (it can't be occupied or scored).
 
 Every feature on a placed tile is addressed by its **local index** into `TileDef.features` (canonical order, independent of rotation).
 
@@ -41,6 +41,7 @@ One turn = one `Move`: place the drawn tile, then do one figure action.
 ```jsonc
 // Ruleset
 { "fieldEdition": 3, "river": true, "abbot": true, "handSize": 1 }
+// handSize other than 1 is rejected until the hand variant (P1) ships
 // Move
 { "x": 1, "y": 0, "rot": 2, "figure": { "type": "meeple", "feature": 3 } }
 // figure: null | {type:"meeple",feature} | {type:"abbot",feature} | {type:"recallAbbot", x, y}
