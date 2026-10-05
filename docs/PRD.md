@@ -14,10 +14,10 @@
 
 A digital adaptation of the Carcassonne board game, with **full rules parity** for the base game plus **The River** and **The Abbot** (both in the current box), playable on:
 
-- **Web**: Next.js and Three.js, deployed to Vercel.
+- **Web**: Next.js and Three.js. The whole backend runs on **Vercel only** (free Hobby plan).
 - **Desktop**: native macOS and Linux apps built on **zpui** (our Zig port of gpui), with a new native 3D renderer.
 
-The table looks like a **realistic tabletop that comes to life**: a wooden table under warm light, cardboard tiles and wooden meeples. As each tile is placed it "pops" into a living 3D diorama: city walls rise, the cloister bell swings, sheep graze, carts roll down finished roads. When the camera pulls back, the board reads as a clean map.
+It ships with **several complete visual styles**, each player picks their own and can switch live (§6.3): realistic Tabletop, Classic 2D top-down, Cartoon, Living Diorama, Storybook and Blueprint, each with top-down, tabletop, orbit and cinematic cameras. The default is a **realistic tabletop that comes to life**: a wooden table under warm light, cardboard tiles and wooden meeples. As each tile is placed it "pops" into a living 3D diorama: city walls rise, the cloister bell swings, sheep graze, carts roll down finished roads. When the camera pulls back, the board reads as a clean map.
 
 Play modes: online multiplayer (invite rooms, ranked play, spectating), local hot-seat, AI opponents (Easy→Expert), replays, and a tutorial.
 
@@ -28,7 +28,7 @@ Play modes: online multiplayer (invite rooms, ranked play, spectating), local ho
 ### Goals
 1. **Rules parity.** Every rule in the base game and River rulebooks is implemented and covered by tests, including edge cases (unplaceable tiles, meeple-sharing ties, field and city adjacency, River U-turn restriction).
 2. **One rules engine.** The same Zig engine runs on the server (authoritative), in the browser (prediction, offline AI) and on desktop. Games are deterministic, so `(seed, ruleset, moves)` always reproduces the same game.
-3. **"Cooler than the box."** Tabletop 3D with live dioramas, scoring cinematics, ambient sound, and a classic 2D top-down toggle.
+3. **"Cooler than the box."** Every style from realistic tabletop to cartoon to classic 2D, with live dioramas, scoring cinematics and ambient sound.
 4. **Native desktop that is not a webview.** zpui UI plus a native 3D pipeline (Vulkan/Metal), at 60 fps or better on integrated GPUs.
 5. **Full online stack.** Accounts, invite rooms, ranked ladder, spectating, replays and game clocks.
 
@@ -56,16 +56,18 @@ The monorepo is scaffolded with Better-T-Stack:
 ```
 bun create better-t-stack@latest carcassonne --frontend next --backend elysia --runtime bun \
   --api trpc --auth better-auth --payments none --database postgres --orm drizzle \
-  --db-setup neon --package-manager bun --git --web-deploy vercel --server-deploy docker \   # overridden: server also deploys to Vercel (§7.3)
+  --db-setup neon --package-manager bun --git --web-deploy vercel --server-deploy docker \
   --install --addons turborepo --examples none
 ```
+
+> The scaffold's `--server-deploy docker` output is not used. The Elysia server deploys to **Vercel** alongside the web app (§7.3).
 
 | Layer | Tech |
 |---|---|
 | Monorepo | Turborepo + Bun workspaces |
 | Web app | Next.js (App Router), React, Three.js (WebGPU renderer with WebGL2 fallback), deployed on Vercel |
 | API | Elysia on Bun + tRPC, **serverless on Vercel Hobby (free)**. Request/response only: every game action is a short HTTP call. No long-lived server process or held sockets (§7.3) |
-| Realtime push | **Ably free tier** (6M messages/month, 200 concurrent connections, 200 channels). The server publishes, and clients only subscribe. The web client uses ably-js; the desktop client uses Ably's SSE endpoint |
+| Realtime push | **Vercel Functions WebSockets** with Postgres `LISTEN/NOTIFY` fan-out, and a CDN-cached polling fallback (§7.3) |
 | Auth | better-auth (email + OAuth; device-authorization flow for desktop) |
 | DB | Postgres on Neon, Drizzle ORM |
 | Core | **Zig** (0.17, matching zpui): rules engine, AI, procedural geometry, animation timeline, protocol codec. Builds to `wasm32` (web + server) and native (desktop) |
@@ -173,19 +175,49 @@ Defaults are current (3rd edition) rules + River. The user hasn't played in a wh
 - **Score panel + scoreboard track** in 3D, with meeples walking along the track.
 - **End-game sequence:** unfinished features and fields score one by one with cinematic camera moves, then a summary screen with per-category points.
 
-### 6.3 Visual direction: "the tabletop comes to life"
-- **Base layer (realistic):** PBR wooden table, linen-textured cardboard tiles with slightly bevelled edges and a printed top face, and wooden meeples with grain and soft contact shadows. Warm key light, cool fill light, and an HDR environment.
-- **Life layer (3D dioramas):** each placed tile rises out of its printed art into low-poly-but-detailed relief:
-  - **Cities:** walls and towers extrude along the city edges. Completed cities raise banners in the owner's colour and light their windows at dusk.
-  - **Roads:** dirt with ruts. Completed roads get a cart that drives the full length.
-  - **Cloisters:** a chapel with a swinging bell. When completed, monks gather.
-  - **Fields:** wind-swept grass shader, sheep and cows (instanced), crops by region.
-  - **River:** a flowing water shader, a mill wheel, ducks.
-- **Procedural generation:** geometry is generated from each tile's feature graph (edges → wall splines, road splines, field polygons) in the **Zig core** (`core/geo`). Both web and desktop therefore get identical meshes. A small hand-made glTF prop kit covers meeple, tower, chapel, house, tree, sheep, cart and mill.
-- **Camera:** an orbit/tabletop camera that frames the table at a tilt, with top-down **Classic 2D** mode one keystroke away. Optional tilt-shift depth of field and a day/night cycle that runs with the game (it reaches dusk at the last tile).
-- **Scoring moments:** the feature outline pulses, points float up as coins, and the meeple hops back to its owner's supply.
-- **Performance tiers:** Low (no shadows/DOF, baked props), Medium, High (shadows, SSAO, DOF, animated foliage). Auto-detected, with a manual override.
-- **Accessibility:** colour-blind-safe meeple palette plus a shape/pattern marker on every meeple, reduced-motion mode (dioramas appear without the rise animation), full keyboard play, scalable UI text.
+### 6.3 Visual styles: every look, switchable live
+The board can be shown in **several complete visual styles**, and each player picks their own. Style is purely client-side, so in the same online game one player can see the realistic tabletop while another plays on the flat classic board. Styles switch live, mid-game, with no reload. The settings show a preview carousel.
+
+Two independent controls:
+- **Style:** how things look (materials, shading, props, effects, sound palette).
+- **Camera:** how you look at it. **Top-down** (orthographic map view), **Tabletop** (tilted perspective, the default for 3D styles), **Free orbit**, and **Cinematic** (follows the action and frames scoring moments). Every style works with every camera. A 2D style simply locks to top-down.
+
+| Style | Look | Ships in |
+|---|---|---|
+| **Tabletop (realistic)** | PBR wooden table, linen cardboard tiles with bevelled edges and printed tops, wooden meeples with grain and soft contact shadows, warm key light + HDR environment. The **life layer** rises out of each tile (below) | M3 (default) |
+| **Classic Board (2D top-down)** | Crisp flat vector tiles in the spirit of the printed game: clean outlines, parchment fields, stone-grey cities with pennant shields, flat meeple tokens. Fastest, clearest, best for competitive play and low-end hardware | M2–M3 |
+| **Cartoon / Toon** | Saturated colours, cel shading with ink outlines, chunky rounded props, squash-and-stretch meeples, bouncy tile drops, comic "POW" score pops | M3–M5 |
+| **Living Diorama (miniature)** | Tilt-shift miniature world (Townscaper-like): soft pastel palette, strong depth of field, animated villagers and sheep, day/night and weather | M8 |
+| **Storybook / Painterly** | Watercolour paper texture, hand-inked edges, painterly post-processing, illustrated score cards | M8 (stretch) |
+| **Blueprint / High-contrast** | Minimal line art on a dark grid, maximum legibility. Doubles as the accessibility style | M8 |
+
+**The life layer** (Tabletop, Toon, Diorama, each in its own art direction). Each placed tile rises out of its printed art into relief:
+- **Cities:** walls and towers extrude along the city edges. Completed cities raise banners in the owner's colour and light their windows at dusk.
+- **Roads:** dirt with ruts. Completed roads get a cart that drives the full length.
+- **Cloisters and gardens:** a chapel with a swinging bell, and a garden with a fountain. When completed, monks gather.
+- **Fields:** wind-swept grass, instanced sheep and cows, crops by region.
+- **River:** flowing water, a mill wheel, ducks.
+
+**How styles stay cheap to add (write once):**
+- **Shared geometry.** `core/geo` (Zig) turns each tile's feature graph into *style-agnostic* data: 3D meshes (wall/road splines, field polygons, terrain height) **and** 2D vector paths (the same regions flattened). The 3D styles use the meshes. Classic Board and Blueprint use the 2D paths, which zpui draws natively with its existing path renderer and the web draws with Three.js orthographic/SVG. So **Classic Board works on desktop before native 3D lands**.
+- **A style pack is data, not code.** `packages/assets/styles/<style>/style.json` (the same file on web and desktop) defines:
+  - the material set: PBR, toon ramp + outline, unlit flat, or watercolour,
+  - the prop kit variant (glTF per style, shared skeletons and animation names),
+  - a palette per player colour (colour-blind safe),
+  - the post-FX chain: tonemap, SSAO, DOF/tilt-shift, outline, paper grain,
+  - animation intensity (realistic ease, cartoon overshoot, reduced motion),
+  - the ambience and SFX palette.
+- **Shared animation.** The `core/anim` timeline is the same for every style. Styles only change easing and intensity curves.
+- **Shading models.** There are a small, fixed set, implemented on both renderers:
+  - `pbr`, `toon` (ramp + inverted-hull outline), `flat` (unlit), and `paint` (watercolour post).
+  - Three.js: built-in materials plus custom shader material.
+  - zpui: GLSL to SPIR-V for Vulkan, SPIRV-Cross to MSL for Metal.
+  - Per-style golden images on both renderers catch visual drift.
+
+**Shared across styles:**
+- **Scoring moments:** the feature outline pulses, points pop up in the style's own way (coins, comic bursts, ink stamps), and the meeple hops home.
+- **Performance tiers:** Low, Medium and High within each style, auto-detected with a manual override. Classic Board is the guaranteed fallback.
+- **Accessibility:** a colour-blind-safe meeple palette plus a shape/pattern marker on every meeple in every style, reduced-motion mode, full keyboard play, scalable UI text, and the Blueprint high-contrast style.
 
 ### 6.4 Audio
 Adaptive ambient soundscape (birds, wind, river near river tiles), tile and meeple foley, scoring stingers, end-game fanfare. A music playlist with volume buses (master/music/SFX/ambience). Shared assets in `packages/assets/audio`.
@@ -246,52 +278,89 @@ The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web and
 - Game canvas: `render-three` builds the scene from `core/geo` buffers and plays the `core/anim` timeline. React handles the HUD/overlays.
 - Network: WebSocket to Elysia, with optimistic local validation by the same engine.
 
-### 7.3 Server (Elysia on Bun, Vercel Hobby, free tier)
-Everything must fit the free tier. **On Hobby, going over a limit pauses the deployment** (there is no overage billing), so the whole site would go down. The design keeps every number well under the limits.
+### 7.3 Server: Vercel only, free tier (Hobby)
+**Constraint:** everything runs on **Vercel**. No separate providers, accounts or bills. The only part not built by Vercel is Postgres. Vercel no longer has its own database: "Vercel Postgres" moved to **Neon through the Vercel Marketplace**, which is provisioned from the Vercel dashboard, **billed through Vercel**, and whose environment variables are injected automatically. So it stays inside Vercel.
 
-**Hobby limits that drive the design:**
+| Need | Vercel product |
+|---|---|
+| Web app, API, tRPC | **Vercel Functions** (Next.js + Elysia on the Bun runtime, `export default app`) |
+| Real-time push | **Vercel Functions WebSockets** (`Bun.serve` WebSocket handlers; public beta) |
+| Cross-instance fan-out | **Postgres `LISTEN/NOTIFY`** on the Marketplace Neon DB (direct, unpooled connection) |
+| Source of truth, auth, ratings | **Postgres (Neon via Vercel Marketplace)** + Drizzle + better-auth |
+| Turn clocks, server bots, matchmaking retries | **Vercel Queues** (delayed messages, push consumers; 1M operations/month free) |
+| Avatars, replay exports, desktop app downloads | **Vercel Blob** |
+| Feature flags, kill switches (e.g. "force polling") | **Edge Config** |
+| Usage alerts | Vercel usage dashboard + notifications, plus our own counters (below) |
+
+**Hobby limits that drive the design.** Going over a limit **pauses the deployment** (there is no overage billing), so we stay well under.
 | Limit | Value | Consequence |
 |---|---|---|
-| Function max duration | **300 s** | No long-running game server. Holding WebSockets means reconnecting every ≤5 min |
-| Function memory | Fixed **2 GB** | 360 GB-hrs / 2 GB = **180 instance-hours/month**. A held WebSocket pins an instance, so a 4-player game spread over up to 4 instances could burn 4 instance-hours per hour of play. That is too tight, so **we don't hold sockets on Vercel** |
-| Active CPU | **4 CPU-hrs/month** | Engine moves are cheap (WASM, about 1 ms), but MCTS bots are not, so bots run on clients |
-| Invocations | 1M/month | About 300 per game, so plenty |
-| Cron | Once per day (±59 min) | Useless for clocks, so turn timers use **Vercel Queues delayed messages** (1M operations/month free on Hobby) |
-| Use | Non-commercial | Fine (private project) |
+| Function max duration | **300 s** (also caps WebSocket lifetime) | Clients reconnect without the player noticing every ~4.5 min |
+| Memory | Fixed **2 GB**; 360 GB-hrs/month = **180 instance-hours** | An open socket keeps its instance billed, but fluid compute **puts many sockets on one instance**. Sockets only stay open during live play |
+| Active CPU | **4 h/month** (idle sockets cost none) | Moves are about 1 ms. Server bots are capped (below) |
+| Invocations / edge requests | 1M each | Polling fallback uses CDN-cached, immutable move URLs |
+| Cron | Once/day | Clocks use Queues instead |
 
-**Shape: HTTP for writes, Ably for push, Postgres as the source of truth**
-- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays, stats, and `submitIntent{gameId, ply, intent}`. Elysia deploys zero-config on Vercel via `export default app` (`app.listen` isn't supported there). Elysia's `.ws()` routes aren't used. The desktop app calls the same tRPC HTTP endpoints: plain JSON over HTTP, so a small Zig client is enough.
-- **Stateless rooms.** The authoritative state is the **move log in Neon Postgres**. Each call:
-  1. loads `(seed, ruleset, moves[])` and replays them with core-wasm (about 100 plies takes well under a millisecond, so **no Redis cache is needed**),
-  2. validates and applies the intent,
-  3. inserts the move with a unique `(gameId, ply)` key, which acts as compare-and-set: if two calls race, the second fails and gets a "stale ply, resync" reply,
-  4. publishes the resulting events to the Ably channel `game:{id}` through Ably's REST API.
-- **Push via Ably (free).** A tRPC call issues each client an Ably token with **subscribe + presence** capability (no publish) on its game, lobby and matchmaking channels. Clients can't publish, so they can't forge events. Ably's channel *rewind/history* covers short disconnects. On a longer gap, the client calls `getGame{sincePly}` over HTTP. Ably *presence* drives "who's connected" and AFK indicators.
-  - Budget: about 300 events × 5 recipients (players and spectators) ≈ 1,500 messages per game, which is roughly 4,000 games/month on the free tier. 200 concurrent connections means about 40 simultaneous full tables.
-- **Turn clocks with Vercel Queues.** Each committed move stores `turnDeadline` in Postgres and enqueues one **delayed message** `{gameId, ply}` due at the deadline (Queues supports delays of up to 7 days and pushes the message to a function). When it fires, the consumer does nothing if `ply` has already advanced. Otherwise it auto-plays (Easy-AI tile, no meeple) through the same compare-and-set path. That is about 3–4 operations per turn, roughly 30K/month at 100 games, against a 1M allowance. Clients only *display* the countdown. Fallback: Upstash QStash delays (1,000 messages/day free). Vercel Workflow (`sleep` racing a hook) would be the cleanest code, but at about 600 events per game it overruns Hobby's 50K events/month.
-- **Bots in online rooms run server-side via Queues.** After a move that hands the turn to a bot seat, the server enqueues `{gameId, ply, tier}`. A Queues consumer function loads the game, runs `core/ai` (WASM) and commits the move. **CPU budget:** Hobby includes 4 Active-CPU-hours a month, shared with everything else. Server bots are capped at about **1 s of think time** (Hard and Expert use iteration-limited MCTS tuned to that cap). A monthly bot-CPU counter in Postgres drops bots to Medium when it reaches about 2.5 h, so the account never pauses. Offline/local games still get full-strength Expert on the client. **Ranked games have no bots.**
-- **Matchmaking (3p/4p queues):** a `queue_ticket` table in Postgres. Each `joinQueue` call tries to form a match in one transaction (`SELECT … FOR UPDATE SKIP LOCKED`, using the Neon serverless driver's WebSocket pool for transactions), creates the room and publishes `match_found` on each player's Ably channel. If no match forms, it enqueues a **delayed Queues retry** (e.g. 15 s) instead of having clients poll. Tickets expire after 10 minutes.
-- **Emoji reactions:** clients get a token that **can publish only** to `game:{id}:react` and publish straight to Ably, so reactions cost no Vercel invocations. Rate-limiting happens client-side, and receivers drop floods. Fine for a private game.
-- **Neon free tier:** scales to zero when idle, with compute hours well within the allowance for personal use. Keep the Neon region next to the Vercel function region (e.g. `iad1` ↔ `us-east-1`).
+**How a move flows**
+1. The client sends `intent{gameId, ply, ...}` over its WebSocket. Desktop and web use the same protocol; desktop uses a native Zig WebSocket client.
+2. The function loads `(seed, ruleset, moves[])` from Postgres and replays it with core-wasm (well under 1 ms), then validates the intent.
+3. It inserts the move with a unique `(gameId, ply)` key, which acts as compare-and-set: if two instances race, one wins.
+4. In the same transaction it runs `NOTIFY game_<id>, '<ply>'`.
+5. Every instance holding sockets for that game has `LISTEN game_<id>` on one shared direct connection. It hears the notification and pushes the new move(s) to its sockets.
+6. It enqueues the next turn's **Queues delayed message** (the clock), plus a bot job if the next seat is a bot.
 
-**Monthly free-tier budget (estimate: 100 games × 4 players, some spectators)**
-| Resource | Estimate | Hobby/free limit |
+**Connection lifecycle and reconnect.**
+- Sockets open only on lobby, queue or game screens.
+- Hidden tabs disconnect after 60 s and resume on focus.
+- At about 280 s the client proactively opens a new socket (`resume{gameId, lastPly}`) before closing the old one, so nothing is missed. The server sends back the moves the client missed.
+- Presence ("connected/AFK") comes from socket join/leave plus a `presence` table with a 30 s TTL heartbeat over the open socket.
+
+**Turn clocks (Vercel Queues).** Each committed move enqueues one delayed message `{gameId, ply}` due at `turnDeadline`.
+- When it fires, the consumer does nothing if the game has already moved past that ply. Otherwise it auto-plays (Easy-AI tile, no meeple) through the same compare-and-set path.
+- Clients only *display* the countdown.
+- This costs about 3–4 operations per turn.
+
+**Bots (Vercel Queues).**
+- When the turn passes to a bot seat, a bot job runs `core/ai` in a consumer function and commits the move.
+- Think time is capped at about **1 s**, using iteration-limited MCTS.
+- A monthly bot-CPU counter in Postgres drops bots to Medium at about **2.5 CPU-h**, so the account never pauses.
+- Offline/local games get full-strength Expert on the client.
+- **Ranked games have no bots.**
+
+**Matchmaking (3p/4p).**
+- Players join a `queue_ticket` table.
+- Each `joinQueue` tries to form a match in one transaction (`SELECT … FOR UPDATE SKIP LOCKED`). If no match forms, it enqueues a delayed Queues retry after 15 s.
+- When a match forms, `NOTIFY user_<id>` tells each player's lobby socket.
+
+**Emoji reactions.** These go over the socket to the server, which rate-limits them per user and relays them with `NOTIFY game_<id>_react`. They are not persisted.
+
+**Guard rails (memory is the tight resource).**
+- An `instance_usage` table records each instance's live time (start, then a heartbeat every 60 s) to estimate GB-hrs.
+- At **70%** of the monthly allowance, an **Edge Config** flag switches *new* connections to **polling mode**:
+  - clients fetch `GET /g/:id/ply` every 2 s, a tiny response cached on the CDN for 1 s, so all clients in a game share about one function call per second,
+  - and `GET /g/:id/m/:ply`, which is **immutable** and cached on the CDN forever.
+- Polling uses almost no provisioned memory.
+- At **90%**, new online games are paused with a friendly banner. Offline, hot-seat and AI play always work.
+
+**Monthly free-tier budget (estimate: ~100 games × 4 players, about 75 game-hours)**
+| Resource | Estimate | Hobby limit |
 |---|---|---|
-| Vercel invocations | ~40K | 1M |
-| Vercel Active CPU | ~0.1 h (moves) + ≤2.5 h (server bots, capped) | 4 h |
-| Vercel provisioned memory | ~20–40 GB-hrs (short requests only) | 360 GB-hrs |
+| Provisioned memory | ~150–220 GB-hrs (sockets share 1–2 instances during play) + ~20 short requests | 360 GB-hrs |
+| Active CPU | ~0.2 h (moves, notify fan-out) + ≤2.5 h (bots, capped) | 4 h |
+| Invocations | ~60K (moves, reconnects every ~4.5 min, queue consumers) | 1M |
 | Vercel Queues | ~30K operations | 1M |
-| Ably | ~300K messages, ~30 peak connections | 6M messages / 200 connections |
-| Neon | ~20 CU-hours | 100 CU-hours |
+| Neon (Marketplace) | ~25 CU-hours (awake during play for LISTEN) | 100 CU-hours |
 
-**Transport abstraction.** `RoomTransport` (publish/subscribe) has implementations for **Ably (default)**, **Vercel WebSockets** (if the project ever moves to Pro, where the 800 s duration makes it viable), and a self-hosted Elysia WS (the Docker image still builds). Game logic never touches the transport directly.
+**Honest capacity.** About **100 game-hours a month** fit comfortably on WebSockets. Beyond that, the automatic switch to polling keeps the site within the free tier (~300+ game-hours). Heavier use means moving to Vercel Pro, which needs no architecture change: the 800 s duration only means fewer reconnects.
+
+**Beta risk.** Vercel WebSockets and Queues are in public beta. Transport (`RoomTransport`: WebSocket | polling) and scheduling (`Scheduler`) are interfaces. **Polling mode is already a complete Vercel-only fallback** if WebSockets misbehave.
 
 ### 7.4 Desktop (zpui)
 - **Native UI in zpui:** main menu, lobby/room, in-game HUD, settings, replay viewer, tutorial overlays. Assets (fonts, icons, audio, glTF, textures) are shared from `packages/assets`.
 - **Native 3D:** a new zpui 3D module (`Surface3D` element + mesh/material/camera/light API) on Vulkan and Metal. It draws `core/geo` meshes and the glTF prop kit, and plays the `core/anim` timeline. Research and design: `docs/research/zpui-3d.md`.
 - **Research result (`docs/research/zpui-3d.md`):** zui, upstream gpui and the gpui community have **no 3D** (no depth buffer, projection or mesh pipeline), so nothing can be ported. The plan is a native `Scene3D` subsystem in zpui. It renders offscreen (HDR, MSAA, depth), then tonemaps and composites the result through a new `viewport3d` scene primitive, the same pattern zpui already uses for vector paths. It is built on both Vulkan and Metal. **A Vulkan spike already works** (lavapipe, zero validation errors): a lit cube and meeple on a table plane composited under a blurred HUD strip, with a new 3D golden image test (`docs/research/zpui-3d-spike.png`, patch `docs/research/zpui-3d-spike.patch`). Metal, glTF loading, shadows and the window element are next. Estimate for phases 1–4: about a quarter of focused work, plus art.
 - **Fallback if native 3D slips:** embed a webview running `render-three` for the board only, with the zpui HUD staying native. This is a good fallback on macOS (WKWebView), but **weak on Linux** (zpui's WebKitGTK helper renders frames offscreen). That makes the native path the priority.
-- **Networking:** the same tRPC HTTP calls as web (a small Zig JSON/HTTP client) for actions. Push comes through Ably's **SSE endpoint** (plain HTTP streaming, so no Ably Zig SDK is needed), (Ably's REST API can only *read* presence, so desktop clients mark themselves online with a `heartbeat` tRPC call every 30 s, about 120 invocations per hour). Uses the same `core/proto` event schema. Auth uses the device flow (§6.5).
+- **Networking:** the same WebSocket protocol as web (a native Zig WebSocket client, `core/proto` messages) for play, and tRPC over HTTP (a small Zig JSON client) for everything else. Polling mode is supported too. Auth uses the device flow (§6.5).
 - **Offline:** hot-seat, AI, tutorial and local replays with no network.
 - **Packaging:** `.app` (universal, signed later) and a Linux tarball/AppImage. Uses zpui's existing `app-bundle`/`dist` build steps.
 
@@ -307,8 +376,8 @@ Everything must fit the free tier. **On Hobby, going over a limit pauses the dep
 
 ## 8. Non-functional requirements
 - **Performance:** 60 fps at 1080p on an M1 or Intel Iris Xe with "Medium" settings and a full 84-tile board with props. 120 fps capable on desktop. Web time-to-interactive under 3 s on broadband, with the WASM core under 500 KB gzipped.
-- **Latency:** intent → broadcast under 300 ms p95 within region (HTTP function + Neon + Ably fan-out; fine for a turn-based game). The local engine validates moves first, so the UI responds instantly.
-- **Free-tier budget:** a usage dashboard (Vercel, Ably and Neon usage pulled into an admin page) with alerts at 50% and 80% of each limit, since going over a Hobby limit pauses the site.
+- **Latency:** intent → broadcast under 200 ms p95 within region on WebSockets (under 2.5 s in polling mode). The local engine validates moves first, so the UI responds instantly.
+- **Free-tier budget:** our own usage counters (instance live time, bot CPU, queue operations) plus the Vercel usage dashboard, with automatic degradation at 70% and 90% (§7.3), since going over a Hobby limit pauses the site.
 - **Determinism:** golden test where 1000 seeded random games produce identical final hashes on WASM and native.
 - **Reliability:** a room survives a server restart (rebuilt from the move log), and clients auto-reconnect.
 - **Security:** server-authoritative play, rate limits on intents, better-auth sessions, no secrets in the client.
@@ -319,13 +388,13 @@ Everything must fit the free tier. **On Hobby, going over a limit pauses the dep
 |---|---|---|
 | M0 | Scaffold | Better-T-Stack monorepo, Zig core builds to wasm + native, CI |
 | M1 | **Rules engine** | Base + River + Abbot + edition toggles, 100% of rule tests pass, determinism harness |
-| M2 | Web 2D playable | Hot-seat + Easy/Medium AI in a minimal 2D board (validates engine UX) |
-| M3 | Web 3D tabletop | `geo` + `anim` + `render-three`, dioramas, sound, Classic 2D toggle |
+| M2 | Web 2D playable | Hot-seat + Easy/Medium AI on the **Classic Board** style (`core/geo` 2D paths), validating engine UX |
+| M3 | Web 3D + style system | `geo` + `anim` + `render-three`, style-pack loader, **Tabletop** (default) + **Cartoon** styles, camera modes, life layer, sound |
 | M4 | Online | Accounts, invite rooms, reconnects, clocks, spectating, replays |
 | M5 | Ranked + Hard/Expert AI | Glicko-2 queues, MCTS bots, tutorial |
 | M6 | zpui 3D spike → module | Lit glTF in a zpui window on Vulkan + Metal, then the full board renderer |
-| M7 | Desktop app | Native HUD/menus, offline modes, online via device-flow auth, packaging |
-| M8 | Polish | Performance tiers, a11y, end-game cinematics |
+| M7 | Desktop app | Native HUD/menus, **Classic Board on zpui paths first**, then the 3D styles, offline modes, online via device-flow auth, packaging (downloads on Vercel Blob) |
+| M8 | Polish + more styles | **Living Diorama**, **Blueprint/High-contrast**, Storybook (stretch), performance tiers, a11y, end-game cinematics |
 
 M6 can run in parallel with M2–M5.
 
@@ -342,8 +411,8 @@ M6 can run in parallel with M2–M5.
 | Two renderers drift visually | Geometry, animation timeline, materials and assets are shared data. Golden images are compared across renderers |
 | Zig 0.17 churn / WASM toolchain | Pin the Zig version (same as zpui). Keep the WASM ABI small and C-like |
 | Field-scoring edge cases | Union-find feature graph + exhaustive rulebook-derived fixtures |
-| Hobby limits pause the whole deployment when exceeded | No held sockets on Vercel. Push goes through Ably. Bots run on clients. Usage alerts at 50% and 80% |
-| Ably free caps (200 connections / 200 channels) | Fine at personal scale. Reuse one channel per game for players and spectators. `RoomTransport` allows swapping providers |
+| Hobby limits pause the whole deployment when exceeded | Sockets only during live play, bot CPU cap, instance-time counter, automatic polling mode at 70% and online pause at 90% |
+| Many visual styles multiply art and shader work | Styles are data packs over shared geometry and animation. A fixed set of 4 shading models. Per-style golden images. Styles beyond Tabletop, Classic and Cartoon are M8 |
 | Concurrent intents land on different instances | Unique `(gameId, ply)` compare-and-set, and the deterministic engine rebuilds state from the log on every call |
 | Server bots exhausting the 4 CPU-hour Hobby budget | 1 s think-time cap, monthly bot-CPU counter with a Medium fallback at about 2.5 h, usage alerts |
 | Vercel Queues is in public beta; Elysia on the Bun runtime is beta | Queues sits behind a `Scheduler` interface with QStash as the fallback. Elysia can run on the Node runtime on Vercel if Bun has problems |
@@ -353,13 +422,14 @@ M6 can run in parallel with M2–M5.
 |---|---|---|
 | 1 | The Abbot + gardens in v1? | **Yes**, on by default (§5.6) |
 | 2 | Ranked queues | **3–4 player FFA** (separate 3p and 4p queues), no 1v1 ranked |
-| 3 | Server hosting | **Vercel Hobby (free)**: HTTP functions + **Vercel Queues** (turn clocks, bots, matchmaking retries), **Ably free** for push, **Neon free** Postgres. No Redis. Vercel WebSockets were evaluated and rejected for Hobby: 300 s cap, idle sockets bill memory, no cross-instance broadcast (§7.3) |
+| 3 | Server hosting | **Vercel only, Hobby (free)**: Functions (HTTP + WebSockets), Queues, Blob, Edge Config, and Postgres via the Vercel Marketplace (Neon, billed by Vercel). Fan-out via Postgres LISTEN/NOTIFY. No Ably or Redis (§7.3) |
 | 4 | Chat | **Emoji reactions only** (§6.8) |
 | 5 | Spectating ranked | **Live**, no delay |
+| 6 | Visual design | **All styles**, chosen per player and switchable live: Tabletop, Classic 2D, Cartoon, Living Diorama, Storybook, Blueprint × camera modes (§6.3) |
 
 ### Still open
 - Hand-of-3 variant: v1 or P1? (Currently P1, off by default.)
-- Region: default `iad1` (Vercel) + `us-east-1` (Neon) + Ably's nearest datacenter, unless you prefer elsewhere.
+- Region: default `iad1` (Vercel) + `us-east-1` (Marketplace Postgres), unless you prefer elsewhere.
 
 ## 13. IP note
 "Carcassonne" and its art are trademarks/copyrights of Hans im Glück / Z-Man Games. This project is **private, for personal use**, and all art assets are original (procedural plus our own models). Do not publish publicly or deploy publicly without rebranding.
