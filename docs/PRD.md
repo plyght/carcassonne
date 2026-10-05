@@ -64,8 +64,8 @@ bun create better-t-stack@latest carcassonne --frontend next --backend elysia --
 |---|---|
 | Monorepo | Turborepo + Bun workspaces |
 | Web app | Next.js (App Router), React, Three.js (WebGPU renderer with WebGL2 fallback), deployed on Vercel |
-| API | Elysia on Bun, tRPC for request/response, WebSockets for real-time game traffic. **Deployed serverless on Vercel** (Bun runtime, `Bun.serve` entrypoint with WebSocket handlers; Vercel Functions WebSocket support, public beta since June 2026). Stateless instances; room state in Postgres + Redis (§7.3) |
-| Realtime fan-out | Redis (Upstash via Vercel Marketplace) pub/sub per room, plus locks and the matchmaking queue |
+| API | Elysia on Bun + tRPC, **serverless on Vercel Hobby (free)**. Request/response only: every game action is a short HTTP call. No long-lived server process or held sockets (§7.3) |
+| Realtime push | **Ably free tier** (6M messages/month, 200 concurrent connections, 200 channels). The server publishes, and clients only subscribe. The web client uses ably-js; the desktop client uses Ably's SSE endpoint |
 | Auth | better-auth (email + OAuth; device-authorization flow for desktop) |
 | DB | Postgres on Neon, Drizzle ORM |
 | Core | **Zig** (0.17, matching zpui): rules engine, AI, procedural geometry, animation timeline, protocol codec. Builds to `wasm32` (web + server) and native (desktop) |
@@ -224,7 +224,7 @@ Adaptive ambient soundscape (birds, wind, river near river tiles), tile and meep
 | Hard | MCTS (determinized over the remaining tile bag) with a heuristic rollout policy | ~1 s |
 | Expert | MCTS + deeper search + opponent modelling, multi-threaded on desktop | ~2–3 s |
 
-The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on a background thread on desktop, and in the server worker pool for bots in online rooms.
+The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on a background thread on desktop, and, for bots in online rooms, in the **host player's client** (§7.3). This keeps Expert MCTS off Vercel's 4 CPU-hour free allowance.
 
 ## 7. Architecture
 
@@ -246,29 +246,42 @@ The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on
 - Game canvas: `render-three` builds the scene from `core/geo` buffers and plays the `core/anim` timeline. React handles the HUD/overlays.
 - Network: WebSocket to Elysia, with optimistic local validation by the same engine.
 
-### 7.3 Server (Elysia on Bun, serverless on Vercel)
-Vercel Functions now accept and hold WebSocket connections (public beta, June 2026). On the Bun runtime, `Bun.serve` with WebSocket handlers works as the function entrypoint. Each connection is pinned to one function instance until it closes or hits the function's maximum duration (300 s by default, 800 s on Pro). New connections can land on any instance, and there is no built-in broadcast across instances. The design follows from that:
+### 7.3 Server (Elysia on Bun, Vercel Hobby, free tier)
+Everything must fit the free tier. **On Hobby, going over a limit pauses the deployment** (there is no overage billing), so the whole site would go down. The design keeps every number well under the limits.
 
-- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays list/fetch, stats.
-- **WS `/game/:roomId`:** join/leave, intents, snapshots, events, clock ticks, emoji reactions. A socket subscribes to its room's Redis channel and forwards what it receives.
-- **No in-memory rooms.** The authoritative state is the **move log in Postgres** plus a cached snapshot (`state blob + ply`) in Redis. To apply an intent, a server instance:
-  1. loads the snapshot (and falls back to replaying the log from Postgres on a cache miss),
-  2. validates and applies the intent with core-wasm,
-  3. appends the move using **compare-and-set on `ply`**, enforced by a unique `(gameId, ply)` constraint, so two racing instances can't both commit,
-  4. updates the snapshot and publishes the events to the room channel.
-  Determinism makes this safe: any instance can rebuild any room.
-- **Connection lifetime:** sockets are closed at the function's maximum duration (800 s on Pro). Clients reconnect without the player noticing, before the limit or on close, using `resume{gameId, lastPly}`. The server sends back the missing events, or a snapshot if too much was missed. The same path covers deploys and network drops.
-- **Clocks without a long-lived process:** each turn stores `turnDeadline` in Redis and Postgres. Every instance holding a socket for that room sets a local timer. When it fires, the instance tries to claim the timeout with the same ply compare-and-set, so exactly one wins and auto-plays. If no sockets are connected, the next request touching the room applies any expired timeouts first (lazy enforcement). A 1-minute Vercel Cron sweeps abandoned rooms.
-- **Bots:** a bot's move is computed in the function that committed the preceding move (Hard ~1 s, Expert ~2–3 s, within limits), then committed through the same compare-and-set path. If several bots play in a row, the function chains their moves or hands off with a self-invoked request.
-- **Matchmaking:** Redis sorted sets per queue (3p, 4p). The ticket's own request (or a cron sweep) forms matches atomically with a Lua script, creates the room and notifies players over their lobby socket.
-- **Fallback:** while the WebSocket feature is in beta, the transport is abstracted (`RoomTransport`). If Vercel's limits get in the way, the same stateless handlers can run behind a hosted pub/sub provider (Ably/Pusher), or the Elysia app can run in its existing Docker image with no code changes.
+**Hobby limits that drive the design:**
+| Limit | Value | Consequence |
+|---|---|---|
+| Function max duration | **300 s** | No long-running game server. Holding WebSockets means reconnecting every ≤5 min |
+| Function memory | Fixed **2 GB** | 360 GB-hrs / 2 GB = **180 instance-hours/month**. A held WebSocket pins an instance, so a 4-player game spread over up to 4 instances could burn 4 instance-hours per hour of play. That is too tight, so **we don't hold sockets on Vercel** |
+| Active CPU | **4 CPU-hrs/month** | Engine moves are cheap (WASM, about 1 ms), but MCTS bots are not, so bots run on clients |
+| Invocations | 1M/month | About 300 per game, so plenty |
+| Cron | Once per day | No per-minute sweeps. Timeouts are enforced lazily or triggered by clients |
+| Use | Non-commercial | Fine (private project) |
+
+**Shape: HTTP for writes, Ably for push, Postgres as the source of truth**
+- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays, stats, and the game calls `submitIntent{gameId, ply, intent}`, `claimTimeout{gameId, ply}`, `submitBotMove{gameId, ply, move}`, `react{gameId, emoji}`. The desktop app calls the same tRPC HTTP endpoints. They are plain JSON over HTTP, so a small Zig client is enough.
+- **Stateless rooms.** The authoritative state is the **move log in Neon Postgres**. Each call:
+  1. loads `(seed, ruleset, moves[])` and replays them with core-wasm (about 100 plies takes well under a millisecond, so **no Redis cache is needed**),
+  2. validates and applies the intent,
+  3. inserts the move with a unique `(gameId, ply)` key, which acts as compare-and-set: if two calls race, the second fails and gets a "stale ply, resync" reply,
+  4. publishes the resulting events to the Ably channel `game:{id}` through Ably's REST API.
+- **Push via Ably (free).** A tRPC call issues each client an Ably token with **subscribe + presence** capability (no publish) on its game, lobby and matchmaking channels. Clients can't publish, so they can't forge events. Ably's channel *rewind/history* covers short disconnects. On a longer gap, the client calls `getGame{sincePly}` over HTTP. Ably *presence* drives "who's connected" and AFK indicators.
+  - Budget: about 300 events × 5 recipients (players and spectators) ≈ 1,500 messages per game, which is roughly 4,000 games/month on the free tier. 200 concurrent connections means about 40 simultaneous full tables.
+- **Clocks without a server process.** Each move stores `turnDeadline` (server time). Clients count down locally. When the deadline passes, every connected client calls `claimTimeout{gameId, ply}`. The server checks the deadline against server time and auto-plays (Easy-AI tile, no meeple), and the unique ply key makes exactly one claim succeed. If nobody is connected, any later call on that game applies the expired timeouts first. Abandoned games are swept by the daily cron.
+- **Bots in online rooms** are computed by the **host player's client** (a WASM worker on web, a native thread on desktop) and sent with `submitBotMove`. The server checks legality like any other move. If the host disconnects, another connected player's client takes over bot duty. If nobody is connected, the server plays the bot at Easy level (cheap). **Ranked games have no bots.**
+- **Matchmaking (3p/4p queues):** a `queue_ticket` table in Postgres. Each `joinQueue` call tries to form a match in one transaction (`SELECT … FOR UPDATE SKIP LOCKED`, using the Neon serverless driver's WebSocket pool for transactions), creates the room and publishes `match_found` on each player's Ably channel. Clients in the queue re-call `pollQueue` every 15 s as a backstop.
+- **Emoji reactions:** `react` is a cheap call (rate-limited per user in Postgres or in memory per instance, best-effort), published to `game:{id}:react`.
+- **Neon free tier:** scales to zero when idle, with compute hours well within the allowance for personal use. Keep the Neon region next to the Vercel function region (e.g. `iad1` ↔ `us-east-1`).
+
+**Transport abstraction.** `RoomTransport` (publish/subscribe) has implementations for **Ably (default)**, **Vercel WebSockets** (if the project ever moves to Pro, where the 800 s duration makes it viable), and a self-hosted Elysia WS (the Docker image still builds). Game logic never touches the transport directly.
 
 ### 7.4 Desktop (zpui)
 - **Native UI in zpui:** main menu, lobby/room, in-game HUD, settings, replay viewer, tutorial overlays. Assets (fonts, icons, audio, glTF, textures) are shared from `packages/assets`.
 - **Native 3D:** a new zpui 3D module (`Surface3D` element + mesh/material/camera/light API) on Vulkan and Metal. It draws `core/geo` meshes and the glTF prop kit, and plays the `core/anim` timeline. Research and design: `docs/research/zpui-3d.md`.
 - **Research result (`docs/research/zpui-3d.md`):** zui, upstream gpui and the gpui community have **no 3D** (no depth buffer, projection or mesh pipeline), so nothing can be ported. The plan is a native `Scene3D` subsystem in zpui. It renders offscreen (HDR, MSAA, depth), then tonemaps and composites the result through a new `viewport3d` scene primitive, the same pattern zpui already uses for vector paths. It is built on both Vulkan and Metal.
 - **Fallback if native 3D slips:** embed a webview running `render-three` for the board only, with the zpui HUD staying native. This is a good fallback on macOS (WKWebView), but **weak on Linux** (zpui's WebKitGTK helper renders frames offscreen). That makes the native path the priority.
-- **Networking:** a native WebSocket client using the same `core/proto` codec. Auth uses the device flow (§6.5).
+- **Networking:** the same tRPC HTTP calls as web (a small Zig JSON/HTTP client) for actions. Push comes through Ably's **SSE endpoint** (plain HTTP streaming, so no Ably Zig SDK is needed), with presence over Ably's REST API. Uses the same `core/proto` event schema. Auth uses the device flow (§6.5).
 - **Offline:** hot-seat, AI, tutorial and local replays with no network.
 - **Packaging:** `.app` (universal, signed later) and a Linux tarball/AppImage. Uses zpui's existing `app-bundle`/`dist` build steps.
 
@@ -280,11 +293,12 @@ Vercel Functions now accept and hold WebSocket connections (public beta, June 20
 | Server, auth, DB, account pages (web) | Platform glue: keychain, file paths, packaging |
 
 ### 7.6 Data model (Drizzle, sketch)
-`user`, `session`, `account` (better-auth) · `profile(userId, displayName, avatar, colorPref)` · `rating(userId, queue, mu, phi, sigma, games)` · `room(id, code, hostId, ruleset jsonb, status, createdAt)` · `game(id, roomId, engineVersion, seed, ruleset, startedAt, endedAt, ranked)` · `game_player(gameId, seat, userId?, botTier?, color, finalScore, breakdown jsonb)` · `move(gameId, ply, seat, payload bytea, at)`.
+`user`, `session`, `account` (better-auth) · `profile(userId, displayName, avatar, colorPref)` · `rating(userId, queue, mu, phi, sigma, games)` · `room(id, code, hostId, ruleset jsonb, status, createdAt)` · `game(id, roomId, engineVersion, seed, ruleset, startedAt, endedAt, ranked, turnDeadline, botHostSeat)` · `game_player(gameId, seat, userId?, botTier?, color, finalScore, breakdown jsonb)` · `move(gameId, ply, seat, payload bytea, at)` (PK `(gameId, ply)`) · `queue_ticket(id, userId, queue, rating, createdAt)`.
 
 ## 8. Non-functional requirements
 - **Performance:** 60 fps at 1080p on an M1 or Intel Iris Xe with "Medium" settings and a full 84-tile board with props. 120 fps capable on desktop. Web time-to-interactive under 3 s on broadband, with the WASM core under 500 KB gzipped.
-- **Latency:** intent → broadcast under 150 ms p95 within region.
+- **Latency:** intent → broadcast under 300 ms p95 within region (HTTP function + Neon + Ably fan-out; fine for a turn-based game). The local engine validates moves first, so the UI responds instantly.
+- **Free-tier budget:** a usage dashboard (Vercel, Ably and Neon usage pulled into an admin page) with alerts at 50% and 80% of each limit, since going over a Hobby limit pauses the site.
 - **Determinism:** golden test where 1000 seeded random games produce identical final hashes on WASM and native.
 - **Reliability:** a room survives a server restart (rebuilt from the move log), and clients auto-reconnect.
 - **Security:** server-authoritative play, rate limits on intents, better-auth sessions, no secrets in the client.
@@ -318,22 +332,23 @@ M6 can run in parallel with M2–M5.
 | Two renderers drift visually | Geometry, animation timeline, materials and assets are shared data. Golden images are compared across renderers |
 | Zig 0.17 churn / WASM toolchain | Pin the Zig version (same as zpui). Keep the WASM ABI small and C-like |
 | Field-scoring edge cases | Union-find feature graph + exhaustive rulebook-derived fixtures |
-| Vercel WebSockets are in beta; connections are capped at the function's maximum duration (800 s on Pro); no cross-instance broadcast | Stateless rooms (Postgres log + Redis snapshot/pub-sub), automatic client resume, `RoomTransport` abstraction with an Ably or Docker fallback |
-| Concurrent intents land on different instances | Unique `(gameId, ply)` compare-and-set, and the deterministic engine rebuilds from the log |
+| Hobby limits pause the whole deployment when exceeded | No held sockets on Vercel. Push goes through Ably. Bots run on clients. Usage alerts at 50% and 80% |
+| Ably free caps (200 connections / 200 channels) | Fine at personal scale. Reuse one channel per game for players and spectators. `RoomTransport` allows swapping providers |
+| Concurrent intents land on different instances | Unique `(gameId, ply)` compare-and-set, and the deterministic engine rebuilds state from the log on every call |
+| Host-computed bot moves could be manipulated | Only legality is checked server-side. That is acceptable for a private game, and ranked games have no bots |
 
 ## 12. Decisions log
 | # | Question | Decision |
 |---|---|---|
 | 1 | The Abbot + gardens in v1? | **Yes**, on by default (§5.6) |
 | 2 | Ranked queues | **3–4 player FFA** (separate 3p and 4p queues), no 1v1 ranked |
-| 3 | Server hosting | **Serverless on Vercel** with WebSockets (§7.3), Neon Postgres, Redis via Vercel Marketplace |
+| 3 | Server hosting | **Vercel Hobby (free)**: HTTP-only functions, **Ably free** for push, **Neon free** Postgres. No Redis (§7.3) |
 | 4 | Chat | **Emoji reactions only** (§6.8) |
 | 5 | Spectating ranked | **Live**, no delay |
 
 ### Still open
 - Hand-of-3 variant: v1 or P1? (Currently P1, off by default.)
-- Vercel plan: the PRD assumes **Pro** (800 s function duration, which reduces reconnect churn).
-- Neon and Redis regions should sit next to the Vercel function region (e.g. `iad1`).
+- Region: default `iad1` (Vercel) + `us-east-1` (Neon) + Ably's nearest datacenter, unless you prefer elsewhere.
 
 ## 13. IP note
 "Carcassonne" and its art are trademarks/copyrights of Hans im Glück / Z-Man Games. This project is **private, for personal use**, and all art assets are original (procedural plus our own models). Do not publish publicly or deploy publicly without rebranding.
