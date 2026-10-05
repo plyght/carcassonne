@@ -1,6 +1,6 @@
 # 3D in zpui: research findings and design
 
-Status: research + design, 2026-10-05. Nothing here has been merged into zpui.
+Status: research + design + Vulkan spike, 2026-10-05. Nothing here has been merged into or pushed to zpui.
 
 Question: can the Carcassonne desktop app (built on [zpui](https://github.com/plyght/zpui))
 get a "realistic tabletop that comes to life" look (PBR wooden table, cardboard tiles, wooden
@@ -316,9 +316,9 @@ PBR + shadows + tonemap is about 600–900 lines and will keep changing. Recomme
   `gen-msl` and fails on `git diff --exit-code`, so the generated file cannot drift.
 - Binding layout must survive SPIRV-Cross. Use explicit `layout(set=0, binding=N)` and keep
   push constants ≤ 4 KB, since SPIRV-Cross maps them to a `constant` buffer slot. BDA
-  (`GL_EXT_buffer_reference`) **does** translate to MSL device pointers in modern
-  SPIRV-Cross, but verify this in the spike. If it misbehaves, the fallback is plain SSBOs
-  (`readonly buffer`) on both backends.
+  (`GL_EXT_buffer_reference`) translates to MSL `device T*` pointers. The spike verified this
+  for `mesh.vert/frag` and `viewport3d.frag`; see the spike section. Fallback if it
+  misbehaves: plain SSBOs (`readonly buffer`) on both backends.
 - Alternative: Slang compiles natively to both SPIR-V and MSL. It is a heavier dependency
   (about 100 MB binary) and not in CI today. Revisit only if GLSL→MSL becomes painful.
 - For the spike only, a hand-written GLSL/MSL pair is fine (about 150 lines each).
@@ -392,7 +392,7 @@ Rough effort is for one engineer familiar with Zig and with Vulkan or Metal.
 | Phase | Deliverable | Effort |
 |---|---|---|
 | **0. Toolchain** | Zig 0.17, `glslc`, `spirv-cross`, mesa lavapipe on the dev box; `zig build test render-test` passes on an unmodified zpui checkout. | 0.5 d |
-| **1. Spike: "spinning lit glTF cube"** (fork of zpui, branch `three-spike`) | `src/three/math.zig`; minimal `Gfx3D` (one mesh, one material, no textures); Vulkan: RGBA16F + D32F offscreen, one Lambert+GGX pipeline, composite pipeline; Metal: depth-state bindings + the same passes (hand-written MSL); cgltf loading `Box.glb` from the glTF sample assets; `examples/three_cube.zig` window with `requestAnimationFrame`; `render-test-3d` golden harness. | 5–8 d |
+| **1. Spike: "spinning lit glTF cube"** (fork of zpui, branch `three-spike`; Vulkan half already prototyped, see the spike section) | `src/three/math.zig`; minimal `Gfx3D` (one mesh, one material, no textures); Vulkan: RGBA16F + D32F offscreen, one Lambert+GGX pipeline, composite pipeline; Metal: depth-state bindings + the same passes (hand-written MSL); cgltf loading `Box.glb` from the glTF sample assets; `examples/three_cube.zig` window with `requestAnimationFrame`; `render-test-3d` golden harness. | 5–8 d |
 | **2. Real pipeline** | GLSL single-source + `gen-msl` + CI drift check; textures (sRGB/linear, mipmaps), normal maps, alpha modes; MSAA 4×; directional shadow map with PCF; reverse-Z; instancing; frustum culling; dirty-flag caching; picking (CPU); resize/DPI; device-lost and swapchain-recreate correctness; Vulkan validation-clean. | 3–4 wk |
 | **3. Tabletop look** | IBL (offline-baked prefiltered cube + BRDF LUT, KTX2 loader), tonemap choices, tile texture array, table/tile/meeple assets, camera rig (orbit, zoom-to-cursor, smooth damping), placement ghost, hover outline. | 3–4 wk (plus art) |
 | **4. Comes to life** | Particles (smoke, dust, sparkles) with soft depth fade; point lights; bloom-lite; transform/dissolve animations; glTF animation channels; skinning (sheep/cows walk cycles); perf pass (GPU timestamps, budget 4 ms at 1440p on an M1 / integrated Intel). | 4–6 wk |
@@ -514,19 +514,72 @@ code and it still looks like a tabletop, but there is no free camera and no real
 
 ---
 
-## Spike prototype status
+## Spike prototype status (done in this research pass, Vulkan only)
 
-See the summary returned with this doc. In short, Zig 0.17, `glslc` and lavapipe are **not**
-installed in this research container. The prototype was not built here.
-To set up a dev box:
+I built a partial phase 1 spike in a scratch copy of zpui at
+`/home/user/research/zpui-3d-spike`. The full diff against the pristine checkout is
+`/home/user/research/zpui-3d-spike.patch` (about 1.3k lines, mostly new files). Nothing was
+pushed, and `/home/user/plyght/zpui` is untouched. Rendered output:
+`docs/research/zpui-3d-spike.png` (next to this doc).
+
+![spike render](zpui-3d-spike.png)
+
+**What it does:**
+
+- A new scene primitive, `Viewport3D`, and `PrimitiveKind.viewport3d` in `src/scene.zig`.
+  The existing `BatchIterator` interleaves it with every other kind by draw order with no
+  other changes.
+- `src/three/math.zig` (Mat4/Vec3, lookAt, infinite reverse-Z perspective, with tests) and
+  `src/three/scene3d.zig` (Scene3D, Camera, DirectionalLight, Material, `cube`/`plane` meshes,
+  GPU structs with comptime size asserts).
+- Vulkan renderer changes:
+  - `Recorder.renderViewports3D` runs **before** the UI pass and renders each viewport into
+    an RGBA16F 4× MSAA color target and a D32F depth target, resolving to a 1× texture.
+    Depth uses reverse-Z with `GREATER` and back-face culling. Vertices and indices are
+    *pulled through buffer device addresses*, following zpui's convention, so the pipeline
+    has no vertex-input state.
+  - The `viewport3d` composite pipeline in the main pass applies exposure, the Khronos PBR
+    Neutral tonemap, the sRGB OETF, premultiplication, and zpui's `quad_sdf` rounded corners
+    and content-mask clip.
+  - `vk.zig` gained depth-aspect images and barriers.
+- Shaders `mesh.vert/frag`: glTF-style GGX/Smith/Schlick BRDF, one directional light,
+  hemisphere ambient.
+- `examples/render_test_3d.zig` and `zig build render-test-3d`. The scene has a wood panel,
+  a rounded viewport with a cube and a "meeple" on a table plane, and 2D UI *over* the 3D
+  content: a backdrop-blur strip and a translucent HUD chip. It compares against
+  `tests/golden/render-test-3d.png`, then spins the scene for 30 frames on a headless
+  swapchain with a resize partway through.
+- Metal: `.viewport3d` is skipped with a warn-once.
+
+**Results on lavapipe** (Mesa 25.2.8, Zig 0.17.0, `VK_LAYER_KHRONOS_validation` active):
+
+- Builds and runs. Zero validation errors. Golden round-trip diff is 0.
+- The 30-frame swapchain spin with resize works.
+- The existing 2D `render-test` still matches its golden exactly, so there is no regression.
+- `zig build metal-check -Dtarget=aarch64-macos` still compiles.
+- `zig build test`: 5 freetype font tests fail because the system fonts from CI's
+  `LINUX_DEPS` (`fonts-inter`, Noto) were not installed here. Those failures are not
+  related to the change.
+
+**SPIRV-Cross check.** With `spirv-cross --msl --msl-version 20100` (Ubuntu's 2021 build),
+`mesh.vert`, `mesh.frag` and `viewport3d.frag` translate cleanly. BDA push constants become
+`constant Push& [[buffer(0)]]` holding `device T*` pointers, which validates the
+"GLSL single source → generated MSL" plan. Compile the MSL variant without `glslc -O`, or
+with `-g`, so struct and member names survive; with `-O`, SPIRV-Cross emits `_13`, `_m0`
+and similar.
+
+**Not done in the spike** (the remaining phase 1 work): the Metal pass, cgltf glTF loading
+(the spike uses procedural meshes), the `viewport3d()` element and `window.paintViewport3D`,
+a live windowed demo, persistent GPU mesh buffers (meshes are re-copied into the per-frame
+host buffer), and shadows. Re-run the spike with:
 
 ```sh
-# Zig 0.17 (matches zpui's minimum_zig_version / CI mlugg/setup-zig version: 0.17.0)
 curl -LO https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz && tar xf zig-*.tar.xz
-# Vulkan + lavapipe + shader tools (Debian/Ubuntu; same list as zpui ci.yml LINUX_DEPS)
-sudo apt-get install libvulkan-dev mesa-vulkan-drivers glslc spirv-cross vulkan-validationlayers
+sudo apt-get install libvulkan-dev mesa-vulkan-drivers glslc spirv-cross vulkan-validationlayers \
+  libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libx11-xcb-dev \
+  libxcb1-dev libxcb-xkb-dev libxcursor-dev libxi-dev libxrandr-dev libfreetype-dev libharfbuzz-dev libfontconfig-dev
 export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json
-zig build test render-test   # in a zpui checkout, before touching anything
+cd /home/user/research/zpui-3d-spike && zig build render-test-3d   # and: zig build render-test
 ```
 
 ## References
