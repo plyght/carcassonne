@@ -82,7 +82,8 @@ function TileSvgImpl({ def, art: source, palette: p, rot, x = 0, y = 0, hitTest,
   const up = (pt: Pt) => rotatePoint(pt, rot);
 
   return (
-    <g transform={`translate(${x * TILE} ${y * TILE})`} className={className} opacity={opacity}>
+    <g transform={`translate(${x * TILE} ${y * TILE})`} opacity={opacity}>
+    <g className={className}>
       <g transform={rot ? `rotate(${rot * 90} 50 50)` : undefined}>
         <rect width={TILE} height={TILE} fill={p.tile.field} />
         {fields.map((f) => (
@@ -150,6 +151,7 @@ function TileSvgImpl({ def, art: source, palette: p, rot, x = 0, y = 0, hitTest,
         <VillageIcon key={`v${i}`} at={up(v)} p={p} />
       ))}
       {cities.flatMap((f) => f.pennants.map((pt, i) => <Pennant key={`p${f.index}-${i}`} at={up(pt)} p={p} />))}
+    </g>
     </g>
   );
 }

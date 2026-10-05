@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 
 import "../index.css";
 import Header from "@/components/header";
@@ -15,9 +15,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const display = Fraunces({
+  variable: "--font-display-serif",
+  subsets: ["latin"],
+  axes: ["SOFT", "opsz"],
+});
+
 export const metadata: Metadata = {
-  title: "carcassonne",
-  description: "carcassonne",
+  title: { default: "Carcassonne", template: "%s · Carcassonne" },
+  description: "Lay tiles, claim cities, roads and fields. Play against bots, friends on one device, or online.",
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4ead8" },
+    { media: "(prefers-color-scheme: dark)", color: "#221a13" },
+  ],
 };
 
 export default function RootLayout({
@@ -27,11 +40,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${display.variable} antialiased`}>
         <Providers>
-          <div className="grid grid-rows-[auto_1fr] h-svh">
+          <div className="bg-parchment grid h-svh grid-rows-[auto_1fr]">
             <Header />
-            {children}
+            <main className="min-h-0 overflow-y-auto">{children}</main>
           </div>
         </Providers>
       </body>

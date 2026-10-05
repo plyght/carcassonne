@@ -159,6 +159,13 @@ export class LocalEngineClient extends GameClient {
     }, this.config.aiDelayMs ?? 650);
   }
 
+  /** Best move for the current (human) player according to the medium bot. */
+  async hint(): Promise<Move | null> {
+    const view = this.state.view;
+    if (!view || view.status !== "playing" || this.busy || this.state.thinking) return null;
+    return this.engine.aiChoose(this.handle, "medium", 300, seedFromString(`${this.config.seed}:hint:${view.ply}`));
+  }
+
   /** Take back to the last human move (unlimited in local games). */
   async undo(): Promise<void> {
     if (!this.moves.length || this.busy) return;

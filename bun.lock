@@ -48,6 +48,9 @@
       "version": "0.1.0",
       "dependencies": {
         "@carcassonne/api": "workspace:*",
+        "@carcassonne/game-client": "workspace:*",
+        "@carcassonne/protocol": "workspace:*",
+        "@carcassonne/render-classic": "workspace:*",
         "@carcassonne/ui": "workspace:*",
         "@swc/helpers": "^0.5.23",
         "@tanstack/react-form": "^1.33.5",

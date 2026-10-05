@@ -67,6 +67,10 @@ export interface ClassicBoardProps {
   onHotspot?(opt: FigureOption): void;
   onRecall?(): void;
   onFeatureHover?(node: NodeRef | null): void;
+  /** Screen-space margins covered by HUD panels; fitting frames the board inside them. */
+  insets?: { top: number; right: number; bottom: number; left: number };
+  /** Re-frame automatically when the board grows out of view. */
+  autoFit?: boolean;
   /** Imperative camera commands (keyboard shortcuts in the host app). */
   commandsRef?: { current: BoardCommands | null };
 }
@@ -169,17 +173,25 @@ export function ClassicBoard(props: ClassicBoardProps) {
     return () => ro.disconnect();
   }, []);
 
+  const insets = props.insets ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const area = {
+    x: insets.left,
+    y: insets.top,
+    w: Math.max(120, size.w - insets.left - insets.right),
+    h: Math.max(120, size.h - insets.top - insets.bottom),
+  };
+
   const fit = useCallback(() => {
     const cells: Cell[] = [...(view?.board ?? []).map((t) => ({ x: t.x, y: t.y })), ...targets];
     const b = boundsOf(cells);
     const wUnits = (b.x1 - b.x0 + 1 + 1) * TILE;
     const hUnits = (b.y1 - b.y0 + 1 + 1) * TILE;
-    const s = Math.max(MIN_S, Math.min(1.1, Math.min(size.w / wUnits, size.h / hUnits)));
+    const s = Math.max(MIN_S, Math.min(1.1, Math.min(area.w / wUnits, area.h / hUnits)));
     const cx = ((b.x0 + b.x1 + 1) / 2) * TILE;
     const cy = ((b.y0 + b.y1 + 1) / 2) * TILE;
-    setCam({ s, tx: size.w / 2 - cx * s, ty: size.h / 2 - cy * s });
+    setCam({ s, tx: area.x + area.w / 2 - cx * s, ty: area.y + area.h / 2 - cy * s });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size.w, size.h, view, targets]);
+  }, [area.x, area.y, area.w, area.h, view, targets]);
 
   const fittedFor = useRef<string>("");
   useEffect(() => {
@@ -189,6 +201,21 @@ export function ClassicBoard(props: ClassicBoardProps) {
     fittedFor.current = key;
     fit();
   }, [fitSignal, size.w, size.h, view, fit]);
+
+  // Auto-fit: when the board (plus legal spots) leaves the visible area, re-frame it.
+  const tileCount = view?.board.length ?? 0;
+  useEffect(() => {
+    if (!props.autoFit || !view) return;
+    const cells: Cell[] = [...view.board.map((t) => ({ x: t.x, y: t.y })), ...targets];
+    const b = boundsOf(cells);
+    const c = camRef.current;
+    const left = b.x0 * TILE * c.s + c.tx;
+    const right = (b.x1 + 1) * TILE * c.s + c.tx;
+    const top = b.y0 * TILE * c.s + c.ty;
+    const bottom = (b.y1 + 1) * TILE * c.s + c.ty;
+    if (left < area.x || top < area.y || right > area.x + area.w || bottom > area.y + area.h) fit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tileCount, targets.length, props.autoFit]);
 
   // ── coordinates ─────────────────────────────────────────────────────────
   const toBoard = useCallback((clientX: number, clientY: number) => {
@@ -249,6 +276,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
     const el = svgRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (propsRef.current.interactive === false) return;
       e.preventDefault();
       const p = propsRef.current;
       const cell = cellAt(e.clientX, e.clientY);
@@ -399,8 +427,8 @@ export function ClassicBoard(props: ClassicBoardProps) {
       <svg
         ref={svgRef}
         className={`cc-board ${anim ? "cc-anim" : ""} ${panning ? "cc-panning" : ""}`}
-        width={size.w}
-        height={size.h}
+        width="100%"
+        height="100%"
         role="application"
         aria-label={ariaLabel}
         onPointerDown={onPointerDown}
@@ -412,7 +440,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
           e.preventDefault();
           if (props.onRotate && !ghost?.pending) props.onRotate(1);
         }}
-        style={{ display: "block", cursor: panning ? "grabbing" : hoverCell ? "pointer" : "grab" }}
+        style={{ display: "block", position: "absolute", inset: 0, cursor: panning ? "grabbing" : hoverCell ? "pointer" : "grab" }}
       >
         <style>{BOARD_CSS}</style>
         <PaletteDefs palette={palette} />
@@ -531,7 +559,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   key={`m${t.x},${t.y},${fig.feature},${i}`}
                   x={fx}
                   y={fy - 4}
-                  size={26}
+                  size={34}
                   kind={fig.figure}
                   lying={kind === "field"}
                   fill={a.fill}
@@ -668,12 +696,12 @@ export function ClassicBoard(props: ClassicBoardProps) {
           ))}
         </g>
       </svg>
-      <BoardControls
+      {interactive ? <BoardControls
         onZoomIn={() => zoomCenter(1.25)}
         onZoomOut={() => zoomCenter(0.8)}
         onFit={fit}
         palette={palette}
-      />
+      /> : null}
     </div>
   );
 }
