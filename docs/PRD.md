@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v0.1 |
+| Status | Draft v0.2 (open questions resolved) |
 | Date | 2026-10-05 |
 | Owner | @plyght |
 | Distribution | Private / personal use only. Not for public release (see §13 IP) |
@@ -12,7 +12,7 @@
 
 ## 1. Summary
 
-A digital adaptation of the Carcassonne board game, with **full rules parity** for the base game plus **The River**, playable on:
+A digital adaptation of the Carcassonne board game, with **full rules parity** for the base game plus **The River** and **The Abbot** (both in the current box), playable on:
 
 - **Web**: Next.js and Three.js, deployed to Vercel.
 - **Desktop**: native macOS and Linux apps built on **zpui** (our Zig port of gpui), with a new native 3D renderer.
@@ -33,10 +33,10 @@ Play modes: online multiplayer (invite rooms, ranked play, spectating), local ho
 5. **Full online stack.** Accounts, invite rooms, ranked ladder, spectating, replays and game clocks.
 
 ### Non-goals (v1)
-- Expansions other than the River (the engine is still designed so they can be added; see §5.6).
+- Expansions other than the River and the Abbot (the engine is still designed so they can be added; see §5.8).
 - Windows, iOS and Android native apps. The web build should stay usable on tablets but is not optimised for them.
 - Public distribution, monetisation, in-app purchases.
-- Chat moderation beyond basic mute/block.
+- Free-text chat (chat is **emoji reactions only**, see §6.8).
 - Bot training through ML self-play (MCTS only).
 
 ## 3. Target users and use cases
@@ -56,7 +56,7 @@ The monorepo is scaffolded with Better-T-Stack:
 ```
 bun create better-t-stack@latest carcassonne --frontend next --backend elysia --runtime bun \
   --api trpc --auth better-auth --payments none --database postgres --orm drizzle \
-  --db-setup neon --package-manager bun --git --web-deploy vercel --server-deploy docker \
+  --db-setup neon --package-manager bun --git --web-deploy vercel --server-deploy docker \   # overridden: server also deploys to Vercel (§7.3)
   --install --addons turborepo --examples none
 ```
 
@@ -64,7 +64,8 @@ bun create better-t-stack@latest carcassonne --frontend next --backend elysia --
 |---|---|
 | Monorepo | Turborepo + Bun workspaces |
 | Web app | Next.js (App Router), React, Three.js (WebGPU renderer with WebGL2 fallback), deployed on Vercel |
-| API | Elysia on Bun, tRPC for request/response, Elysia WebSockets for real-time game traffic. Runs in Docker on a long-lived host, not Vercel, because game rooms are stateful sockets |
+| API | Elysia on Bun, tRPC for request/response, WebSockets for real-time game traffic. **Deployed serverless on Vercel** (Bun runtime, `Bun.serve` entrypoint with WebSocket handlers; Vercel Functions WebSocket support, public beta since June 2026). Stateless instances; room state in Postgres + Redis (§7.3) |
+| Realtime fan-out | Redis (Upstash via Vercel Marketplace) pub/sub per room, plus locks and the matchmaking queue |
 | Auth | better-auth (email + OAuth; device-authorization flow for desktop) |
 | DB | Postgres on Neon, Drizzle ORM |
 | Core | **Zig** (0.17, matching zpui): rules engine, AI, procedural geometry, animation timeline, protocol codec. Builds to `wasm32` (web + server) and native (desktop) |
@@ -91,7 +92,7 @@ docs/
 ### 5.1 Components
 - **Base game: 72 land tiles** (including the start tile with a darker back) across **24 tile types**: roads, city segments (some with **pennants**), cloisters, fields, and road ends at crossroads, villages or cities.
 - **The River: 12 tiles**: a spring, a lake, and 10 river pieces (straights, curves, and pieces with roads, cities or cloisters).
-- **Meeples:** 7 per player, in 5 colours (2–5 players). A 6th colour is reserved for future expansions.
+- **Meeples:** 7 per player plus 1 abbot, in 5 colours (2–5 players). A 6th colour is reserved for future expansions.
 - **Scoreboard** with the 50/100 lap marker (cosmetic, since we track exact scores).
 - The exact tile distribution is a data file (`core/engine/tiles/base.zon`, `river.zon`) verified against the rulebook manifest and checked by a unit test that counts tiles by type.
 
@@ -128,7 +129,14 @@ docs/
 - **No U-turns:** two consecutive curves may not turn the same way, so the river never folds back on itself.
 - If a river tile cannot be placed legally, follow the rulebook's redraw procedure.
 
-### 5.6 House rules and variants (v1)
+### 5.6 The Abbot (v1)
+- Each player gets 1 **abbot** in addition to 7 meeples. Some base tiles (3rd edition) show **gardens** in field areas. The tile data carries a `garden` flag.
+- The abbot may only be placed on a **cloister or garden** of the tile just placed (in place of a meeple). Normal meeples may not occupy gardens.
+- A garden scores like a cloister: 9 when surrounded, otherwise 1 + 1 per neighbouring tile at game end.
+- Instead of placing a figure, a player may **recall their abbot** from the board and immediately score its cloister/garden as if the game had ended.
+- Toggle: "Abbot & gardens" (on by default). Rules text verified against the 3rd edition rulebook before implementation.
+
+### 5.7 House rules and variants (v1)
 Defaults are current (3rd edition) rules + River. The user hasn't played in a while, so the menu shows each option with a one-line explanation.
 - Field-scoring edition (1st / 2nd / **3rd**)
 - River on/off
@@ -136,9 +144,9 @@ Defaults are current (3rd edition) rules + River. The user hasn't played in a wh
 - Hand variant (hold 1–3 tiles and choose one): **P1**, off by default
 - Turn clock settings (§6.6)
 - Undo/takebacks (offline/AI/hot-seat only)
-- **P1 stretch:** *The Abbot* mini-expansion (included in the current box; needs garden tiles), shipped behind a toggle
+- **The Abbot (v1, on by default to match the current box):** see §5.6
 
-### 5.7 Expansion-ready engine
+### 5.8 Expansion-ready engine
 - Tiles are data. Each tile is described by feature graphs (edge segments → features, plus extra flags: pennant, cloister, garden, inn, cathedral, etc.).
 - Rules run as a **module pipeline** (`onSetup`, `legalPlacements`, `legalFigures`, `onPlaced`, `scoreFeature`, `onGameEnd`). Base and River are modules, and future expansions (Inns & Cathedrals, Traders & Builders…) register additional modules.
 
@@ -148,10 +156,10 @@ Defaults are current (3rd edition) rules + River. The user hasn't played in a wh
 | Mode | Web | Desktop | Notes |
 |---|---|---|---|
 | Online room (invite link) | ✅ | ✅ | 2–5 players, mixed human/bots, guests allowed via link (an account is needed for ranked play) |
-| Ranked 1v1 / FFA | ✅ | ✅ | Glicko-2 rating per queue, server-picked seat order, fixed default ruleset |
+| Ranked **3–4 player FFA** | ✅ | ✅ | Glicko-2 rating, separate queues for 3p and 4p, server-picked seat order, fixed default ruleset. No 1v1 ranked queue in v1 |
 | Hot-seat | ✅ | ✅ | Pass-the-device screen that hides upcoming tile info between turns |
 | vs AI | ✅ | ✅ (offline) | Runs locally in WASM (web worker) or natively (desktop thread) |
-| Spectate | ✅ | ✅ | Live view of public, ranked or invite games. Optional delay for ranked games |
+| Spectate | ✅ | ✅ | **Live** view of public, ranked or invite games, with no delay |
 | Replays | ✅ | ✅ | Every finished game; scrub, step, follow a player's POV; share link |
 | Tutorial | ✅ | ✅ | Scripted seeded game teaching tile placement, each meeple role, completion and farmer scoring |
 
@@ -195,16 +203,20 @@ Adaptive ambient soundscape (birds, wind, river near river tiles), tile and meep
 
 ### 6.7 Online rooms, matchmaking, spectating
 - **Rooms:** created via tRPC and joined by `/r/{code}` link. The host sets the ruleset and bots, and can kick players. Rooms survive reconnects: on reconnect the client gets a state snapshot plus a move log tail.
-- **Ranked:** queue → match → room with the locked ruleset. Glicko-2 updates when a game ends. FFA uses pairwise result decomposition.
-- **Spectating:** read-only socket subscribers. Hidden information (hands, if the hand variant is on) is filtered server-side. Ranked spectating has an N-move delay.
+- **Ranked:** queue → match → room with the locked ruleset. Glicko-2 updates when a game ends. Queues hold 3p and 4p FFA. Ratings use pairwise result decomposition (each finishing position treated as wins/losses against every other player), and ties count as draws.
+- **Spectating:** read-only socket subscribers. Hidden information (hands, if the hand variant is on) is filtered server-side. Spectating is **live** for every game type, ranked included. (Base game + River + Abbot has no hidden information beyond the draw pile, so there is nothing to leak.)
 - **Anti-cheat:** the server is authoritative. Clients send *intents* (`placeTile{x,y,rot}`, `placeMeeple{featureId}`), and the server validates them against the engine. The draw pile is server-side only.
 
-### 6.8 Replays
+### 6.8 Chat: emoji only
+- An emoji reaction bar (a curated set of about 24 emoji, plus a few game-specific ones like 🏰 🐑 🛣️ ⛪). Reactions float up over the sender's avatar or score row, and are rate-limited.
+- No free text, so no moderation is needed. Per-player mute, and a "hide all reactions" setting. Spectators can react, but their reactions are only shown to other spectators.
+
+### 6.9 Replays
 - Stored as `(engineVersion, ruleset, seed, moves[])` plus timestamps (about 2 KB per game). Re-simulated deterministically by the engine on demand.
 - Viewer: play, pause, scrub, step, per-turn score delta, "what was the best move here?" analysis using Expert AI (P1).
 - Engine-version pinning: old replays run on the engine version they were recorded with. WASM builds are versioned and kept.
 
-### 6.9 AI
+### 6.10 AI
 | Tier | Approach | Target time per move |
 |---|---|---|
 | Easy | Greedy one-ply with randomness, prefers placing meeples, ignores farmers | <50 ms |
@@ -220,7 +232,7 @@ The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on
 | Module | Responsibility |
 |---|---|
 | `engine/` | Pure, deterministic state machine. `State`, `Ruleset`, `Move`, `apply(state, move) → (state', events[])`, `legalMoves`, scoring, feature union-find. No allocation in the hot path (arena per game). Seeded PRNG (e.g. PCG/xoshiro) |
-| `ai/` | Bots (§6.9) |
+| `ai/` | Bots (§6.10) |
 | `geo/` | Procedural meshes from tile feature graphs → vertex/index buffers + prop instance transforms (renderer-agnostic, emitted as flat typed arrays) |
 | `anim/` | Turns engine `events[]` into a **presentation timeline** (tile rise, wall extrude, meeple hop, score popups) with keyed tracks. Both renderers play the same timeline, so effects behave identically on web and desktop |
 | `proto/` | Wire message schema + binary codec (compact, versioned). A TS type generator emits `packages/protocol` |
@@ -234,16 +246,28 @@ The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on
 - Game canvas: `render-three` builds the scene from `core/geo` buffers and plays the `core/anim` timeline. React handles the HUD/overlays.
 - Network: WebSocket to Elysia, with optimistic local validation by the same engine.
 
-### 7.3 Server (Elysia on Bun, Docker)
-- tRPC: auth session, profile, room CRUD, matchmaking queue, replays list/fetch, stats.
-- WS `/game/:roomId`: join/leave, intents, snapshots, events, clock ticks, chat.
-- Rooms: in-memory actors (one per room) that persist each move to Postgres, so a crashed server can rebuild rooms from the log. A single instance is enough for v1. Scaling out with room-sharding (sticky routing) is documented but deferred.
-- Bot workers: a Bun `Worker` pool running core-wasm AI.
+### 7.3 Server (Elysia on Bun, serverless on Vercel)
+Vercel Functions now accept and hold WebSocket connections (public beta, June 2026). On the Bun runtime, `Bun.serve` with WebSocket handlers works as the function entrypoint. Each connection is pinned to one function instance until it closes or hits the function's maximum duration (300 s by default, 800 s on Pro). New connections can land on any instance, and there is no built-in broadcast across instances. The design follows from that:
+
+- **tRPC (HTTP functions):** auth session, profile, room CRUD, matchmaking, replays list/fetch, stats.
+- **WS `/game/:roomId`:** join/leave, intents, snapshots, events, clock ticks, emoji reactions. A socket subscribes to its room's Redis channel and forwards what it receives.
+- **No in-memory rooms.** The authoritative state is the **move log in Postgres** plus a cached snapshot (`state blob + ply`) in Redis. To apply an intent, a server instance:
+  1. loads the snapshot (and falls back to replaying the log from Postgres on a cache miss),
+  2. validates and applies the intent with core-wasm,
+  3. appends the move using **compare-and-set on `ply`**, enforced by a unique `(gameId, ply)` constraint, so two racing instances can't both commit,
+  4. updates the snapshot and publishes the events to the room channel.
+  Determinism makes this safe: any instance can rebuild any room.
+- **Connection lifetime:** sockets are closed at the function's maximum duration (800 s on Pro). Clients reconnect without the player noticing, before the limit or on close, using `resume{gameId, lastPly}`. The server sends back the missing events, or a snapshot if too much was missed. The same path covers deploys and network drops.
+- **Clocks without a long-lived process:** each turn stores `turnDeadline` in Redis and Postgres. Every instance holding a socket for that room sets a local timer. When it fires, the instance tries to claim the timeout with the same ply compare-and-set, so exactly one wins and auto-plays. If no sockets are connected, the next request touching the room applies any expired timeouts first (lazy enforcement). A 1-minute Vercel Cron sweeps abandoned rooms.
+- **Bots:** a bot's move is computed in the function that committed the preceding move (Hard ~1 s, Expert ~2–3 s, within limits), then committed through the same compare-and-set path. If several bots play in a row, the function chains their moves or hands off with a self-invoked request.
+- **Matchmaking:** Redis sorted sets per queue (3p, 4p). The ticket's own request (or a cron sweep) forms matches atomically with a Lua script, creates the room and notifies players over their lobby socket.
+- **Fallback:** while the WebSocket feature is in beta, the transport is abstracted (`RoomTransport`). If Vercel's limits get in the way, the same stateless handlers can run behind a hosted pub/sub provider (Ably/Pusher), or the Elysia app can run in its existing Docker image with no code changes.
 
 ### 7.4 Desktop (zpui)
 - **Native UI in zpui:** main menu, lobby/room, in-game HUD, settings, replay viewer, tutorial overlays. Assets (fonts, icons, audio, glTF, textures) are shared from `packages/assets`.
 - **Native 3D:** a new zpui 3D module (`Surface3D` element + mesh/material/camera/light API) on Vulkan and Metal. It draws `core/geo` meshes and the glTF prop kit, and plays the `core/anim` timeline. Research and design: `docs/research/zpui-3d.md`.
-- **Fallback if native 3D slips:** embed a webview (zpui already hosts WKWebView/WebKitGTK) that runs `render-three` for the board only. The zpui HUD stays native.
+- **Research result (`docs/research/zpui-3d.md`):** zui, upstream gpui and the gpui community have **no 3D** (no depth buffer, projection or mesh pipeline), so nothing can be ported. The plan is a native `Scene3D` subsystem in zpui. It renders offscreen (HDR, MSAA, depth), then tonemaps and composites the result through a new `viewport3d` scene primitive, the same pattern zpui already uses for vector paths. It is built on both Vulkan and Metal.
+- **Fallback if native 3D slips:** embed a webview running `render-three` for the board only, with the zpui HUD staying native. This is a good fallback on macOS (WKWebView), but **weak on Linux** (zpui's WebKitGTK helper renders frames offscreen). That makes the native path the priority.
 - **Networking:** a native WebSocket client using the same `core/proto` codec. Auth uses the device flow (§6.5).
 - **Offline:** hot-seat, AI, tutorial and local replays with no network.
 - **Packaging:** `.app` (universal, signed later) and a Linux tarball/AppImage. Uses zpui's existing `app-bundle`/`dist` build steps.
@@ -270,14 +294,14 @@ The AI is written in Zig in `core/ai`. It runs in a Web Worker (WASM) on web, on
 | # | Milestone | Exit criteria |
 |---|---|---|
 | M0 | Scaffold | Better-T-Stack monorepo, Zig core builds to wasm + native, CI |
-| M1 | **Rules engine** | Base + River + edition toggles, 100% of rule tests pass, determinism harness |
+| M1 | **Rules engine** | Base + River + Abbot + edition toggles, 100% of rule tests pass, determinism harness |
 | M2 | Web 2D playable | Hot-seat + Easy/Medium AI in a minimal 2D board (validates engine UX) |
 | M3 | Web 3D tabletop | `geo` + `anim` + `render-three`, dioramas, sound, Classic 2D toggle |
 | M4 | Online | Accounts, invite rooms, reconnects, clocks, spectating, replays |
 | M5 | Ranked + Hard/Expert AI | Glicko-2 queues, MCTS bots, tutorial |
 | M6 | zpui 3D spike → module | Lit glTF in a zpui window on Vulkan + Metal, then the full board renderer |
 | M7 | Desktop app | Native HUD/menus, offline modes, online via device-flow auth, packaging |
-| M8 | Polish | Performance tiers, a11y, end-game cinematics, Abbot (stretch) |
+| M8 | Polish | Performance tiers, a11y, end-game cinematics |
 
 M6 can run in parallel with M2–M5.
 
@@ -294,15 +318,22 @@ M6 can run in parallel with M2–M5.
 | Two renderers drift visually | Geometry, animation timeline, materials and assets are shared data. Golden images are compared across renderers |
 | Zig 0.17 churn / WASM toolchain | Pin the Zig version (same as zpui). Keep the WASM ABI small and C-like |
 | Field-scoring edge cases | Union-find feature graph + exhaustive rulebook-derived fixtures |
-| Vercel can't host sockets | The game server is a separate Docker service (already chosen) |
+| Vercel WebSockets are in beta; connections are capped at the function's maximum duration (800 s on Pro); no cross-instance broadcast | Stateless rooms (Postgres log + Redis snapshot/pub-sub), automatic client resume, `RoomTransport` abstraction with an Ably or Docker fallback |
+| Concurrent intents land on different instances | Unique `(gameId, ply)` compare-and-set, and the deterministic engine rebuilds from the log |
 
-## 12. Open questions
-1. Include **The Abbot** (and gardens) for "current box" parity in v1, or keep it as a stretch goal?
-2. Default **ranked queues**: 1v1 only, or also 3–4 player FFA?
-3. Server host for the Docker service (Fly / Railway / VPS)? Neon region needs to match.
-4. Chat: free text, emotes only, or none?
-5. Should spectators see ranked games live, or only after a delay?
-6. Should the hand-of-3 variant be in v1 or P1?
+## 12. Decisions log
+| # | Question | Decision |
+|---|---|---|
+| 1 | The Abbot + gardens in v1? | **Yes**, on by default (§5.6) |
+| 2 | Ranked queues | **3–4 player FFA** (separate 3p and 4p queues), no 1v1 ranked |
+| 3 | Server hosting | **Serverless on Vercel** with WebSockets (§7.3), Neon Postgres, Redis via Vercel Marketplace |
+| 4 | Chat | **Emoji reactions only** (§6.8) |
+| 5 | Spectating ranked | **Live**, no delay |
+
+### Still open
+- Hand-of-3 variant: v1 or P1? (Currently P1, off by default.)
+- Vercel plan: the PRD assumes **Pro** (800 s function duration, which reduces reconnect churn).
+- Neon and Redis regions should sit next to the Vercel function region (e.g. `iad1`).
 
 ## 13. IP note
 "Carcassonne" and its art are trademarks/copyrights of Hans im Glück / Z-Man Games. This project is **private, for personal use**, and all art assets are original (procedural plus our own models). Do not publish publicly or deploy publicly without rebranding.
