@@ -66,7 +66,7 @@ export function NewGameSetup() {
       ruleset,
       seed: seed.trim() || randomSeedString(),
       players: seats.map((s, i) => ({ ...s, name: s.name.trim() || `Player ${i + 1}` })),
-      engine: "dev-ts",
+      engine: "core-wasm",
     });
     router.push(`/play/local/${rec.id}` as Route);
   };

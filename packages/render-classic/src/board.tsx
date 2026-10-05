@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import type { FigureOption, GameView, TileId } from "@carcassonne/protocol";
 import type { NodeRef, PlayerColorId, TileCatalog } from "@carcassonne/game-client";
 
+import { installedFigureArt, installedTileArt } from "./defaults";
 import { FigureToken, proceduralFigures, type FigureArtSource } from "./figures";
 import { PLAYER_COLORS, playerFill, type BoardPalette } from "./palette";
 import { proceduralArt } from "./procedural-art";
@@ -129,8 +130,8 @@ export function ClassicBoard(props: ClassicBoardProps) {
     catalog,
     palette,
     players,
-    art = proceduralArt,
-    figures = proceduralFigures,
+    art = installedTileArt() ?? proceduralArt,
+    figures = installedFigureArt() ?? proceduralFigures,
     targets = [],
     ghost,
     hotspots,

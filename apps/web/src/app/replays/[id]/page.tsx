@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
-import { simulateReplay, tileCatalog, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
+import { simulateReplay, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
 import { ClassicBoard, renderableStyle } from "@carcassonne/render-classic";
 
 import { describeEvent, playerName } from "@/components/game/helpers";
 import { Panel, ScorePanel } from "@/components/game/hud-parts";
+import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { getGame, type LocalGameRecord } from "@/lib/local-games";
 import { useReducedMotion, useSettings } from "@/lib/settings";
@@ -25,6 +26,8 @@ export default function ReplayViewer() {
   const settings = useSettings();
   const reduced = useReducedMotion();
   const palette = renderableStyle(settings.style).palette!;
+  const core = useCore();
+  const catalog = core?.catalog;
 
   useEffect(() => {
     const r = getGame(id);
@@ -51,8 +54,8 @@ export default function ReplayViewer() {
   }, [id]);
 
   const total = rep?.plies.length ?? 0;
-  const view = useMemo(() => (rep ? viewAtPly(rep, ply, tileCatalog) : null), [rep, ply]);
-  const prev = useMemo(() => (rep && ply > 0 ? viewAtPly(rep, ply - 1, tileCatalog) : null), [rep, ply]);
+  const view = useMemo(() => (rep ? viewAtPly(rep, ply, catalog) : null), [rep, ply, catalog]);
+  const prev = useMemo(() => (rep && ply > 0 ? viewAtPly(rep, ply - 1, catalog) : null), [rep, ply, catalog]);
 
   useEffect(() => {
     if (!playing) return;
@@ -80,7 +83,7 @@ export default function ReplayViewer() {
 
   if (rec === null) return <div className="p-10 text-center">Replay not found.</div>;
   if (error) return <div className="p-10 text-center text-destructive">{error}</div>;
-  if (!rec || !rep || !view) return <div className="grid h-full place-items-center font-display text-2xl">Re-simulating…</div>;
+  if (!rec || !rep || !view || !catalog) return <div className="grid h-full place-items-center font-display text-2xl">Re-simulating…</div>;
 
   const batch = ply > 0 ? rep.plies[ply - 1]! : [];
   const placed = batch.find((e) => e.type === "tilePlaced");
@@ -91,7 +94,7 @@ export default function ReplayViewer() {
     <div className="relative h-full min-h-0">
       <ClassicBoard
         view={view}
-        catalog={tileCatalog}
+        catalog={catalog}
         palette={palette}
         players={rec.players}
         lastPlaced={placed && placed.type === "tilePlaced" ? { x: placed.x, y: placed.y } : null}

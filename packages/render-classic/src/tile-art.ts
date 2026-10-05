@@ -24,11 +24,28 @@ export interface TileArtFeature {
   pennants: Pt[];
 }
 
+/** One drawable path from core/geo, in the geo buffer's recommended draw order. */
+export interface TileArtLayer {
+  /** region = filled area; centerline = road/river spline; wall = city wall; building = cloister/garden footprint; plaza = road junction. */
+  role: "region" | "centerline" | "wall" | "building" | "plaza";
+  kind: FeatureKind;
+  /** Local feature index, or null. */
+  feature: number | null;
+  /** SVG path data in the 100×100 tile box (canonical orientation). */
+  d: string;
+  /** Stroke width suggested by geo (centerlines, walls), tile units ×100. */
+  width: number;
+  /** Centre of a building or plaza (icons are drawn upright there). */
+  center?: Pt;
+}
+
 export interface TileArt {
   id: TileId;
   features: TileArtFeature[];
   /** Small houses where several roads end. */
   villages: Pt[];
+  /** Full layered drawing (core-geo). When present the renderer draws these instead of `features`. */
+  layers?: TileArtLayer[];
 }
 
 export interface TileArtSource {

@@ -7,10 +7,14 @@
     "build": "next build",
     "check-types": "tsc --noEmit",
     "start": "next start",
-    "env:generate": "varlock codegen"
+    "env:generate": "varlock codegen",
+    "e2e": "bun e2e/online.e2e.ts",
+    "e2e:local": "bun e2e/local-smoke.ts"
   },
   "dependencies": {
     "@carcassonne/api": "workspace:*",
+    "@carcassonne/core-geo": "workspace:*",
+    "@carcassonne/core-wasm": "workspace:*",
     "@carcassonne/game-client": "workspace:*",
     "@carcassonne/protocol": "workspace:*",
     "@carcassonne/render-classic": "workspace:*",
@@ -40,6 +44,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "playwright": "1.56.1",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

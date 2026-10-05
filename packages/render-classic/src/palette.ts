@@ -12,7 +12,8 @@ export interface BoardPalette {
   tile: { field: string; fieldShade: string; border: string; borderWidth: number };
   city: { fill: string; shade: string; wall: string; wallWidth: number; crenel: string; hatch?: string };
   road: { casing: string; fill: string; casingWidth: number; fillWidth: number; dash?: string };
-  river: { fill: string };
+  river: { fill: string; edge?: string; ripple?: string };
+  garden?: { fill: string; hedge: string; bloom: string };
   building: { body: string; roof: string; outline: string };
   pennant: { fill: string; stroke: string; mark: string };
   target: { fill: string; stroke: string; hover: string };
@@ -30,7 +31,8 @@ export const CLASSIC_PALETTE: BoardPalette = {
   tile: { field: "#93b65a", fieldShade: "#86a94f", border: "#5f7a33", borderWidth: 0.8 },
   city: { fill: "#e3c88f", shade: "#d4b274", wall: "#8a7356", wallWidth: 4.5, crenel: "#6d5a43" },
   road: { casing: "#8e7a5c", fill: "#f3ead2", casingWidth: 10, fillWidth: 6.5 },
-  river: { fill: "#5aa5d6" },
+  river: { fill: "#5aa5d6", edge: "#3f7fae", ripple: "rgba(235, 248, 255, 0.55)" },
+  garden: { fill: "#6f9c47", hedge: "#3f6a2a", bloom: "#f4d35e" },
   building: { body: "#f1e6cc", roof: "#b5523b", outline: "#5c4a35" },
   pennant: { fill: "#2f5fa8", stroke: "#f6efdc", mark: "#f6efdc" },
   target: { fill: "rgba(255, 244, 214, 0.18)", stroke: "rgba(255, 244, 214, 0.85)", hover: "rgba(255, 244, 214, 0.42)" },
@@ -46,7 +48,8 @@ export const BLUEPRINT_PALETTE: BoardPalette = {
   tile: { field: "#0f2747", fieldShade: "#0f2747", border: "rgba(140, 200, 255, 0.55)", borderWidth: 0.7 },
   city: { fill: "#163a66", shade: "#163a66", wall: "#e8f3ff", wallWidth: 2, crenel: "#e8f3ff", hatch: "rgba(200, 228, 255, 0.35)" },
   road: { casing: "#9fd3ff", fill: "#0f2747", casingWidth: 7, fillWidth: 4.2 },
-  river: { fill: "#3d8bd9" },
+  river: { fill: "#163a66", edge: "#3d8bd9", ripple: "rgba(159, 211, 255, 0.5)" },
+  garden: { fill: "#0f2747", hedge: "#7fe0a8", bloom: "#ffd166" },
   building: { body: "#0f2747", roof: "#0f2747", outline: "#e8f3ff" },
   pennant: { fill: "#0f2747", stroke: "#ffd166", mark: "#ffd166" },
   target: { fill: "rgba(255, 209, 102, 0.08)", stroke: "rgba(255, 209, 102, 0.9)", hover: "rgba(255, 209, 102, 0.3)" },

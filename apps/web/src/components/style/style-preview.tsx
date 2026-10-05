@@ -3,21 +3,24 @@
 import { useMemo } from "react";
 
 import type { BoardTile, GameView } from "@carcassonne/protocol";
-import { legalPlacementsOn, tileCatalog } from "@carcassonne/game-client";
+import { legalPlacementsOn, type TileCatalog } from "@carcassonne/game-client";
 import { ClassicBoard, type StylePack } from "@carcassonne/render-classic";
 
+import { useCore } from "@/lib/core";
+
 /** A small, legally connected sample board (built once). */
-function buildSample(): BoardTile[] {
+function buildSample(catalog: TileCatalog): BoardTile[] {
   const board = new Map<string, BoardTile>([["0,0", { x: 0, y: 0, rot: 0, tile: "D", figures: [] }]]);
   const order = ["F", "V", "B", "J", "M", "U", "W", "E", "K"];
+  const on = (id: string, kind: string) => Math.max(0, catalog.get(id)?.features.findIndex((f) => f.kind === kind) ?? 0);
   const figs: Record<string, BoardTile["figures"]> = {
-    F: [{ player: 0, feature: 0, figure: "meeple" }],
-    B: [{ player: 1, feature: 0, figure: "abbot" }],
-    W: [{ player: 2, feature: 3, figure: "meeple" }],
-    V: [{ player: 3, feature: 0, figure: "meeple" }],
+    F: [{ player: 0, feature: on("F", "city"), figure: "meeple" }],
+    B: [{ player: 1, feature: on("B", "cloister"), figure: "abbot" }],
+    W: [{ player: 2, feature: on("W", "road"), figure: "meeple" }],
+    V: [{ player: 3, feature: on("V", "road"), figure: "meeple" }],
   };
   for (const id of order) {
-    const legal = legalPlacementsOn(board, tileCatalog, id);
+    const legal = legalPlacementsOn(board, catalog, id);
     legal.sort((a, b) => Math.abs(a.x) + Math.abs(a.y) * 1.3 - (Math.abs(b.x) + Math.abs(b.y) * 1.3));
     const p = legal[0];
     if (!p) continue;
@@ -32,13 +35,17 @@ const SAMPLE_PLAYERS = [{ color: "red" as const }, { color: "blue" as const }, {
 
 /** Live preview of a style: real renderer for 2D packs, a swatch card for 3D ones. */
 export function StylePreview({ style, className }: { style: StylePack; className?: string }) {
-  const view = useMemo(() => ({ board: (SAMPLE ??= buildSample()) }) as Pick<GameView, "board">, []);
+  const core = useCore();
+  const view = useMemo(() => (core ? ({ board: (SAMPLE ??= buildSample(core.catalog)) } as Pick<GameView, "board">) : null), [core]);
   if (style.status === "ready" && style.palette) {
+    if (!core || !view) return <div className={className} style={{ background: style.palette.table }} />;
     return (
       <div className={className}>
         <ClassicBoard
           view={view}
-          catalog={tileCatalog}
+          catalog={core.catalog}
+          art={core.art}
+          figures={core.figures}
           palette={style.palette}
           players={SAMPLE_PLAYERS}
           interactive={false}

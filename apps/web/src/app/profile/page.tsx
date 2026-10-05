@@ -10,13 +10,13 @@ import { cn } from "@carcassonne/ui/lib/utils";
 
 import { authClient } from "@/lib/auth-client";
 import { listGames, type LocalGameRecord } from "@/lib/local-games";
-import { profileApi, type ProfileStats } from "@/lib/rooms-api";
+import { profileApi, type Profile } from "@/lib/rooms-api";
 import { readJSON, writeJSON } from "@/lib/storage";
 
 export default function ProfilePage() {
   const { data: session } = authClient.useSession();
   const [games, setGames] = useState<LocalGameRecord[]>([]);
-  const [server, setServer] = useState<ProfileStats | null>(null);
+  const [server, setServer] = useState<Profile | null>(null);
   const [color, setColor] = useState<PlayerColorId>("blue");
 
   useEffect(() => {
@@ -66,10 +66,10 @@ export default function ProfilePage() {
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ["Games", server?.games ?? stats.played],
-          ["Wins", server?.wins ?? stats.wins],
-          ["Avg. score", server?.averageScore ?? stats.avg],
-          ["Rating", server?.rating ? `${Math.round(server.rating.ffa4)}` : "—"],
+          ["Games", server?.stats.games ?? stats.played],
+          ["Wins", server?.stats.wins ?? stats.wins],
+          ["Avg. score", (server ? Math.round(server.stats.averageScore) : stats.avg)],
+          ["Rating", server?.ratings.length ? `${Math.round(Math.max(...server.ratings.map((r) => r.rating)))}` : "—"],
         ].map(([k, v]) => (
           <div key={k as string} className="rounded-2xl border border-border/80 bg-card/80 p-4 shadow-sm">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{k}</div>

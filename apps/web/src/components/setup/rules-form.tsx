@@ -48,8 +48,9 @@ export function RulesForm({
 }: {
   ruleset: Ruleset;
   onRuleset(r: Ruleset): void;
-  seed: string;
-  onSeed(s: string): void;
+  /** Omit to hide the seed row (online rooms: the server picks the seed). */
+  seed?: string;
+  onSeed?(s: string): void;
   disabled?: boolean;
 }) {
   return (
@@ -73,16 +74,17 @@ export function RulesForm({
           ))}
         </div>
       </Row>
-      <Row title="The River" hint="Start with the 12 river tiles, spring first and lake last. (Arrives with the full engine.)">
+      <Row title="The River" hint="Start with the 12 river tiles, spring first and lake last.">
         <Switch label="The River" checked={ruleset.river} onChange={(v) => onRuleset({ ...ruleset, river: v })} />
       </Row>
       <Row title="The Abbot" hint="Each player gets an abbot for cloisters and gardens, and may recall it to score early.">
         <Switch label="The Abbot" checked={ruleset.abbot} onChange={(v) => onRuleset({ ...ruleset, abbot: v })} />
       </Row>
+      {onSeed ? (
       <Row title="Seeded shuffle" hint="Same seed, same tile order: share it for rematches, puzzles and bug reports.">
         <div className="flex items-center gap-1.5">
           <input
-            value={seed}
+            value={seed ?? ""}
             onChange={(e) => onSeed(e.target.value)}
             className="h-9 w-44 rounded-xl border border-input bg-background px-3 font-mono text-sm"
             aria-label="Seed"
@@ -99,6 +101,7 @@ export function RulesForm({
           </button>
         </div>
       </Row>
+      ) : null}
     </fieldset>
   );
 }

@@ -23,7 +23,7 @@ export default function RankedPage() {
       setSince((s) => s + 1);
       try {
         const st = await matchmakingApi.status();
-        if (st.state === "matched" && st.roomCode) router.push(`/r/${st.roomCode}` as Route);
+        if (st.status === "matched" && st.gameId) router.push(`/play/online/${st.gameId}` as Route);
       } catch {}
     }, 1000);
     return () => clearInterval(id);
@@ -32,7 +32,7 @@ export default function RankedPage() {
   const join = async (q: "ffa3" | "ffa4") => {
     setError(null);
     try {
-      await matchmakingApi.join({ queue: q });
+      await matchmakingApi.join(q);
       setQueue(q);
       setSince(0);
     } catch (e) {

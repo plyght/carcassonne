@@ -29,6 +29,7 @@ import {
 } from "@carcassonne/render-classic";
 import { cn } from "@carcassonne/ui/lib/utils";
 
+import { useCore } from "@/lib/core";
 import { useReducedMotion, useSettings } from "@/lib/settings";
 
 import { StyleCarousel } from "../style/style-settings";
@@ -71,7 +72,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const reducedMotion = useReducedMotion();
   const style = renderableStyle(settings.style);
   const palette = style.palette!;
-  const art = proceduralArt;
+  const core = useCore();
+  const art = core?.art ?? proceduralArt;
   const catalog = client.catalog;
   const view = s.view;
 
@@ -370,7 +372,16 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const online = !isLocal;
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden" data-testid="game-screen" data-ply={view.ply} data-status={view.status}>
+    <div className="relative h-full min-h-0 overflow-hidden" data-testid="game-screen"
+      data-ply={view.ply}
+      data-status={view.status}
+      data-current={view.currentPlayer}
+      data-my-turn={canAct ? "1" : "0"}
+      data-connection={s.connection}
+      data-scores={view.players.map((p) => p.score).join(",")}
+      data-board={view.board.map((t) => `${t.tile}@${t.x},${t.y},${t.rot}:${t.figures.map((f) => `${f.player}${f.figure[0]}${f.feature}`).join("")}`).join(";")}
+      data-reactions={s.reactions.map((r) => r.emoji).join("")}
+    >
       <ClassicBoard
         view={view}
         catalog={catalog}
@@ -432,7 +443,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           </div>
           {online ? (
             <span className="ml-1 text-muted-foreground" title={`Connection: ${s.connection}`}>
-              {s.connection === "open" ? <Wifi className="size-4" /> : <WifiOff className="size-4 text-destructive" />}
+              {s.connection === "open" ? <Wifi className="size-4" /> : s.connection === "polling" ? <Wifi className="size-4 opacity-50" /> : <WifiOff className="size-4 text-destructive" />}
             </span>
           ) : null}
         </Panel>

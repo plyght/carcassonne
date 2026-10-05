@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 
 import type { TileDef } from "@carcassonne/game-client";
 
@@ -71,8 +71,135 @@ export interface TileSvgProps {
   opacity?: number;
 }
 
+function GardenIcon({ at, p }: { at: Pt; p: BoardPalette }) {
+  const [x, y] = at;
+  const g = p.garden ?? { fill: "#6f9c47", hedge: "#3f6a2a", bloom: "#f4d35e" };
+  return (
+    <g transform={`translate(${x} ${y})`} pointerEvents="none">
+      <path d="M-1.4 6V1.5h2.8V6Z" fill={p.building.outline} opacity={0.8} />
+      <circle cx={0} cy={-2.5} r={5.4} fill={g.hedge} stroke={p.building.outline} strokeWidth={1} />
+      <circle cx={-3.6} cy={1.8} r={3.3} fill={g.hedge} stroke={p.building.outline} strokeWidth={0.9} />
+      <circle cx={3.6} cy={1.8} r={3.3} fill={g.hedge} stroke={p.building.outline} strokeWidth={0.9} />
+      <circle cx={-1.8} cy={-4} r={1} fill={g.bloom} />
+      <circle cx={2.2} cy={-1.5} r={1} fill={g.bloom} />
+      <circle cx={-3.4} cy={1.6} r={0.9} fill={g.bloom} />
+      <circle cx={3.8} cy={2.2} r={0.9} fill={g.bloom} />
+    </g>
+  );
+}
+
+/** Tile drawn from core-geo layers (regions, bands, walls, buildings) in geo draw order. */
+function LayeredTile({ art, palette: p, rot, x = 0, y = 0, hitTest, className, opacity }: Omit<TileSvgProps, "art"> & { art: TileArt }) {
+  const layers = art.layers!;
+  const node = (i: number | null) => (hitTest && i !== null ? { "data-node": `${x},${y},${i}` } : {});
+  const up = (pt: Pt) => rotatePoint(pt, rot);
+  const roadish = layers.filter((l) => l.kind === "road" && (l.role === "region" || l.role === "plaza"));
+  const firstRoad = layers.findIndex((l) => l.kind === "road" && (l.role === "region" || l.role === "plaza"));
+  const casing = Math.max(1.2, (p.road.casingWidth - p.road.fillWidth) / 2 + 0.4);
+  const garden = p.garden ?? { fill: p.tile.fieldShade, hedge: p.building.outline, bloom: p.pennant.fill };
+  const riverEdge = p.river.edge ?? p.river.fill;
+  const icons: ReactNode[] = [];
+
+  const drawn = layers.map((l, i) => {
+    const key = `${l.role}${i}`;
+    switch (l.role) {
+      case "region":
+        if (l.kind === "field")
+          return <path key={key} d={l.d} fill={p.tile.field} stroke={p.tile.fieldShade} strokeWidth={0.6} pointerEvents={hitTest ? "all" : "none"} {...node(l.feature)} />;
+        if (l.kind === "river")
+          return <path key={key} d={l.d} fill={p.river.fill} stroke={riverEdge} strokeWidth={1.1} strokeLinejoin="round" pointerEvents={hitTest ? "all" : "none"} {...node(l.feature)} />;
+        if (l.kind === "city")
+          return (
+            <g key={key}>
+              <path d={l.d} fill={p.city.fill} pointerEvents={hitTest ? "all" : "none"} {...node(l.feature)} />
+              {p.city.hatch ? <path d={l.d} fill={`url(#${hatchId(p)})`} pointerEvents="none" /> : null}
+            </g>
+          );
+        if (l.kind === "road") {
+          if (i !== firstRoad) return null;
+          // Two passes over every road band and plaza: casing strokes, then fills, so junctions merge cleanly.
+          return (
+            <g key={key}>
+              {roadish.map((r, j) => (
+                <path key={`c${j}`} d={r.d} fill={p.road.casing} stroke={p.road.casing} strokeWidth={casing * 2} strokeLinejoin="round" pointerEvents="none" />
+              ))}
+              {roadish.map((r, j) => (
+                <path key={`f${j}`} d={r.d} fill={p.road.fill} pointerEvents={hitTest ? "all" : "none"} {...node(r.feature)} />
+              ))}
+            </g>
+          );
+        }
+        return <path key={key} d={l.d} fill={p.tile.fieldShade} pointerEvents="none" />;
+      case "plaza":
+        if (i === firstRoad) {
+          return (
+            <g key={key}>
+              {roadish.map((r, j) => (
+                <path key={`c${j}`} d={r.d} fill={p.road.casing} stroke={p.road.casing} strokeWidth={casing * 2} strokeLinejoin="round" pointerEvents="none" />
+              ))}
+              {roadish.map((r, j) => (
+                <path key={`f${j}`} d={r.d} fill={p.road.fill} pointerEvents={hitTest ? "all" : "none"} {...node(r.feature)} />
+              ))}
+            </g>
+          );
+        }
+        return null;
+      case "centerline":
+        if (l.kind === "river")
+          return p.river.ripple ? (
+            <path key={key} d={l.d} fill="none" stroke={p.river.ripple} strokeWidth={1.2} strokeDasharray="5 6" strokeLinecap="round" pointerEvents="none" />
+          ) : null;
+        return (
+          <g key={key}>
+            {p.road.dash ? <path d={l.d} fill="none" stroke={p.road.casing} strokeWidth={0.9} strokeDasharray={p.road.dash} pointerEvents="none" /> : null}
+            {hitTest ? <path d={l.d} stroke="transparent" strokeWidth={14} fill="none" pointerEvents="stroke" {...node(l.feature)} /> : null}
+          </g>
+        );
+      case "wall":
+        return (
+          <g key={key} pointerEvents="none">
+            <path d={l.d} stroke={p.city.wall} strokeWidth={p.city.wallWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            {p.city.crenel !== p.city.wall ? (
+              <path d={l.d} stroke={p.city.crenel} strokeWidth={p.city.wallWidth * 0.55} strokeDasharray="2.2 2.2" fill="none" />
+            ) : null}
+          </g>
+        );
+      case "building": {
+        const at = up(l.center ?? [50, 50]);
+        if (l.kind === "garden") {
+          icons.push(<GardenIcon key={`gi${i}`} at={at} p={p} />);
+          return (
+            <path key={key} d={l.d} fill={garden.fill} stroke={garden.hedge} strokeWidth={1.6} strokeDasharray="3 1.6" pointerEvents={hitTest ? "all" : "none"} {...node(l.feature)} />
+          );
+        }
+        icons.push(<CloisterIcon key={`ci${i}`} at={[at[0], at[1] + 2]} p={p} />);
+        return <path key={key} d={l.d} fill="transparent" pointerEvents={hitTest ? "all" : "none"} {...node(l.feature)} />;
+      }
+    }
+  });
+
+  const villages = layers.filter((l) => l.role === "plaza" && l.center).map((l) => up(l.center!));
+  return (
+    <g transform={`translate(${x * TILE} ${y * TILE})`} opacity={opacity}>
+      <g className={className}>
+        <g transform={rot ? `rotate(${rot * 90} 50 50)` : undefined}>
+          <rect width={TILE} height={TILE} fill={p.tile.field} />
+          {drawn}
+          <rect width={TILE} height={TILE} fill="none" stroke={p.tile.border} strokeWidth={p.tile.borderWidth} pointerEvents="none" />
+        </g>
+        {icons}
+        {villages.map((v, i) => (
+          <VillageIcon key={`v${i}`} at={v} p={p} />
+        ))}
+        {art.features.flatMap((f) => f.pennants.map((pt, i) => <Pennant key={`p${f.index}-${i}`} at={up(pt)} p={p} />))}
+      </g>
+    </g>
+  );
+}
+
 function TileSvgImpl({ def, art: source, palette: p, rot, x = 0, y = 0, hitTest, className, opacity }: TileSvgProps) {
   const art: TileArt = source.get(def);
+  if (art.layers) return <LayeredTile def={def} art={art} palette={p} rot={rot} x={x} y={y} hitTest={hitTest} className={className} opacity={opacity} />;
   const node = (i: number) => (hitTest ? { "data-node": `${x},${y},${i}` } : {});
   const roads = art.features.filter((f) => f.line && f.kind === "road");
   const rivers = art.features.filter((f) => f.line && f.kind === "river");

@@ -1,4 +1,5 @@
 import type { FigureKind } from "@carcassonne/protocol";
+import { installedFigureArt } from "./defaults";
 
 import type { MarkerShape } from "./palette";
 
@@ -89,7 +90,7 @@ function FigureBody({
   strokeWidth,
   ghost,
 }: Omit<FigureTokenProps, "x" | "y" | "size" | "title" | "className"> & { strokeWidth: number }) {
-  const src = figures ?? proceduralFigures;
+  const src = figures ?? installedFigureArt() ?? proceduralFigures;
   const lyingPath = lying ? src.lyingPath?.(kind) : undefined;
   const [mx, my] = src.markerAt(kind);
   return (

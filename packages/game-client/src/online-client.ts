@@ -17,8 +17,9 @@ import type {
   ServerMessage,
 } from "@carcassonne/protocol";
 
-import { GameClient, realTimers, type PlayerMeta, type Timers } from "./client";
+import { GameClient, realTimers, type GameClientState, type PlayerMeta, type Timers } from "./client";
 import { boardFromTiles, legalFiguresOn, legalPlacementsOn } from "./board";
+import type { ViewRules } from "./engine";
 import type { TileCatalog } from "./tiles";
 
 /** Minimal WebSocket surface (browser WebSocket satisfies it; tests use a fake). */
@@ -42,8 +43,16 @@ export type FetchLike = (url: string, init?: { method?: string; body?: string; h
 /** Response of GET /g/:id/m/:ply (immutable, CDN-cached). */
 export interface PolledMove {
   ply: number;
+  seat?: number;
   move?: Move;
   events: EngineEvent[];
+}
+
+/** Full state over HTTP (tRPC `game.get`): used to start in polling mode. */
+export interface GameSnapshot {
+  view: GameView;
+  seat: number | null;
+  players?: PlayerMeta[];
 }
 
 export interface OnlineClientOptions {
@@ -65,6 +74,15 @@ export interface OnlineClientOptions {
   maxFailuresBeforePolling?: number;
   /** Start in polling mode (server flag "force polling"). */
   forcePolling?: boolean;
+  /**
+   * Legal moves from the real engine (core-wasm `game_from_view`). Without it the
+   * client falls back to the TS feature-graph check in ./board.ts (no river rules).
+   */
+  rules?: ViewRules;
+  /** Fetch the current view + my seat over HTTP (polling mode has no `welcome`). */
+  snapshot?: () => Promise<GameSnapshot>;
+  /** Send an intent over HTTP when no socket is open (tRPC `game.submitMove`). Throws when rejected. */
+  submitHttp?: (gameId: string, ply: number, move: Move) => Promise<void>;
 }
 
 const OPEN = 1;
@@ -79,9 +97,12 @@ export class OnlineClient extends GameClient {
   private reconnectTimer: unknown = null;
   private pollTimer: unknown = null;
   private disposed = false;
-  private o: Required<Omit<OnlineClientOptions, "players" | "socketFactory" | "fetch">> & {
+  private o: Required<Omit<OnlineClientOptions, "players" | "socketFactory" | "fetch" | "rules" | "snapshot" | "submitHttp">> & {
     socketFactory: SocketFactory;
     fetch: FetchLike;
+    rules?: ViewRules;
+    snapshot?: () => Promise<GameSnapshot>;
+    submitHttp?: (gameId: string, ply: number, move: Move) => Promise<void>;
   };
 
   constructor(opts: OnlineClientOptions) {
@@ -111,8 +132,9 @@ export class OnlineClient extends GameClient {
 
   // ── socket lifecycle ────────────────────────────────────────────────────
 
+  /** Plies we hold (the server's `hello.lastPly` is >= 0; 0 asks for a full welcome). */
   private lastPly(): number {
-    return this.state.view?.ply ?? -1;
+    return this.state.view?.ply ?? 0;
   }
 
   private openSocket(): SocketLike {
@@ -259,7 +281,7 @@ export class OnlineClient extends GameClient {
           const prev = players[e.player];
           players[e.player] = {
             name: e.name,
-            color: prev?.color ?? (["red", "blue", "yellow", "green", "black", "pink"] as const)[e.player % 6]!,
+            color: prev?.color ?? (["red", "blue", "green", "yellow", "black"] as const)[e.player % 5]!,
             kind: prev?.kind ?? "remote",
             tier: prev?.tier,
             userId: e.userId,
@@ -294,7 +316,7 @@ export class OnlineClient extends GameClient {
     this.applyEvents(events);
     if (this.state.view && this.state.view.ply !== toPly) {
       // Engine/reducer disagreement: trust the server.
-      this.send({ t: "hello", gameId: this.o.gameId, lastPly: -1 });
+      this.send({ t: "hello", gameId: this.o.gameId, lastPly: 0 });
     }
     this.setState({ deadline: null, error: null });
     this.refreshLegal();
@@ -306,7 +328,16 @@ export class OnlineClient extends GameClient {
       if (this.state.legalPlacements.length) this.setState({ legalPlacements: [] });
       return;
     }
-    this.setState({ legalPlacements: legalPlacementsOn(boardFromTiles(v.board), this.catalog, v.currentTile) });
+    let legal: Placement[];
+    try {
+      legal = this.o.rules
+        ? this.o.rules.legalPlacements(v)
+        : legalPlacementsOn(boardFromTiles(v.board), this.catalog, v.currentTile);
+    } catch (e) {
+      legal = legalPlacementsOn(boardFromTiles(v.board), this.catalog, v.currentTile);
+      console.warn("[online] engine rejected the view, using the TS rules:", (e as Error).message);
+    }
+    this.setState({ legalPlacements: legal });
   }
 
   // ── polling fallback ────────────────────────────────────────────────────
@@ -314,6 +345,7 @@ export class OnlineClient extends GameClient {
   private startPolling() {
     if (this.disposed) return;
     this.setState({ connection: "polling" });
+    this.socket = null;
     const tick = async () => {
       if (this.disposed) return;
       await this.pollOnce();
@@ -322,9 +354,23 @@ export class OnlineClient extends GameClient {
     void tick();
   }
 
+  /** Load the full view over HTTP (polling start, or a desync). */
+  async loadSnapshot(): Promise<void> {
+    if (!this.o.snapshot) return;
+    const snap = await this.o.snapshot();
+    if (this.disposed) return;
+    const patch: Partial<GameClientState> = { phase: "ready", localSeats: snap.seat === null ? [] : [snap.seat] };
+    if (snap.players?.length) patch.players = snap.players;
+    this.setState(patch);
+    const cur = this.state.view;
+    if (!cur || snap.view.ply >= cur.ply) this.adoptView(snap.view);
+    else this.refreshLegal();
+  }
+
   async pollOnce(): Promise<void> {
     const base = `${this.o.httpBase.replace(/\/$/, "")}/g/${encodeURIComponent(this.o.gameId)}`;
     try {
+      if (!this.state.view) await this.loadSnapshot();
       const res = await this.o.fetch(`${base}/ply`);
       if (!res.ok) return;
       const { ply } = (await res.json()) as { ply: number };
@@ -348,6 +394,13 @@ export class OnlineClient extends GameClient {
     if (!v?.currentTile) return [];
     const me = v.players[v.currentPlayer];
     if (!me) return [];
+    if (this.o.rules) {
+      try {
+        return this.o.rules.legalFigures(v, p);
+      } catch {
+        /* fall through to the TS rules */
+      }
+    }
     return legalFiguresOn(boardFromTiles(v.board), this.catalog, v.currentTile, p, me, v.ruleset);
   }
 
@@ -356,19 +409,18 @@ export class OnlineClient extends GameClient {
     if (!v) return;
     const intent: ClientMessage = { t: "intent", gameId: this.o.gameId, ply: v.ply, move };
     if (this.send(intent)) return;
-    // Polling mode: post the intent over HTTP (server endpoint TBD with the server workstream).
-    const base = `${this.o.httpBase.replace(/\/$/, "")}/g/${encodeURIComponent(this.o.gameId)}/intent`;
+    // No socket (polling mode): the same intent over HTTP, then catch up.
+    if (!this.o.submitHttp) {
+      this.setState({ error: "not connected" });
+      return;
+    }
     try {
-      const res = await this.o.fetch(base, {
-        method: "POST",
-        body: JSON.stringify(intent),
-        headers: { "content-type": "application/json" },
-      });
-      if (!res.ok) this.setState({ error: `move rejected (${res.status})` });
-      await this.pollOnce();
+      await this.o.submitHttp(this.o.gameId, v.ply, move);
+      this.setState({ error: null });
     } catch (e) {
       this.setState({ error: String((e as Error)?.message ?? e) });
     }
+    await this.pollOnce();
   }
 
   react(emoji: string) {

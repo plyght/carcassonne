@@ -6,9 +6,10 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
-import { LocalEngineClient, randomSeedString, tileCatalog, type AsyncEngine } from "@carcassonne/game-client";
+import { LocalEngineClient, randomSeedString, type AsyncEngine } from "@carcassonne/game-client";
 
 import { GameScreen } from "@/components/game/game-screen";
+import { loadCoreAssets } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { createLocalGame, getGame, saveGame, type LocalGameRecord } from "@/lib/local-games";
 import { BOT_DELAY, getSettings } from "@/lib/settings";
@@ -27,7 +28,8 @@ export default function LocalGamePage() {
     let engine: AsyncEngine | null = null;
     let c: LocalEngineClient | null = null;
     void (async () => {
-      engine = await createEngine();
+      const [core, eng] = await Promise.all([loadCoreAssets(), createEngine()]);
+      engine = eng;
       if (disposed) return engine.dispose();
       c = new LocalEngineClient(
         engine,
@@ -39,7 +41,7 @@ export default function LocalGamePage() {
           aiDelayMs: BOT_DELAY[getSettings().botSpeed],
         },
         {
-          catalog: tileCatalog,
+          catalog: core.catalog,
           onMoves: (moves, view) => {
             const ended = view.status === "ended";
             saveGame({

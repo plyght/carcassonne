@@ -12,6 +12,8 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@carcassonne/core-geo": "workspace:*",
+    "@carcassonne/core-wasm": "workspace:*",
     "@carcassonne/game-client": "workspace:*",
     "@carcassonne/protocol": "workspace:*",
     "react": "catalog:"

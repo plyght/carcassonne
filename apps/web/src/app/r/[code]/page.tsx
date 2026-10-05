@@ -4,78 +4,79 @@ import { useEffect, useState } from "react";
 
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Bot, Check, Copy, Loader2, Play, User } from "lucide-react";
 
-import { FigureIcon, PLAYER_COLOR_ORDER, PLAYER_COLORS } from "@carcassonne/render-classic";
+import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
 import type { PlayerColorId } from "@carcassonne/game-client";
 
 import { EDITION_TEXT } from "@/components/setup/rules-form";
 import { authClient } from "@/lib/auth-client";
-import { roomApi, type Room } from "@/lib/rooms-api";
+import { getGuest } from "@/lib/guest";
+import { roomApi } from "@/lib/rooms-api";
 import { readJSON, writeJSON } from "@/lib/storage";
+import { queryClient, trpc } from "@/utils/trpc";
+
+/** Seat colours as the server assigns them (packages/api game service). */
+const SEAT_COLORS: PlayerColorId[] = ["red", "blue", "green", "yellow", "black"];
 
 export default function RoomLobby() {
-  const { code } = useParams<{ code: string }>();
+  const { code: rawCode } = useParams<{ code: string }>();
+  const code = decodeURIComponent(rawCode).toUpperCase();
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const [room, setRoom] = useState<Room | null>(null);
+  const { data: session, isPending } = authClient.useSession();
+  const roomQuery = useQuery({ ...trpc.room.get.queryOptions({ code }), refetchInterval: 1500, meta: { silent: true } });
+  const room = roomQuery.data ?? null;
   const [error, setError] = useState<string | null>(null);
   const [nickname, setNickname] = useState(() => readJSON("carc.nickname", ""));
-  const [joined, setJoined] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await roomApi.get({ code });
-        if (!alive) return;
-        setRoom(r);
-        setError(null);
-        if (r.status === "playing" && r.gameId) router.push(`/play/online/${r.gameId}` as Route);
-      } catch (e) {
-        if (alive) setError((e as Error).message || "Server unavailable");
-      }
-    };
-    void load();
-    const id = setInterval(load, 2000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [code, router]);
+    if (room?.status === "playing" && room.gameId) router.push(`/play/online/${room.gameId}` as Route);
+  }, [room?.status, room?.gameId, router]);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: trpc.room.get.queryKey({ code }) });
 
   const join = async () => {
+    setBusy(true);
+    setError(null);
     try {
       writeJSON("carc.nickname", nickname);
-      setRoom(await roomApi.join({ code, nickname: session ? undefined : nickname || undefined }));
-      setJoined(true);
+      await roomApi.join(code, { signedIn: !!session, nickname });
+      await refresh();
     } catch (e) {
       setError((e as Error).message || "Couldn’t join");
+    } finally {
+      setBusy(false);
     }
   };
 
   const start = async () => {
-    setStarting(true);
+    if (!room) return;
+    setBusy(true);
     try {
-      const { gameId } = await roomApi.start({ code });
+      const { gameId } = await roomApi.start(room.id);
       router.push(`/play/online/${gameId}` as Route);
     } catch (e) {
       setError((e as Error).message || "Couldn’t start");
-      setStarting(false);
+      setBusy(false);
     }
   };
 
   const [link, setLink] = useState(`/r/${code}`);
   useEffect(() => setLink(`${window.location.origin}/r/${code}`), [code]);
-  const isHost = !!room && !!session && room.hostUserId === session.user.id;
-  const seats = room?.seats ?? Array.from({ length: 4 }, (_, i) => ({ seat: i, kind: "open" as const, name: null, userId: null, color: null }));
+  const seated = !!room && room.mySeat >= 0;
+  const max = room?.maxPlayers ?? 4;
+  const seats = Array.from({ length: max }, (_, i) => room?.seats[i] ?? null);
+  const loadError = roomQuery.error?.message;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8" data-testid="room-lobby" data-room-status={room?.status ?? "loading"}>
       <div className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">Room</div>
-      <h1 className="font-display text-5xl tracking-[0.12em]">{code}</h1>
+      <h1 className="font-display text-5xl tracking-[0.12em]" data-testid="room-code">
+        {code}
+      </h1>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-card/80 p-2 pl-4">
         <span className="min-w-0 flex-1 truncate font-mono text-sm text-muted-foreground" suppressHydrationWarning>
@@ -96,26 +97,29 @@ export default function RoomLobby() {
         </button>
       </div>
 
-      {error ? (
+      {error || (loadError && !room) ? (
         <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          {error}. The room service may not be running yet; this page retries automatically.
+          {error ?? `${loadError}. This page retries automatically.`}
         </div>
       ) : null}
 
       <section className="mt-6 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
         <h2 className="mb-3 font-display text-2xl">Seats</h2>
-        <ol className="grid gap-2 sm:grid-cols-2">
-          {seats.map((s) => {
-            const color = (s.color as PlayerColorId | null) ?? PLAYER_COLOR_ORDER[s.seat]!;
-            const app = PLAYER_COLORS[color] ?? PLAYER_COLORS.red;
+        <ol className="grid gap-2 sm:grid-cols-2" data-testid="room-seats">
+          {seats.map((s, i) => {
+            const color = SEAT_COLORS[i % SEAT_COLORS.length]!;
+            const app = PLAYER_COLORS[color];
             return (
-              <li key={s.seat} className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3">
-                <FigureIcon fill={s.kind === "open" ? "transparent" : app.fill} outline={s.kind === "open" ? "currentColor" : undefined} ink={app.ink} marker={app.marker} size={28} />
+              <li key={i} className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3" data-seat-kind={s?.kind ?? "open"}>
+                <FigureIcon fill={s ? app.fill : "transparent"} outline={s ? undefined : "currentColor"} ink={app.ink} marker={app.marker} size={28} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{s.kind === "open" ? "Open seat" : (s.name ?? "Player")}</div>
+                  <div className="truncate font-semibold">
+                    {s ? s.name : "Open seat"}
+                    {room && i === room.mySeat ? <span className="ml-1 text-xs text-muted-foreground">(you)</span> : null}
+                  </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {s.kind === "bot" ? <Bot className="size-3" /> : s.kind === "human" ? <User className="size-3" /> : null}
-                    {s.kind === "bot" ? `Bot · ${s.tier ?? "medium"}` : s.kind === "human" ? (s.connected === false ? "away" : "ready") : "waiting…"}
+                    {s?.kind === "bot" ? <Bot className="size-3" /> : s ? <User className="size-3" /> : null}
+                    {s?.kind === "bot" ? `Bot · ${s.tier}` : s ? ("isGuest" in s && s.isGuest ? "guest" : "player") : "waiting…"}
                   </div>
                 </div>
               </li>
@@ -123,30 +127,37 @@ export default function RoomLobby() {
           })}
         </ol>
 
-        {!joined ? (
+        {room && !seated && room.status === "lobby" ? (
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            {!session ? (
+            {!isPending && !session ? (
               <input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value.slice(0, 20))}
-                placeholder="Your nickname"
+                placeholder={getGuest()?.name ?? "Your nickname"}
                 className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
                 aria-label="Nickname"
               />
             ) : null}
-            <button type="button" onClick={join} className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            <button
+              type="button"
+              onClick={join}
+              disabled={busy}
+              data-testid="take-seat"
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
               Take a seat
             </button>
           </div>
         ) : null}
-        {isHost ? (
+        {room?.isHost ? (
           <button
             type="button"
             onClick={start}
-            disabled={starting}
+            disabled={busy || room.seats.length < 2}
+            data-testid="start-online"
             className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-60"
           >
-            {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start game
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start game
           </button>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">The host starts the game when everyone is seated.</p>
@@ -157,7 +168,9 @@ export default function RoomLobby() {
         <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 text-sm shadow-sm">
           <h2 className="mb-2 font-display text-2xl">Rules</h2>
           <ul className="space-y-1 text-muted-foreground">
-            <li>Field scoring, {["", "1st", "2nd", "3rd"][room.ruleset.fieldEdition]} edition: {EDITION_TEXT[room.ruleset.fieldEdition]}</li>
+            <li>
+              Field scoring, {["", "1st", "2nd", "3rd"][room.ruleset.fieldEdition]} edition: {EDITION_TEXT[room.ruleset.fieldEdition]}
+            </li>
             <li>The River: {room.ruleset.river ? "on" : "off"}</li>
             <li>The Abbot: {room.ruleset.abbot ? "on" : "off"}</li>
           </ul>

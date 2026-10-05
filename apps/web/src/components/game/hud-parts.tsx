@@ -341,7 +341,8 @@ export function RemainingTiles({
   art: TileArtSource;
   palette: BoardPalette;
 }) {
-  const ids = catalog.all().map((d) => d.id);
+  // Engine order; ids the ruleset never uses (River off, the spring) are not in `remaining`.
+  const ids = catalog.all().map((d) => d.id).filter((id) => id in remaining);
   const total = Object.values(remaining).reduce((a, b) => a + b, 0);
   return (
     <Panel className="w-full p-3" aria-label="Remaining tiles">
@@ -349,13 +350,13 @@ export function RemainingTiles({
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Draw pile</span>
         <span className="font-display text-lg tabular-nums">{total}</span>
       </div>
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-7 gap-1.5">
         {ids.map((id) => {
           const def = catalog.get(id)!;
           const n = remaining[id] ?? 0;
           return (
             <div key={id} className={cn("relative", n === 0 && "opacity-25 grayscale")} title={`${id}: ${n} left`}>
-              <TileThumb def={def} art={art} palette={palette} size={36} title={`Tile ${id}, ${n} left`} />
+              <TileThumb def={def} art={art} palette={palette} size={32} title={`Tile ${id}, ${n} left`} />
               <span className="absolute -right-1 -bottom-1 grid min-w-4 place-items-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background tabular-nums">
                 {n}
               </span>

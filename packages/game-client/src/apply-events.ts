@@ -32,9 +32,8 @@ function removeFigure(v: GameView, f: FigureRef) {
 }
 
 function decRemaining(v: GameView, tile: string) {
-  const n = (v.remaining[tile] ?? 0) - 1;
-  if (n > 0) v.remaining[tile] = n;
-  else delete v.remaining[tile];
+  // The engine view keeps exhausted ids at 0, so the reducer does too.
+  v.remaining[tile] = Math.max(0, (v.remaining[tile] ?? 0) - 1);
 }
 
 /** Apply one event in place to a (cloned) view. */
@@ -52,6 +51,8 @@ function step(v: GameView, e: EngineEvent, catalog?: TileCatalog) {
       v.board.push({ x: e.x, y: e.y, rot: e.rot, tile: e.tile, figures: [] });
       v.currentTile = null;
       v.ply++;
+      // The engine passes the turn right after placing (also on the final move).
+      v.currentPlayer = (e.player + 1) % Math.max(1, v.players.length);
       break;
     case "figurePlaced": {
       const t = v.board.find((b) => b.x === e.x && b.y === e.y);

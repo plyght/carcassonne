@@ -7,19 +7,19 @@ import { useRouter } from "next/navigation";
 import { Loader2, Swords } from "lucide-react";
 
 import { DEFAULT_RULESET, type Ruleset } from "@carcassonne/protocol";
-import { randomSeedString } from "@carcassonne/game-client";
 import { cn } from "@carcassonne/ui/lib/utils";
 
 import { RulesForm } from "@/components/setup/rules-form";
+import { authClient } from "@/lib/auth-client";
 import { roomApi } from "@/lib/rooms-api";
 
 export default function OnlinePage() {
   const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
   const [code, setCode] = useState("");
   const [seats, setSeats] = useState(4);
   const [bots, setBots] = useState(0);
   const [ruleset, setRuleset] = useState<Ruleset>({ ...DEFAULT_RULESET });
-  const [seed, setSeed] = useState(() => randomSeedString());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,9 +29,8 @@ export default function OnlinePage() {
     try {
       const room = await roomApi.create({
         ruleset,
-        seats,
-        seed,
-        bots: Array.from({ length: bots }, (_, i) => ({ seat: seats - 1 - i, tier: "medium" as const })),
+        maxPlayers: seats,
+        bots: Array.from({ length: bots }, () => "medium" as const),
       });
       router.push(`/r/${room.code}` as Route);
     } catch (e) {
@@ -106,17 +105,27 @@ export default function OnlinePage() {
           </div>
         </div>
         <div className="mt-3">
-          <RulesForm ruleset={ruleset} onRuleset={setRuleset} seed={seed} onSeed={setSeed} />
+          <RulesForm ruleset={ruleset} onRuleset={setRuleset} />
         </div>
         {error ? (
           <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}
+        {!isPending && !session ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Hosting needs an account.{" "}
+            <a href="/login" className="font-semibold text-primary underline">
+              Sign in or sign up
+            </a>
+            ; guests can join with a code.
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={create}
-          disabled={busy}
+          disabled={busy || !session}
+          data-testid="create-room"
           className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Swords className="size-4" />} Create room

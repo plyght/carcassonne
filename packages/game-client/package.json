@@ -6,7 +6,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./worker": "./src/worker/engine-worker.ts",
-    "./dev-engine": "./src/dev-engine/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
@@ -14,6 +13,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@carcassonne/core-wasm": "workspace:*",
     "@carcassonne/protocol": "workspace:*"
   },
   "devDependencies": {

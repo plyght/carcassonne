@@ -3,14 +3,15 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_RULESET, type ClientMessage, type ServerMessage } from "@carcassonne/protocol";
 
 import type { PlayerMeta, Timers } from "./client";
-import { DevEngine } from "./dev-engine";
-import { baseCatalog } from "./dev-engine/tiles-base";
+import { catalogFromKit, loadEngine } from "./engine";
 import { inlineEngine, seedFromString } from "./engine-port";
 import { LocalEngineClient } from "./local-client";
 import { OnlineClient, type FetchLike, type SocketLike } from "./online-client";
 import { simulateReplay, viewAtPly } from "./replay";
 
 const RULES = { ...DEFAULT_RULESET, river: false };
+const port = await loadEngine();
+const baseCatalog = catalogFromKit(port.kit);
 
 class FakeTimers implements Timers {
   t = 0;
@@ -81,7 +82,7 @@ const HUMANS: PlayerMeta[] = [
 
 /** A server-side engine to produce realistic views and events. */
 function serverGame() {
-  const eng = new DevEngine();
+  const eng = port;
   const h = eng.createGame(RULES, seedFromString("wire"), 2);
   return {
     view: () => eng.view(h),
@@ -100,7 +101,7 @@ describe("LocalEngineClient", () => {
     const timers = new FakeTimers();
     const saved: number[] = [];
     const c = new LocalEngineClient(
-      inlineEngine(new DevEngine()),
+      inlineEngine(port),
       { ruleset: RULES, seed: "hotseat", players: HUMANS },
       { catalog: baseCatalog, timers, onMoves: (m) => saved.push(m.length) },
     );
@@ -127,7 +128,7 @@ describe("LocalEngineClient", () => {
   test("vs AI: bot answers after the delay, undo rewinds past the bot", async () => {
     const timers = new FakeTimers();
     const c = new LocalEngineClient(
-      inlineEngine(new DevEngine()),
+      inlineEngine(port),
       {
         ruleset: RULES,
         seed: "ai",
@@ -176,7 +177,7 @@ describe("OnlineClient", () => {
     client.start();
     expect(client.getState().connection).toBe("connecting");
     sockets[0]!.open();
-    expect(sockets[0]!.sent[0]).toEqual({ t: "hello", gameId: "g1", lastPly: -1 });
+    expect(sockets[0]!.sent[0]).toEqual({ t: "hello", gameId: "g1", lastPly: 0 });
     sockets[0]!.receive({ t: "welcome", gameId: "g1", view: srv.view(), ply: 0, seat: 0 });
     expect(client.getState().phase).toBe("ready");
     expect(client.getState().localSeats).toEqual([0]);
@@ -288,7 +289,7 @@ describe("OnlineClient", () => {
 
 describe("replay", () => {
   test("re-simulates and scrubs", async () => {
-    const eng = new DevEngine();
+    const eng = port;
     const h = eng.createGame(RULES, seedFromString("replay"), 2);
     const moves = [];
     for (let i = 0; i < 6; i++) {
@@ -296,9 +297,9 @@ describe("replay", () => {
       eng.apply(h, m);
       moves.push(m);
     }
-    const rep = await simulateReplay(inlineEngine(new DevEngine()), {
+    const rep = await simulateReplay(inlineEngine(port), {
       id: "r",
-      engine: "dev-ts",
+      engine: "core-wasm",
       ruleset: RULES,
       seed: "replay",
       players: HUMANS,

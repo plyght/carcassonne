@@ -5,3 +5,5 @@ export * from "./styles";
 export * from "./figures";
 export * from "./tile";
 export * from "./board";
+export * from "./geo-art";
+export * from "./defaults";

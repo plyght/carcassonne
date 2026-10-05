@@ -28,7 +28,7 @@ export default function TutorialPage() {
         { name: "You", color: "blue", kind: "human" },
         { name: "Brother Odo", color: "red", kind: "bot", tier: "easy" },
       ],
-      engine: "dev-ts",
+      engine: "core-wasm",
     });
     router.push(`/play/local/${rec.id}` as Route);
   };
