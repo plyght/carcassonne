@@ -1,0 +1,27 @@
+{
+  "name": "@carcassonne/render-classic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@carcassonne/game-client": "workspace:*",
+    "@carcassonne/protocol": "workspace:*",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@carcassonne/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}
