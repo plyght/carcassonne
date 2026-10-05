@@ -1,0 +1,15 @@
+{
+  "name": "@carcassonne/protocol",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@carcassonne/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

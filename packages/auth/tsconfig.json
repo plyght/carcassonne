@@ -1,0 +1,6 @@
+{
+  "extends": "@carcassonne/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
