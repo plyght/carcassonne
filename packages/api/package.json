@@ -6,17 +6,24 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@carcassonne/auth": "workspace:*",
     "@carcassonne/db": "workspace:*",
+    "@carcassonne/protocol": "workspace:*",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
+    "@vercel/queue": "^0.8.0",
+    "drizzle-orm": "catalog:",
+    "pg": "^8.23.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@carcassonne/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/pg": "^8.23.1",
     "typescript": "catalog:"
   }
 }
