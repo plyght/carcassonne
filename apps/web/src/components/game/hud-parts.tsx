@@ -69,7 +69,33 @@ export function ScorePanel({
 }) {
   const leader = Math.max(...view.players.map((p) => p.score));
   return (
-    <Panel className="w-full p-2" aria-label="Scores">
+    <>
+    {/* compact strip for phones */}
+    <Panel className="flex w-full gap-1 overflow-x-auto p-1.5 md:hidden" aria-label="Scores">
+      {view.players.map((p, i) => {
+        const color = players[i]?.color ?? "red";
+        const app = PLAYER_COLORS[color];
+        const active = view.status === "playing" && view.currentPlayer === i;
+        return (
+          <div key={i} className={cn("relative flex items-center gap-1.5 rounded-lg px-2 py-1", active && "bg-accent/70 ring-1 ring-gold/60")}>
+            <FigureIcon fill={playerFill(palette, color)} ink={app.ink} marker={app.marker} size={18} />
+            <span className="max-w-16 truncate text-xs font-medium">{playerName(players, i)}</span>
+            <span className="font-display text-base tabular-nums">{p.score}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">×{p.meeples}</span>
+            {!hideReactions
+              ? reactions
+                  .filter((r) => r.player === i)
+                  .map((r) => (
+                    <span key={r.id} className="reaction-float pointer-events-none absolute -top-3 right-1 text-xl" aria-hidden>
+                      {r.emoji}
+                    </span>
+                  ))
+              : null}
+          </div>
+        );
+      })}
+    </Panel>
+    <Panel className="hidden w-full p-2 md:block" aria-label="Scores">
       <ol className="flex flex-col gap-1">
         {view.players.map((p, i) => {
           const meta = players[i];
@@ -156,6 +182,7 @@ export function ScorePanel({
         })}
       </ol>
     </Panel>
+    </>
   );
 }
 
@@ -261,7 +288,7 @@ export function TileInHand({
                   ↻
                 </button>
               </div>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              <p className="mt-2 hidden text-[11px] md:block leading-relaxed text-muted-foreground">
                 <Kbd>R</Kbd> / scroll rotate · <Kbd>←↑→↓</Kbd> pick spot · <Kbd>Enter</Kbd> place
               </p>
             </>

@@ -67,7 +67,8 @@ export default function RoomLobby() {
     }
   };
 
-  const link = typeof window !== "undefined" ? `${window.location.origin}/r/${code}` : `/r/${code}`;
+  const [link, setLink] = useState(`/r/${code}`);
+  useEffect(() => setLink(`${window.location.origin}/r/${code}`), [code]);
   const isHost = !!room && !!session && room.hostUserId === session.user.id;
   const seats = room?.seats ?? Array.from({ length: 4 }, (_, i) => ({ seat: i, kind: "open" as const, name: null, userId: null, color: null }));
 

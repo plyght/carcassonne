@@ -109,7 +109,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   useEffect(() => {
     const update = () => {
       const wide = window.innerWidth >= 900;
-      setInsets(wide ? { top: 76, right: 320, bottom: 76, left: 320 } : { top: 200, right: 8, bottom: 260, left: 8 });
+      setInsets(wide ? { top: 76, right: 320, bottom: 76, left: 320 } : { top: 130, right: 8, bottom: 250, left: 8 });
     };
     update();
     window.addEventListener("resize", update);
@@ -408,13 +408,13 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
 
       {/* top bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-        <Panel className="flex items-center gap-3 px-3 py-2">
+        <Panel className="flex min-w-0 items-center gap-3 px-3 py-2">
           <Link href={exitHref as "/"} className="grid size-8 place-items-center rounded-lg hover:bg-muted" aria-label="Leave game">
             <ArrowLeft className="size-4" />
           </Link>
           <div className="min-w-0">
             <div className="truncate font-display text-base leading-tight">{title}</div>
-            {subtitle ? <div className="truncate text-[11px] text-muted-foreground">{subtitle}</div> : null}
+            {subtitle ? <div className="hidden truncate text-[11px] sm:block text-muted-foreground">{subtitle}</div> : null}
           </div>
           <div className="mx-1 h-8 w-px bg-border" />
           <div className="flex items-center gap-2" aria-live="polite">
@@ -423,10 +423,10 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             ) : (
               <>
                 <span className="size-3 rounded-full ring-2 ring-white/60" style={{ background: PLAYER_COLORS[currentColor].fill }} />
-                <span className="text-sm font-semibold" data-testid="turn-indicator">
+                <span className="text-sm font-semibold whitespace-nowrap" data-testid="turn-indicator">
                   {canAct && s.localSeats.length === 1 ? "Your turn" : `${playerName(s.players, current)}’s turn`}
                 </span>
-                <TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} />
+                <span className="hidden sm:inline"><TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} /></span>
               </>
             )}
           </div>
@@ -436,7 +436,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             </span>
           ) : null}
         </Panel>
-        <Panel className="flex items-center gap-1 p-1.5">
+        <Panel className="flex shrink-0 items-center gap-1 p-1.5">
           {isLocal ? (
             <button
               type="button"
@@ -472,7 +472,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
       </div>
 
       {/* left: scores */}
-      <div className="pointer-events-none absolute top-[74px] left-3 flex w-[min(300px,calc(100vw-24px))] flex-col gap-2">
+      <div className="pointer-events-none absolute top-[74px] right-3 left-3 flex md:right-auto md:w-[300px] flex-col gap-2">
         <ScorePanel
           view={view}
           players={s.players}
@@ -494,7 +494,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
       </div>
 
       {/* right: tile in hand + remaining */}
-      <div className="pointer-events-none absolute right-3 bottom-[64px] flex w-[min(300px,calc(100vw-24px))] flex-col gap-2 md:top-[74px] md:bottom-auto">
+      <div className="pointer-events-none absolute right-16 bottom-[64px] left-3 flex flex-col gap-2 md:top-[74px] md:right-3 md:bottom-auto md:left-auto md:w-[300px]">
         {!ended ? (
           <TileInHand
             tile={view.currentTile}

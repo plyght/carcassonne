@@ -97,7 +97,7 @@ function FigureBody({
       <path
         d={lyingPath ?? src.path(kind)}
         fill={fill}
-        fillOpacity={ghost ? 0.45 : 1}
+        fillOpacity={ghost ? 0.62 : 1}
         stroke={outline}
         strokeWidth={strokeWidth}
         strokeLinejoin="round"

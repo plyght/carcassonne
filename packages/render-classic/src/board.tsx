@@ -639,18 +639,18 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   >
                     <title>{h.label ?? `${h.type} on feature ${h.feature}`}</title>
                     {/* generous hit area */}
-                    <circle cx={hx + offset} cy={hy - 4} r={15} fill="transparent" pointerEvents="all" />
+                    <circle cx={hx + offset} cy={hy - 4} r={18} fill="transparent" pointerEvents="all" />
                     <g className="cc-hotspot">
                       <FigureToken
                         x={hx + offset}
                         y={hy - 4}
-                        size={26}
+                        size={34}
                         kind={h.type}
                         lying={catalog.get(ghost.tile)?.features[h.feature]?.kind === "field"}
                         fill={a.fill}
                         ink={a.ink}
                         marker={a.marker}
-                        outline={palette.highlight.stroke}
+                        outline={palette.figureOutline}
                         figures={figures}
                         ghost
                       />
