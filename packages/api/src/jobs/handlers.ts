@@ -19,9 +19,11 @@ const TIMEOUT_BUDGET_MS = 50;
 export { monthKey } from "../util";
 import { monthKey } from "../util";
 
+const GOLDEN = BigInt("0x9e3779b97f4a7c15");
+
 /** Deterministic per-turn AI seed so a redelivered job picks the same move. */
 function turnSeed(gameSeed: string, ply: number) {
-  return BigInt.asUintN(64, BigInt(gameSeed) ^ (BigInt(ply + 1) * 0x9e3779b97f4a7c15n));
+  return BigInt.asUintN(64, BigInt(gameSeed) ^ (BigInt(ply + 1) * GOLDEN));
 }
 
 export type JobOutcome = "stale" | "rescheduled" | "played" | "conflict" | "skipped";

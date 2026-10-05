@@ -73,7 +73,7 @@ export async function getEngine(): Promise<Engine> {
 /** Split a u64 seed into the (lo, hi) u32 pair the WASM ABI takes. */
 export function splitSeed(seed: bigint): [number, number] {
   const s = BigInt.asUintN(64, seed);
-  return [Number(s & 0xffffffffn), Number(s >> 32n)];
+  return [Number(s & BigInt(0xffffffff)), Number(s >> BigInt(32))];
 }
 
 export function randomSeed(): bigint {

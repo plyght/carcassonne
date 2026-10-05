@@ -1,8 +1,9 @@
 // Vercel Function entrypoint AND local dev server (same code).
 //
-// Vercel (Bun runtime, `bunVersion` in vercel.json) detects this module-startup `Bun.serve()` call and
-// routes the function's requests — including WebSocket upgrades — through it; `port` only applies
-// locally. Docs: https://vercel.com/docs/functions/runtimes/bun#deploy-a-bun-server-from-api and
+// vercel.json: service "server" (framework "bun", entrypoint "api/server.ts", `bunVersion` 1.x). Vercel
+// detects this module-startup `Bun.serve()` call and routes the service's requests — including WebSocket
+// upgrades — through it; `port` only applies locally. `vercel build` emits one `bun1.x` function for it.
+// Docs: https://vercel.com/docs/functions/runtimes/bun (Bun.serve entrypoint) and
 // https://vercel.com/docs/functions/websockets#bun.
 import { getServices } from "../src/bootstrap";
 import { createServeOptions } from "../src/main";

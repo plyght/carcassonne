@@ -20,6 +20,7 @@ import {
 } from "../game/service";
 import type { Identity } from "../identity";
 import { monthKey } from "../util";
+import { moveSchema } from "../routers/schemas";
 import type { PgListener } from "./listener";
 
 export const PRESENCE_TTL_MS = 30_000;
@@ -46,18 +47,6 @@ interface GameSub {
   unlisten: Promise<() => Promise<void>>;
   chain: Promise<void>;
 }
-
-const moveSchema = z.object({
-  x: z.number().int(),
-  y: z.number().int(),
-  rot: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
-  figure: z
-    .union([
-      z.object({ type: z.enum(["meeple", "abbot"]), feature: z.number().int().min(0) }),
-      z.object({ type: z.literal("recallAbbot"), x: z.number().int(), y: z.number().int() }),
-    ])
-    .nullable(),
-});
 
 export const clientMessageSchema = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), gameId: z.string().uuid(), lastPly: z.number().int().min(0) }),

@@ -17,8 +17,13 @@ export async function runMigrations(env: DatabaseConfig) {
 }
 
 if (import.meta.main) {
+  // DDL goes over the direct connection (Neon: DATABASE_URL_UNPOOLED), not the pooler.
   const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is required");
-  await runMigrations({ DATABASE_URL: url });
-  console.log("migrations applied");
+  if (!url) {
+    // Vercel build without a connected database (e.g. first deploy): don't fail the build.
+    console.warn("[migrate] DATABASE_URL not set; skipping migrations");
+  } else {
+    await runMigrations({ DATABASE_URL: url });
+    console.log("[migrate] migrations applied");
+  }
 }

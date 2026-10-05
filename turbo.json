@@ -3,15 +3,28 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": [
+        "^check-types"
+      ]
     },
     "dev": {
       "cache": false,
@@ -32,21 +45,43 @@
     "db:studio": {
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "dependsOn": [],
+      "cache": false
+    },
+    "db:seed": {
+      "cache": false,
+      "interactive": true
     }
   },
   "globalEnv": [
+    "ADMIN_EMAILS",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",
     "CI",
+    "CORE_WASM_PATH",
     "CORS_ORIGIN",
     "DATABASE_URL",
+    "DATABASE_URL_UNPOOLED",
+    "EDGE_CONFIG",
+    "ENGINE",
+    "ENGINE_VERSION",
+    "FORCE_POLLING",
     "NEXT_PUBLIC_SERVER_URL",
     "NODE_ENV",
+    "PAUSE_ONLINE",
+    "SCHEDULER",
+    "TEST_DATABASE_BASE_URL",
     "VERCEL",
     "VERCEL_ENV",
     "VERCEL_PROJECT_PRODUCTION_URL",
     "VERCEL_URL",
     "_VARLOCK_ENV_KEY"
   ],
-  "globalDependencies": [".env*", "apps/*/.env*", "packages/*/.env*"]
+  "globalDependencies": [
+    ".env*",
+    "apps/*/.env*",
+    "packages/*/.env*"
+  ]
 }

@@ -26,16 +26,17 @@ bun install
 
 ## Database Setup
 
-This project uses PostgreSQL with Drizzle ORM.
+This project uses PostgreSQL with Drizzle ORM (Neon via the Vercel Marketplace in production).
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
+1. Start a local Postgres 16 and put its URL in `apps/server/.env` (`DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres`).
+2. Apply the migrations and seed dev data:
 
 ```bash
-bun run db:push
+bun run db:migrate        # drizzle-kit migrate (packages/db/src/migrations)
+bun run db:seed           # 4 dev accounts (password "carcassonne-dev"), a lobby room, a game vs bots
 ```
+
+After changing `packages/db/src/schema/*`, run `bun run db:generate` and commit the new migration.
 
 Then, run the development server:
 
@@ -44,7 +45,26 @@ bun run dev
 ```
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+The API is running at [http://localhost:3000](http://localhost:3000) (WebSocket at `ws://localhost:3000/ws`).
+
+## Server (apps/server)
+
+- `api/server.ts` calls `Bun.serve({ fetch, websocket })` once at module startup. This is both the Vercel
+  Function entrypoint and the local dev server (`bun run dev:server`), so local dev runs the same code.
+  `fetch` upgrades `/ws` to a raw Bun WebSocket (`GameHub`, protocol in `packages/protocol/src/wire.ts`)
+  and hands every other request to the Elysia app (`src/http.ts`: better-auth, tRPC, polling endpoints).
+- Moves: stateless replay + compare-and-set insert on `move (game_id, ply)` + `NOTIFY game_<id>` in the
+  same transaction; every instance holding sockets LISTENs on one direct connection and pushes new moves.
+- Clocks, server bots and matchmaking retries are Vercel Queues topics (`clock-timeout`, `bot-move`,
+  `matchmaking-retry`), consumed by `api/queues/*.ts`. Locally (`SCHEDULER=local`, the default off Vercel)
+  an in-process scheduler calls the same handlers.
+- Polling fallback: `GET /g/:id/ply` (`s-maxage=1`) and `GET /g/:id/m/:ply` (immutable). Force it with
+  `FORCE_POLLING=true` or the Edge Config key `forcePolling`; it also turns on automatically at 70% of
+  the estimated monthly memory allowance.
+- Engine: `ENGINE=fake` (default, test stand-in) or `ENGINE=wasm` (`core.wasm` via the CONTRACT ABI).
+  The binding point is `apps/server/src/engine.ts`.
+- Env vars are documented in `apps/server/.env.schema`.
+- Tests: `bun run test` (needs the local Postgres; creates `carcassonne_test_*` databases).
 
 ## UI Customization
 
@@ -82,26 +102,22 @@ Bun's automatic env loading is disabled in `bunfig.toml`; the framework integrat
 
 Run standalone Node/Bun tools that use Varlock from the owning app directory so they load that app's schema and env files. `env:generate` only generates TypeScript files; it does not initialize environment values in a subsequent command.
 
-## Deployment
+## Deployment (Vercel only)
 
-### Docker Compose
+Everything deploys to Vercel (Hobby) from the root `vercel.json` as Vercel Services:
 
-- Target: server
-- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
-- Build images: bun run docker:build
-- Start: bun run docker:up
-- Logs: bun run docker:logs
-- Stop: bun run docker:down
+| Service | Root | What |
+|---|---|---|
+| `web` | `apps/web` | Next.js app (catch-all route) |
+| `server` | `apps/server` | Bun runtime function `api/server.ts` (HTTP + WebSockets, `maxDuration` 300 s); the build step applies DB migrations |
+| `clock-timeout`, `bot-move`, `matchmaking-retry` | `apps/server` | Private Vercel Queues push consumers (`queue/v2beta` triggers), no public route |
 
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
+Public routes `/ws`, `/trpc/*`, `/api/auth/*`, `/g/*`, `/config`, `/healthz` go to `server`; everything else goes to `web`.
+Set `NEXT_PUBLIC_SERVER_URL` to the deployment origin (same domain).
 
-For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
-
-### Vercel Services
-
-- Target: web
-- Config: `vercel.json`
 - Link the project first: bun run deploy:setup
+- Connect Neon from the Vercel Marketplace (injects `DATABASE_URL` and `DATABASE_URL_UNPOOLED`)
+- Local build of the deploy output (no upload): bun run build:vercel
 - Local Vercel dev: bun run dev:vercel
 - Sync preview env: bun run env:preview
 - Sync production env: bun run env:production
@@ -119,7 +135,7 @@ For more details, see the guide on [Deploying to Vercel](https://www.better-t-st
 carcassonne/
 ├── apps/
 │   ├── web/         # Frontend application (Next.js)
-│   └── server/      # Backend API (Elysia, TRPC)
+│   └── server/      # Bun.serve entry (WebSockets + Elysia/tRPC), Vercel Queues consumers
 ├── packages/
 │   ├── ui/          # Shared shadcn/ui components and styles
 │   ├── api/         # API layer / business logic
@@ -138,10 +154,9 @@ carcassonne/
 - `bun run db:generate`: Generate database client/types
 - `bun run db:migrate`: Run database migrations
 - `bun run db:studio`: Open database studio UI
-- `bun run docker:build`: Build the Docker Compose images
-- `bun run docker:up`: Build and start the Docker Compose stack
-- `bun run docker:logs`: Tail logs from the Docker Compose stack
-- `bun run docker:down`: Stop the Docker Compose stack
+- `bun run db:seed`: Seed dev accounts, a room and a game
+- `bun run test`: Run the test suites (server tests need local Postgres)
+- `bun run build:vercel`: Build the Vercel output locally
 - `bun run deploy:setup`: Link this repo to a Vercel project (first-time setup)
 - `bun run dev:vercel`: Run the Vercel Services dev environment locally
 - `bun run env:preview`: Sync local env files to the Vercel preview environment

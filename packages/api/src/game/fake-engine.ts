@@ -22,11 +22,16 @@ import type { Engine, EngineGame } from "./engine";
 const LETTERS = "ABCEFGHIJKLMNOPQRSTUVWX".split(""); // every base tile id except the start tile D
 const MEEPLES = 7;
 
+// BigInt() calls instead of literals: apps/web type-checks this file with a pre-ES2020 target.
+const GOLDEN = BigInt("0x9e3779b97f4a7c15");
+const LCG_MUL = BigInt("6364136223846793005");
+const LCG_INC = BigInt("1442695040888963407");
+
 function lcg(seed: bigint) {
-  let s = BigInt.asUintN(64, seed ^ 0x9e3779b97f4a7c15n);
+  let s = BigInt.asUintN(64, seed ^ GOLDEN);
   return () => {
-    s = BigInt.asUintN(64, s * 6364136223846793005n + 1442695040888963407n);
-    return Number(s >> 33n);
+    s = BigInt.asUintN(64, s * LCG_MUL + LCG_INC);
+    return Number(s >> BigInt(33));
   };
 }
 

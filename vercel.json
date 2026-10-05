@@ -6,9 +6,67 @@
       "root": "apps/web",
       "framework": "nextjs",
       "installCommand": "cd ../.. && bun install"
+    },
+    "server": {
+      "root": "apps/server",
+      "framework": "bun",
+      "entrypoint": "api/server.ts",
+      "installCommand": "cd ../.. && bun install",
+      "buildCommand": "bun ../../packages/db/src/migrate.ts",
+      "functions": {
+        "api/server.ts": { "maxDuration": 300 }
+      }
+    },
+    "clock-timeout": {
+      "root": "apps/server",
+      "framework": "bun",
+      "entrypoint": "api/queues/clock-timeout.ts",
+      "installCommand": "cd ../.. && bun install",
+      "functions": {
+        "api/queues/clock-timeout.ts": {
+          "maxDuration": 30,
+          "experimentalTriggers": [
+            { "type": "queue/v2beta", "topic": "clock-timeout", "retryAfterSeconds": 5, "maxDeliveries": 8 }
+          ]
+        }
+      }
+    },
+    "bot-move": {
+      "root": "apps/server",
+      "framework": "bun",
+      "entrypoint": "api/queues/bot-move.ts",
+      "installCommand": "cd ../.. && bun install",
+      "functions": {
+        "api/queues/bot-move.ts": {
+          "maxDuration": 30,
+          "experimentalTriggers": [
+            { "type": "queue/v2beta", "topic": "bot-move", "retryAfterSeconds": 5, "maxDeliveries": 8 }
+          ]
+        }
+      }
+    },
+    "matchmaking-retry": {
+      "root": "apps/server",
+      "framework": "bun",
+      "entrypoint": "api/queues/matchmaking-retry.ts",
+      "installCommand": "cd ../.. && bun install",
+      "functions": {
+        "api/queues/matchmaking-retry.ts": {
+          "maxDuration": 30,
+          "experimentalTriggers": [
+            { "type": "queue/v2beta", "topic": "matchmaking-retry", "retryAfterSeconds": 15, "maxDeliveries": 8 }
+          ]
+        }
+      }
     }
   },
   "rewrites": [
+    { "source": "/ws", "destination": { "service": "server" } },
+    { "source": "/trpc/(.*)", "destination": { "service": "server" } },
+    { "source": "/api/auth/(.*)", "destination": { "service": "server" } },
+    { "source": "/g/(.*)", "destination": { "service": "server" } },
+    { "source": "/config", "destination": { "service": "server" } },
+    { "source": "/healthz", "destination": { "service": "server" } },
     {
       "source": "/(.*)",
       "destination": {
