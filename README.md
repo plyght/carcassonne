@@ -47,6 +47,43 @@ bun run dev
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
 The API is running at [http://localhost:3000](http://localhost:3000) (WebSocket at `ws://localhost:3000/ws`).
 
+## Run locally
+
+Everything (Postgres, API server, web app, the online e2e test) runs on one machine.
+
+1. **Postgres 16.** Start it (`service postgresql start` on the dev container) so that
+   `postgresql://postgres:password@localhost:5432/postgres` works.
+2. **Env files** (gitignored; schemas in `apps/*/.env.schema`):
+
+   ```bash
+   # apps/server/.env
+   BETTER_AUTH_SECRET=<32+ random chars>
+   BETTER_AUTH_URL=http://localhost:3000
+   CORS_ORIGIN=http://localhost:3001
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres
+   # optional: FORCE_POLLING=true, SCHEDULER=local (default off Vercel), ENGINE=wasm (default)
+
+   # apps/web/.env
+   NEXT_PUBLIC_SERVER_URL=http://localhost:3000
+   ```
+
+3. **Install and migrate:** `bun install`, then `cd packages/db && bunx varlock run -- bun src/migrate.ts`
+   (or `bun run db:migrate` with a TTY). Optional: `bun run db:seed`.
+4. **Run:** `bun run dev` starts the API server on :3000 (HTTP, tRPC, `/ws`, in-process scheduler for
+   clocks and bots) and the web app on :3001. Local games (hot-seat, vs AI) need no server at all.
+5. **Engine:** the web app loads `packages/core-wasm/core.wasm` twice from one cached URL: in a Web
+   Worker for local games (`apps/web/src/workers/engine.worker.ts`) and on the main thread for the tile
+   catalog, core-geo tile/meeple art and online legal moves (`apps/web/src/lib/core.tsx`). After changing
+   Zig code: `cd packages/core && zig build test && zig build wasm && cp zig-out/bin/core.wasm ../core-wasm/core.wasm`.
+6. **End-to-end test** (Playwright, real engine, two browsers): with Postgres up and the web app running
+   on :3001 (`bun run dev:web`, or `next build && next start -p 3001` with `NEXT_PUBLIC_SERVER_URL` set),
+   run `cd apps/web && bun run e2e`. The script starts the API server on :3000 itself (stop your own
+   first), then covers: sign-up and guest join of an invite room by code, 12 turns over WebSockets with
+   both clients in sync, reload and resume, an emoji reaction, a game under `FORCE_POLLING=true`, and a
+   bot seat played by the queue consumer. Screenshots land in `docs/screenshots/online-*.png`.
+   `bun run e2e:local` smoke-tests a local vs-AI River game. Chromium comes from `/opt/pw-browsers`
+   (`CHROMIUM_PATH` overrides it); never run `playwright install`.
+
 ## Server (apps/server)
 
 - `api/server.ts` calls `Bun.serve({ fetch, websocket })` once at module startup. This is both the Vercel
@@ -61,7 +98,7 @@ The API is running at [http://localhost:3000](http://localhost:3000) (WebSocket 
 - Polling fallback: `GET /g/:id/ply` (`s-maxage=1`) and `GET /g/:id/m/:ply` (immutable). Force it with
   `FORCE_POLLING=true` or the Edge Config key `forcePolling`; it also turns on automatically at 70% of
   the estimated monthly memory allowance.
-- Engine: `ENGINE=fake` (default, test stand-in) or `ENGINE=wasm` (`core.wasm` via the CONTRACT ABI).
+- Engine: `ENGINE=wasm` (default: the committed `packages/core-wasm/core.wasm`) or `ENGINE=fake` (test stand-in).
   The binding point is `apps/server/src/engine.ts`.
 - Env vars are documented in `apps/server/.env.schema`.
 - Tests: `bun run test` (needs the local Postgres; creates `carcassonne_test_*` databases).
