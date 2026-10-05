@@ -153,6 +153,18 @@
         "varlock": "catalog:",
       },
     },
+    "packages/game-client": {
+      "name": "@carcassonne/game-client",
+      "version": "0.0.0",
+      "dependencies": {
+        "@carcassonne/protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@carcassonne/config": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/protocol": {
       "name": "@carcassonne/protocol",
       "devDependencies": {
@@ -305,6 +317,8 @@
     "@carcassonne/core-wasm": ["@carcassonne/core-wasm@workspace:packages/core-wasm"],
 
     "@carcassonne/db": ["@carcassonne/db@workspace:packages/db"],
+
+    "@carcassonne/game-client": ["@carcassonne/game-client@workspace:packages/game-client"],
 
     "@carcassonne/protocol": ["@carcassonne/protocol@workspace:packages/protocol"],
 
