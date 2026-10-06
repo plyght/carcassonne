@@ -112,6 +112,10 @@ fn worker() void {
         stats.margin[0] += local.margin[0];
         stats.ties += local.ties;
         stats.games += local.games;
+        if (stats.games % 50 == 0) {
+            const gf: f64 = @floatFromInt(stats.games);
+            std.debug.print("  .. {d} games: A {d:.1}%\n", .{ stats.games, (@as(f64, @floatFromInt(stats.wins[0])) + 0.5 * @as(f64, @floatFromInt(stats.ties))) / gf * 100 });
+        }
     }
 }
 
@@ -144,6 +148,7 @@ fn profile() !void {
     var t_apply: u64 = 0;
     var t_eval: u64 = 0;
     var t_gen: u64 = 0;
+    var t_draw: u64 = 0;
     var n_apply: u64 = 0;
     var n_gen: u64 = 0;
     var buf: [ai.movegen.MAX_MOVES]engine.Move = undefined;
@@ -167,11 +172,15 @@ fn profile() !void {
                 t_apply += t1 - t0;
                 t_eval += t2 - t1;
                 n_apply += 1;
+                // Next tile's placeability check alone (part of apply).
+                const t3 = nowNs();
+                sink += @floatFromInt(@intFromBool(c.status == .playing and c.hasPlacement(c.current_tile)));
+                t_draw += nowNs() - t3;
             }
             try g.apply(ms[@intCast(rng.below(ms.len))], null);
         }
     }
-    std.debug.print("gen {d} ns/call, apply {d} ns, eval {d} ns, moves/turn {d} ({d})\n", .{ t_gen / n_gen, t_apply / n_apply, t_eval / n_apply, n_apply / n_gen, sink });
+    std.debug.print("gen {d} ns/call, apply {d} ns (hasPlacement {d} ns), eval {d} ns, moves/turn {d} ({d})\n", .{ t_gen / n_gen, t_apply / n_apply, t_draw / n_apply, t_eval / n_apply, n_apply / n_gen, sink });
 }
 
 pub fn main(init: std.process.Init) !void {

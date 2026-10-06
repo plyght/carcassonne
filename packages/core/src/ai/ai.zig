@@ -3,16 +3,18 @@
 //! | Tier   | Approach                                                          |
 //! |--------|-------------------------------------------------------------------|
 //! | Easy   | Greedy one-ply with noise; grabs features, never places farmers   |
-//! | Medium | One-ply over every move with the heuristic evaluation (eval.zig)  |
-//! | Hard   | Determinized MCTS (UCB over root moves, progressive widening      |
-//! |        | ordered by the Medium evaluation, heuristic rollouts)             |
-//! | Expert | Hard with more iterations, deeper rollouts and opponents modelled |
-//! |        | as Medium players inside the rollouts                             |
+//! | Medium | One-ply over every (deduplicated) move with the heuristic         |
+//! |        | evaluation in eval.zig                                            |
+//! | Hard   | Determinized MCTS with chance nodes over the next draw (mcts.zig),|
+//! |        | progressive widening ordered by the Medium evaluation; opponents  |
+//! |        | answer with their best heuristic reply                            |
+//! | Expert | Hard searched deeper and wider, with heuristic rollouts in which  |
+//! |        | opponents are modelled as Medium players                          |
 //!
-//! Everything is deterministic given `Options.seed` and an iteration budget:
-//! no clock is read here. A millisecond budget is turned into iterations with
-//! a calibrated iterations-per-ms constant (see `iterationsFor`), which is also
-//! what makes the WASM build (no clock on wasm32-freestanding) work.
+//! Everything is deterministic given `Options.seed` and the budget: nothing
+//! here reads a clock. A millisecond budget is turned into a cap on search
+//! work (apply + evaluate calls) with the calibrated `work_per_ms`, which is
+//! also what makes the WASM build (no clock on wasm32-freestanding) work.
 //!
 //! Search never peeks at the draw order: every MCTS iteration reshuffles the
 //! unseen tiles (determinization), and the evaluation only uses tile counts.
@@ -70,7 +72,7 @@ pub const expert_config: SearchConfig = .{
 /// and packages/core-wasm/test/ai.test.ts). `budget_ms` is turned into a work
 /// cap with it, so think time stays near the budget in every game phase while
 /// the search stays deterministic (nothing reads a clock).
-pub const work_per_ms: f32 = 60.0;
+pub const work_per_ms: f32 = 90.0;
 
 pub const Options = struct {
     tier: Tier = .medium,

@@ -49,6 +49,8 @@ pub const Params = struct {
     field_growth: f32 = 2.0,
     /// Points a farmer gets per completed city (3rd edition).
     farm_city_points: f32 = 3.0,
+    /// Weight of joining/stealing opportunities (see `addMerges`).
+    steal_weight: f32 = 1.0,
 };
 
 pub const default_params: Params = .{};
@@ -72,7 +74,9 @@ const Entry = struct {
     x: i16 = 0,
     y: i16 = 0,
     p_complete: f32 = 0,
-    done: bool = false,
+    /// Majority holders (bit p) and the expected value they share.
+    winners: u8 = 0,
+    value: f32 = 0,
 };
 
 /// Unseen tiles (draw pile + tile in hand), as counts.
@@ -112,29 +116,53 @@ const FitMemo = struct {
     n: usize = 0,
 };
 
-fn fitCount(g: *const Game, u: *const Unseen, memo: *FitMemo, x: i16, y: i16) u32 {
-    const key = movegen.CellSet.key(x, y);
-    for (memo.keys[0..memo.n], 0..) |k, i| {
-        if (k == key) return memo.vals[i];
-    }
-    const need = movegen.cellNeeds(g, x, y);
-    var k: u32 = 0;
-    var river = false;
-    for (need) |e| {
-        if (e == .river) river = true;
-    }
-    if (!river) {
-        for (u.types[0..u.ntypes]) |t| {
-            for (0..4) |ri| {
-                const r: u2 = @intCast(ri);
-                if (movegen.canon_rot[t][r] != r) continue;
-                if (movegen.rotFits(t, r, need)) {
-                    k += u.counts[t];
+/// Neighbour-edge pattern of an empty cell: each side is none/field/road/city/river.
+const PATTERNS = 5 * 5 * 5 * 5;
+
+fn patternIndex(need: movegen.CellNeeds) usize {
+    var i: usize = 0;
+    for (need) |e| i = i * 5 + (if (e) |k| @as(usize, @intFromEnum(k)) + 1 else 0);
+    return i;
+}
+
+/// For each neighbour pattern, the base tile types that fit in some rotation
+/// (bit t = tile index t). River tiles are left out: they only ever go at the
+/// river's open end.
+const fit_masks: [PATTERNS]u64 = blk: {
+    @setEvalBranchQuota(10_000_000);
+    if (tiles.count > 64) @compileError("fit masks need more bits");
+    var out: [PATTERNS]u64 = @splat(0);
+    for (0..PATTERNS) |pi| {
+        var need: movegen.CellNeeds = undefined;
+        var rest = pi;
+        var s: usize = 4;
+        while (s > 0) {
+            s -= 1;
+            const d = rest % 5;
+            rest /= 5;
+            need[s] = if (d == 0) null else @as(tiles.EdgeKind, @enumFromInt(d - 1));
+        }
+        for (0..tiles.count) |t| {
+            if (tiles.isRiver(@intCast(t))) continue;
+            for (0..4) |r| {
+                if (movegen.rotFits(@intCast(t), @intCast(r), need)) {
+                    out[pi] |= @as(u64, 1) << @intCast(t);
                     break;
                 }
             }
         }
     }
+    break :blk out;
+};
+
+fn fitCount(g: *const Game, u: *const Unseen, memo: *FitMemo, x: i16, y: i16) u32 {
+    const key = movegen.CellSet.key(x, y);
+    for (memo.keys[0..memo.n], 0..) |k, i| {
+        if (k == key) return memo.vals[i];
+    }
+    var k: u32 = 0;
+    var mask = fit_masks[patternIndex(movegen.cellNeeds(g, x, y))];
+    while (mask != 0) : (mask &= mask - 1) k += u.counts[@ctz(mask)];
     if (memo.n < memo.keys.len) {
         memo.keys[memo.n] = key;
         memo.vals[memo.n] = @intCast(k);
@@ -385,11 +413,62 @@ pub fn evaluate(g: *const Game, params: *const Params) Values {
             },
             else => 0,
         };
+        e.winners = winners;
+        e.value = value;
         for (0..g.num_players) |p| {
             if (winners & (@as(u8, 1) << @intCast(p)) != 0) v[p] += value;
         }
     }
+    if (params.steal_weight > 0) addMerges(g, &u, &memo, turns, &an, params, &v);
     return addEconomy(g, &u, turns, &an, params, v);
+}
+
+/// Joining and stealing: two claimed roads (or cities) with different
+/// majorities that share an open cell can be merged by one tile. Every player
+/// who would gain from the merge gets that gain, weighted by the chance they
+/// draw a tile for the cell.
+fn addMerges(g: *const Game, u: *const Unseen, memo: *FitMemo, turns: [MAX_PLAYERS]f32, an: *Analysis, params: *const Params, v: *Values) void {
+    const n = an.n;
+    for (0..n) |i| {
+        const a = &an.entries[i];
+        if ((a.kind != .road and a.kind != .city) or a.winners == 0) continue;
+        for (i + 1..n) |j| {
+            const b = &an.entries[j];
+            if (b.kind != a.kind or b.winners == 0 or b.winners == a.winners) continue;
+            // A shared open cell?
+            var shared: ?engine.Cell = null;
+            outer: for (a.cells[0..a.ncells]) |ca| {
+                for (b.cells[0..b.ncells]) |cb| {
+                    if (ca.x == cb.x and ca.y == cb.y) {
+                        shared = ca;
+                        break :outer;
+                    }
+                }
+            }
+            const c = shared orelse continue;
+            const k = fitCount(g, u, memo, c.x, c.y);
+            if (k == 0) continue;
+            var counts: [MAX_PLAYERS]u8 = undefined;
+            var best: u8 = 0;
+            for (0..MAX_PLAYERS) |p| {
+                counts[p] = a.counts[p] + b.counts[p];
+                best = @max(best, counts[p]);
+            }
+            const merged = a.value + b.value;
+            for (0..g.num_players) |p| {
+                const bit = @as(u8, 1) << @intCast(p);
+                const after: f32 = if (counts[p] == best) merged else 0;
+                var before: f32 = 0;
+                if (a.winners & bit != 0) before += a.value;
+                if (b.winners & bit != 0) before += b.value;
+                const gain = after - before;
+                if (gain <= 0) continue;
+                // Not every fitting tile joins both sides; roughly half do.
+                const chance = hitChance(k, u.total, turns[p] * params.own_turns) * 0.5;
+                v[p] += params.steal_weight * chance * gain;
+            }
+        }
+    }
 }
 
 fn supplyWorth(eff: f32, turns: f32, params: *const Params) f32 {

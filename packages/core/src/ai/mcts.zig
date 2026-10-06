@@ -244,6 +244,7 @@ pub const Search = struct {
     /// Heuristic rollout from `sim` until the searching player is to move
     /// (after `rollout_cycles` extra rounds), then evaluate.
     fn rollout(self: *Search, sim: *Game) Values {
+        self.work += 1;
         var cycles = self.cfg.rollout_cycles;
         var guard: u32 = 0;
         while (sim.status == .playing and guard < 64) : (guard += 1) {
@@ -347,6 +348,7 @@ pub const Search = struct {
             const ci = self.selectChild(ni);
             path[depth] = .{ .node = ni, .child = ci };
             depth += 1;
+            self.work += 1;
             sim.apply(self.children.items[ci].move, null) catch {
                 leaf = self.children.items[ci].h;
                 break;

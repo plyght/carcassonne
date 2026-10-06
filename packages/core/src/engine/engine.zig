@@ -417,9 +417,24 @@ pub const Game = struct {
         return out[0..n];
     }
 
+    /// Same answer as `placementsFor(t).len > 0`, but stops at the first fit
+    /// (it runs on every draw, so AI search calls it constantly).
     pub fn hasPlacement(self: *const Game, t: TileIndex) bool {
-        var buf: [MAX_PLACEMENTS]Placement = undefined;
-        return self.placementsFor(t, &buf).len > 0;
+        if (tiles.isRiver(t)) {
+            var buf: [4]Placement = undefined;
+            return self.placementsFor(t, &buf).len > 0;
+        }
+        for (self.placed[0..self.placed_len]) |p| {
+            for (0..4) |s| {
+                const cx = p.x + dx[s];
+                const cy = p.y + dy[s];
+                if (self.slotAt(cx, cy) != null) continue;
+                for (0..4) |r| {
+                    if (self.edgesMatch(t, cx, cy, @intCast(r))) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// Legal placements of the current tile.
