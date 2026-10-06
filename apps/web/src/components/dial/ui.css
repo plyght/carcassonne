@@ -260,6 +260,13 @@
   white-space: nowrap;
 }
 
+.dark .carc-kbd {
+  background: var(--fill-hover);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--foreground) 16%, transparent) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.35) inset;
+}
+
 /* ── labels and links ────────────────────────────────────────────────── */
 
 .carc-eyebrow {
