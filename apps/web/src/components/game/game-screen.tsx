@@ -20,7 +20,6 @@ import {
 } from "@carcassonne/game-client";
 import {
   ClassicBoard,
-  effectiveCamera,
   hudPalette,
   is3DStyle,
   PLAYER_COLOR_ORDER,
@@ -29,7 +28,6 @@ import {
   proceduralArt,
   renderableStyle,
   type BoardCommands,
-  type CameraMode,
   type Cell,
   type Floater,
 } from "@carcassonne/render-classic";
@@ -37,7 +35,8 @@ import type { PickResult } from "@carcassonne/render-three";
 import { cn } from "@carcassonne/ui/lib/utils";
 
 import { useCore } from "@/lib/core";
-import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
+import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
+import { useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 
 import { Board3D } from "../board3d/board-3d";
 import { CameraSwitcher, StyleCarousel } from "../style/style-settings";
@@ -102,16 +101,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const [figureMenu, setFigureMenu] = useState<{ x: number; y: number; choices: FigureChoice[] } | null>(null);
   const is3d = is3DStyle(style) && !!core;
   // Camera actually in use: settings, or free orbit after the player drags the 3D board.
-  const [camera, setCamera] = useState<CameraMode>(() => effectiveCamera(style, settings.camera));
-  useEffect(() => setCamera(effectiveCamera(style, settings.camera)), [style, settings.camera]);
-  const chooseCamera = useCallback((c: CameraMode) => {
-    setCamera(c);
-    updateSettings({ camera: c });
-  }, []);
+  const { camera, choose: chooseCamera, report: setCamera } = useBoardCamera(style);
   const on3DFail = useCallback((reason: string) => {
     console.warn("[board3d]", reason);
     toast.error("3D board unavailable, switched to Classic Board", { description: reason, id: "board3d-fallback" });
-    updateSettings({ style: "classic", camera: "top-down" });
+    fallbackToClassic();
   }, []);
 
   const isLocal = client instanceof LocalEngineClient;

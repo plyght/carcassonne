@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@carcassonne/ui/lib/utils";
 import { CAMERA_MODES, effectiveCamera, getStyle, STYLE_PACKS, type CameraMode, type StyleId } from "@carcassonne/render-classic";
 
+import { selectCamera, selectMotion, selectStyle, selectTier } from "@/lib/board-controls";
 import { updateSettings, useSettings, type Settings } from "@/lib/settings";
 
 import { StylePreview } from "./style-preview";
@@ -61,7 +62,7 @@ export function StyleCarousel({ compact = false }: { compact?: boolean }) {
         <button
           type="button"
           disabled={style.status !== "ready" || selected}
-          onClick={() => updateSettings({ style: style.id, camera: effectiveCamera(style, settings.camera) })}
+          onClick={() => selectStyle(style.id)}
           className={cn(
             "shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition-colors",
             selected
@@ -82,7 +83,7 @@ export function StyleCarousel({ compact = false }: { compact?: boolean }) {
             role="option"
             aria-selected={s.id === focus}
             onClick={() => setFocus(s.id)}
-            onDoubleClick={() => s.status === "ready" && updateSettings({ style: s.id, camera: effectiveCamera(s, settings.camera) })}
+            onDoubleClick={() => s.status === "ready" && selectStyle(s.id)}
             className={cn(
               "group relative flex w-24 shrink-0 flex-col items-center gap-1 rounded-xl border p-1.5 text-xs transition-colors",
               s.id === focus ? "border-primary bg-accent/60" : "border-border hover:bg-muted",
@@ -152,7 +153,7 @@ export function CameraPicker() {
               key={c.id}
               type="button"
               disabled={!supported}
-              onClick={() => updateSettings({ camera: c.id })}
+              onClick={() => selectCamera(c.id)}
               className={cn(
                 "rounded-xl border px-3 py-2 text-left text-sm transition-colors disabled:opacity-45",
                 active ? "border-primary bg-accent/60" : "hover:bg-muted",
@@ -175,7 +176,7 @@ export function CameraPicker() {
           { value: "medium", label: "Medium" },
           { value: "high", label: "High" },
         ]}
-        onChange={(v) => updateSettings({ tier: v })}
+        onChange={selectTier}
       />
       <p className="px-1 text-xs text-muted-foreground">Auto picks Low on phones and integrated GPUs. Low turns off shadows and post effects.</p>
     </section>
@@ -257,7 +258,7 @@ export function GeneralSettings() {
           { value: "reduced", label: "Reduced" },
           { value: "full", label: "Full" },
         ]}
-        onChange={(v) => set({ motion: v })}
+        onChange={selectMotion}
       />
       <Segmented
         label="Text size"

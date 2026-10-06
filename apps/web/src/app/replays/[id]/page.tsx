@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
 import { simulateReplay, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
-import { ClassicBoard, effectiveCamera, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle, type CameraMode } from "@carcassonne/render-classic";
+import { ClassicBoard, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle } from "@carcassonne/render-classic";
 
 import { Board3D, type Board3DBatch } from "@/components/board3d/board-3d";
 import { describeEvent, playerName } from "@/components/game/helpers";
@@ -16,7 +16,8 @@ import { CameraSwitcher } from "@/components/style/style-settings";
 import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { getGame, type LocalGameRecord } from "@/lib/local-games";
-import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
+import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
+import { useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 
 export default function ReplayViewer() {
   const { id } = useParams<{ id: string }>();
@@ -42,8 +43,7 @@ export default function ReplayViewer() {
   const palette = hudPalette(style);
   const debug = useDebugFlag();
   const core = useCore();
-  const [camera, setCamera] = useState<CameraMode>(() => effectiveCamera(style, settings.camera));
-  useEffect(() => setCamera(effectiveCamera(style, settings.camera)), [style, settings.camera]);
+  const { camera, choose: chooseCamera, report: setCamera } = useBoardCamera(style);
   const catalog = core?.catalog;
 
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function ReplayViewer() {
           view={view}
           batches={batches}
           playerSlots={playerSlots}
-          onFail={() => updateSettings({ style: "classic", camera: "top-down" })}
+          onFail={fallbackToClassic}
           insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
           ariaLabel="Replay board (3D)"
         />
@@ -154,10 +154,7 @@ export default function ReplayViewer() {
           </div>
           {is3DStyle(style) && core ? (
             <div className="ml-auto">
-              <CameraSwitcher value={camera} onChange={(c) => {
-                setCamera(c);
-                updateSettings({ camera: c });
-              }} />
+              <CameraSwitcher value={camera} onChange={chooseCamera} />
             </div>
           ) : null}
         </Panel>
