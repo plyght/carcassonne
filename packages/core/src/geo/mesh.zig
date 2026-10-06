@@ -16,19 +16,29 @@ const Allocator = std.mem.Allocator;
 const NONE = layout.NONE;
 
 pub const CITY_H: F = 0.012;
-pub const WALL_H: F = 0.06;
-pub const WALL_HT: F = 0.011;
+/// Curtain wall height above the city ground (chunky, like the reference miniatures).
+pub const WALL_H: F = 0.085;
+/// Half thickness of the curtain wall.
+pub const WALL_HT: F = 0.019;
 pub const WATER_Y: F = -0.007;
 pub const RIVER_BED: F = -0.022;
-pub const ROAD_Y: F = -0.003;
-pub const RUT_D: F = 0.003;
+/// Roads are slightly sunken soft-edged ribbons.
+pub const ROAD_Y: F = -0.006;
+pub const RUT_D: F = 0.0015;
 /// Default tile slab thickness (fraction of the tile width).
 pub const SLAB_DEFAULT: F = 0.09;
 pub const PLINTH_H: F = 0.012;
-/// Suggested meeple height (tile units): chunky next to ~0.04 houses.
-pub const MEEPLE_H: F = 0.16;
+/// Suggested meeple height (tile units): chunky and readable next to ~0.08 houses,
+/// like the wooden pieces in the reference photo.
+pub const MEEPLE_H: F = 0.26;
 const EDGE_BLEND: F = 0.1;
-const GATE_R: F = 0.045;
+const GATE_R: F = 0.055;
+/// Merlon pitch and height on the wall walk.
+const MERLON: F = 0.036;
+const MERLON_H: F = 0.016;
+/// House footprint radius at scale 1 (models are ~0.11 x 0.07 tile units; packing
+/// circles may overlap a little at the corners, like packed medieval houses).
+pub const HOUSE_R: F = 0.045;
 
 /// Geometry groups; styles map each to a material.
 pub const Material = enum(u32) { terrain = 0, wall = 1, water = 2, slab = 3 };
@@ -408,20 +418,20 @@ fn addWall(a: Allocator, m: *Mesh, L: *const layout.Layout, l: layout.Line, gate
     }
     // crenellations: merlons on the field-side half of the wall walk
     const total = arc[n - 1];
-    const merlon: F = 0.03;
+    const merlon: F = MERLON;
     var s: F = merlon * 0.5;
     while (s < total) : (s += merlon) {
         const at = vec.polylineAt(l.pts, s / total);
         if (nearGate(gates, at.p) or vec.borderDistance(at.p) < 0.02) continue;
         const outn = at.t.perp().scale(-1);
         const c = at.p.add(at.t.perp().scale(WALL_HT * 0.6)).add(outn.scale(WALL_HT * 0.55));
-        try addBox(a, m, c, at.t, merlon * 0.27, WALL_HT * 0.45, top, top + 0.011, f, false);
+        try addBox(a, m, c, at.t, merlon * 0.3, WALL_HT * 0.42, top, top + MERLON_H, f, false);
     }
 
     // towers: near both ends and at joints; square and round alternate
     var rng = vec.Rng.init(vec.mix(L.seed, 0x7077 + @as(u64, f)));
     const inset: F = 0.045;
-    const count: usize = @max(1, @as(usize, @intFromFloat(@floor((total - 2 * inset) / 0.24))));
+    const count: usize = @max(1, @as(usize, @intFromFloat(@floor((total - 2 * inset) / 0.26))));
     const step = (total - 2 * inset) / @as(F, @floatFromInt(count));
     s = inset;
     for (0..count + 1) |k| {
@@ -563,6 +573,35 @@ fn put(a: Allocator, m: *Mesh, L: *const layout.Layout, prop: Prop, f: u8, rng: 
 
 const House = struct { p: V2, r: F };
 
+/// Unit tangent of the nearest city wall to p (null when there is no wall).
+fn wallTangent(L: *const layout.Layout, p: V2) ?V2 {
+    var best: F = 1e9;
+    var t: ?V2 = null;
+    for (L.lines.items) |l| if (l.kind == .wall) {
+        var i: usize = 0;
+        while (i + 1 < l.pts.len) : (i += 1) {
+            const d = vec.distPointSeg(p, l.pts[i], l.pts[i + 1]);
+            if (d < best) {
+                best = d;
+                t = l.pts[i + 1].sub(l.pts[i]).norm();
+            }
+        }
+    };
+    return t;
+}
+
+/// One to three small bushes around p, all on field feature f.
+fn bushCluster(a: Allocator, m: *Mesh, L: *const layout.Layout, rng: *vec.Rng, f: u8, p: V2, clear: F) !void {
+    const tau = 2 * std.math.pi;
+    const n: usize = 1 + @as(usize, @intCast(rng.next() % 3));
+    for (0..n) |k| {
+        const q = if (k == 0) p else p.add(V2.init(rng.range(-0.022, 0.022), rng.range(-0.022, 0.022)));
+        if (L.classify(q) != f or vec.borderDistance(q) < 0.02 or !clearOfLines(L, q, 0.01) or !clearOfMarks(L, q, clear)) continue;
+        if (wallDist(L, q) < WALL_HT + 0.02) continue;
+        try put(a, m, L, .bush, f, rng, q, rng.float() * tau, rng.range(0.7, 1.25));
+    }
+}
+
 fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
     var rng = vec.Rng.init(vec.mix(L.seed, 0x9409));
     const tau = 2 * std.math.pi;
@@ -579,67 +618,86 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
         }
     }
 
-    // Houses: deterministic dart-throwing packing (no overlaps, clear of walls,
-    // roads, the tile border and meeple spots). Footprint radius = 0.029*scale.
+    // Houses: deterministic dart-throwing packing of fewer, much larger
+    // houses (no overlaps, clear of walls, roads, the tile border and meeple
+    // spots). Irregular gaps leave courtyard ground showing between them.
+    // Houses near a wall line up with it, the rest snap to a jittered grid.
     var houses: std.ArrayList(House) = .empty;
     var tries: usize = 0;
-    while (tries < 900) : (tries += 1) {
+    while (tries < 500) : (tries += 1) {
         const p = V2.init(rng.float(), rng.float());
-        const sc = rng.range(0.75, 1.35);
-        const hgt = rng.range(0.8, 1.6);
-        const yaw_snap = @floor(rng.float() * 4) * tau / 4 + rng.range(-0.25, 0.25);
-        const r = 0.029 * sc;
+        const sc = rng.range(0.8, 1.3);
+        const hgt = rng.range(0.85, 1.5);
+        const gap = rng.range(-0.004, 0.02);
+        var yaw: F = @floor(rng.float() * 4) * tau / 4 + rng.range(-0.3, 0.3);
+        const variant: u8 = @intCast(rng.next() % 6);
+        const tint: u8 = @intCast(rng.next() % 4);
+        const r = HOUSE_R * sc;
         const f = L.classify(p);
         if (f == NONE or L.kind(f) != .city) continue;
-        if (vec.borderDistance(p) < r * 0.9) continue;
-        if (wallDist(L, p) < r + 0.022 or !clearOfLines(L, p, r * 0.6) or !clearOfMarks(L, p, 0.085)) continue;
+        if (vec.borderDistance(p) < r * 0.85) continue;
+        const wd = wallDist(L, p);
+        if (wd < r * 0.7 + WALL_HT * 1.6 or !clearOfLines(L, p, r * 0.55) or !clearOfMarks(L, p, 0.09 + r * 0.5)) continue;
         var ok = true;
-        for (houses.items) |h| if (h.p.dist(p) < h.r + r + 0.003) {
+        for (houses.items) |h| if (h.p.dist(p) < h.r + r + gap) {
             ok = false;
             break;
         };
         if (!ok) continue;
+        if (wd < r + 0.06) {
+            if (wallTangent(L, p)) |t| yaw = @as(F, yawOf(t)) + (if (rng.float() < 0.5) @as(F, tau / 4.0) else 0) + rng.range(-0.08, 0.08);
+        }
         try houses.append(a, .{ .p = p, .r = r });
-        try m.props.append(a, .{ .prop = .house, .feature = f, .variant = @intCast(rng.next() % 6), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = @floatCast(yaw_snap), .scale = @floatCast(sc), .height = @floatCast(hgt) });
+        try m.props.append(a, .{ .prop = .house, .feature = f, .variant = variant, .tint = tint, .pos = v3(p.x, height(L, p), p.y), .yaw = @floatCast(yaw), .scale = @floatCast(sc), .height = @floatCast(hgt) });
     }
 
-    // Fields: trees, sheep, cows, crops on a jittered grid
-    const fs: F = 0.09;
+    // Fields: mostly clusters of small dark bushes, a few round trees, sheep,
+    // cows and the odd subtle crop strip, on a jittered grid.
+    const fs: F = 0.1;
     var gy: F = fs * 0.5;
     while (gy < 1) : (gy += fs) {
         var gx: F = fs * 0.5;
         while (gx < 1) : (gx += fs) {
-            const p = V2.init(gx + rng.range(-0.03, 0.03), gy + rng.range(-0.03, 0.03));
+            const p = V2.init(gx + rng.range(-0.035, 0.035), gy + rng.range(-0.035, 0.035));
             const r = rng.float();
             const yaw = rng.float() * tau;
             const sc = rng.range(0.75, 1.25);
             const f = L.classify(p);
             if (f == NONE or L.kind(f) != .field) continue;
             if (vec.borderDistance(p) < 0.04 or !clearOfLines(L, p, 0.03) or !clearOfMarks(L, p, 0.09)) continue;
-            if (wallDist(L, p) < 0.045) continue;
-            const prop: ?Prop = if (r < 0.22) .tree else if (r < 0.32) .sheep else if (r < 0.36) .cow else if (r < 0.46) .crop else null;
-            if (prop) |pp| try put(a, m, L, pp, f, &rng, p, yaw, sc);
+            if (wallDist(L, p) < 0.05) continue;
+            if (r < 0.1) {
+                try bushCluster(a, m, L, &rng, f, p, 0.09);
+            } else if (r < 0.125) {
+                try put(a, m, L, .tree, f, &rng, p, yaw, sc);
+            } else if (r < 0.15) {
+                try put(a, m, L, .sheep, f, &rng, p, yaw, sc);
+            } else if (r < 0.158) {
+                try put(a, m, L, .cow, f, &rng, p, yaw, sc);
+            } else if (r < 0.178) {
+                try put(a, m, L, .crop, f, &rng, p, yaw, sc);
+            }
         }
     }
 
-    // Bushes: small dark clusters along roads and outside city walls
+    // Bushes: small dark clusters along roads, rivers and outside city walls
     for (L.lines.items) |l| {
         const off: F = switch (l.kind) {
-            .road => l.hw + 0.022,
-            .wall => 0.034,
-            .river => l.hw + 0.026,
+            .road => l.hw + 0.024,
+            .wall => WALL_HT * 2 + 0.03,
+            .river => l.hw + 0.028,
         };
         const total = vec.polylineLength(l.pts);
         var s: F = 0.03 + rng.float() * 0.05;
-        while (s < total) : (s += 0.05 + rng.float() * 0.07) {
-            if (rng.float() < 0.45) continue;
+        while (s < total) : (s += 0.07 + rng.float() * 0.09) {
+            if (rng.float() < 0.4) continue;
             const at = vec.polylineAt(l.pts, s / total);
             const side: F = if (l.kind == .wall) -1 else if (rng.float() < 0.5) 1 else -1;
-            const p = at.p.add(at.t.perp().scale(side * (off + rng.range(-0.006, 0.01))));
+            const p = at.p.add(at.t.perp().scale(side * (off + rng.range(-0.004, 0.012))));
             const f = L.classify(p);
             if (f == NONE or L.kind(f) != .field) continue;
-            if (vec.borderDistance(p) < 0.02 or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.07) or wallDist(L, p) < 0.025) continue;
-            try put(a, m, L, .bush, f, &rng, p, rng.float() * tau, rng.range(0.7, 1.3));
+            if (vec.borderDistance(p) < 0.02 or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.07) or wallDist(L, p) < WALL_HT + 0.02) continue;
+            try bushCluster(a, m, L, &rng, f, p, 0.07);
         }
     }
 
@@ -702,10 +760,10 @@ fn scatterProps(a: Allocator, m: *Mesh, L: *const layout.Layout) !void {
         for (0..4) |k| {
             const ang = (@as(F, @floatFromInt(k)) + 0.5) * tau / 4;
             const dir = V2.init(@cos(ang), @sin(ang));
-            const p = d.center.add(dir.scale(d.r + 0.06));
+            const p = d.center.add(dir.scale(d.r + 0.07));
             const f = L.classify(p);
             if (f == NONE or L.kind(f) != .field or !clearOfLines(L, p, 0.012) or !clearOfMarks(L, p, 0.08)) continue;
-            try m.props.append(a, .{ .prop = .house, .feature = f, .variant = @intCast(rng.next() % 6), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = yawOf(dir.scale(-1)), .scale = 0.9, .height = 1.1 });
+            try m.props.append(a, .{ .prop = .house, .feature = f, .variant = @intCast(rng.next() % 6), .tint = @intCast(rng.next() % 4), .pos = v3(p.x, height(L, p), p.y), .yaw = yawOf(dir.scale(-1)), .scale = 0.72, .height = 1.0 });
         }
     }
 }

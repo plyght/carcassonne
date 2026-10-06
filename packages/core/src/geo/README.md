@@ -120,9 +120,11 @@ Houses are dart-thrown with no overlaps, kept clear of walls, roads, the tile bo
 
 Anchors and poses:
 
+- Field and city anchors (2D `FEAT` and 3D `ANC3` alike) are the **pole of inaccessibility** of the feature's region: the centre of the largest inscribed circle, clipped against road and river ribbons, plazas, ponds, buildings, walls and the tile border (`layout.clearance`). `tests.zig` checks every registry tile: each anchor classifies as its own feature, keeps a margin from roads, rivers, walls and other features, and is within 15% of the region's best clearance.
+- Road anchors sit on their own road, clear of other roads and rivers.
 - Farmers (field anchors) lie on their back (`pose = 1`).
 - Cloister anchors stand on the plinth in front of the chapel.
-- `scale` = 0.16 tile units, so figures read large next to houses (~0.05).
+- `scale` = 0.26 tile units, so figures read large next to houses (~0.08), as in the reference photo.
 
 ### Figure (kind 3)
 
