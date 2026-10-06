@@ -50,9 +50,9 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${display.variable}`} suppressHydrationWarning>
       <body className="antialiased">
         <Providers>
-          <div className="bg-parchment grid h-svh grid-rows-[auto_1fr]">
+          <div className="bg-parchment relative flex h-svh flex-col">
             <Header />
-            <main className="min-h-0 overflow-y-auto">{children}</main>
+            <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
           </div>
         </Providers>
       </body>

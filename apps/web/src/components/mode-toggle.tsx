@@ -1,36 +1,34 @@
 "use client";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@carcassonne/ui/components/dropdown-menu";
-import { Monitor, Moon, Sun } from "lucide-react";
+// The theme switch: a small two-tone disc (paper and ink) that turns over when you
+// switch between light and dark. Settings keeps the "follow the system" choice.
+
+import { useEffect, useState } from "react";
+
 import { useTheme } from "next-themes";
-import * as React from "react";
 
-export function ModeToggle() {
-  const { setTheme } = useTheme();
+import { cn } from "@carcassonne/ui/lib/utils";
 
+export function ThemeSwitch({ className, withLabel }: { className?: string; withLabel?: boolean }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const dark = mounted && resolvedTheme === "dark";
+  const label = dark ? "Switch to light" : "Switch to dark";
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<button type="button" className="carc-icon-btn carc-theme-toggle" />}>
-        <Sun className="carc-theme-sun" />
-        <Moon className="carc-theme-moon" />
-        <span className="sr-only">Toggle theme</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-40">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          <Sun /> Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          <Moon /> Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          <Monitor /> System
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <button
+      type="button"
+      className={cn("carc-theme-switch", className)}
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={label}
+      title={label}
+      data-dark={dark || undefined}
+    >
+      <span className="carc-theme-disc" aria-hidden />
+      {withLabel ? <span>{dark ? "Light mode" : "Dark mode"}</span> : null}
+    </button>
   );
 }
+
+/** Kept for existing imports. */
+export const ModeToggle = ThemeSwitch;
