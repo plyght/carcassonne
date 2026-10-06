@@ -5,6 +5,7 @@ export const VERSION = 1;
 export const KIND_2D = 1;
 export const KIND_3D = 2;
 export const KIND_FIGURE = 3;
+export const KIND_PROP = 4;
 
 /** Section tag as the little-endian u32 of 4 ASCII chars. */
 export function tag(s: string): number {
@@ -28,6 +29,9 @@ export const TAG = {
   SLAB: tag("SLAB"),
   FDIM: tag("FDIM"),
   OUTL: tag("OUTL"),
+  PDIM: tag("PDIM"),
+  VPRT: tag("VPRT"),
+  VSHD: tag("VSHD"),
 } as const;
 
 /** `engine/tile.zig` FeatureKind order. */
@@ -68,6 +72,46 @@ export const PROPS = [
   "wall_stairs",
 ] as const;
 export type PropKind = (typeof PROPS)[number];
+
+/** Distinct models per prop kind (geo/props.zig `variantCount`); a variant is taken modulo this. */
+export const PROP_VARIANTS: Readonly<Record<PropKind, number>> = {
+  tower: 3,
+  house: 6,
+  chapel: 1,
+  tree: 2,
+  sheep: 1,
+  cow: 1,
+  cart: 1,
+  mill: 1,
+  fountain: 1,
+  crop: 1,
+  duck: 1,
+  bridge: 1,
+  bush: 3,
+  gatehouse: 1,
+  round_tower: 3,
+  wall_stairs: 1,
+};
+
+/** Per-vertex palette part ids of prop models (geo/props.zig `Part`). */
+export const PROP_PARTS = {
+  plaster: 0,
+  roof: 1,
+  stone: 2,
+  stoneDark: 3,
+  foliage: 4,
+  trunk: 5,
+  wood: 6,
+  dark: 7,
+  sheep: 8,
+  cow: 9,
+  crop: 10,
+  water: 11,
+  grass: 12,
+} as const;
+export type PropPart = keyof typeof PROP_PARTS;
+/** Palette width reserved for part ids (13..15 unused). */
+export const PROP_PART_COUNT = 16;
 
 export const TILE_SPECIAL = ["none", "start", "spring", "lake"] as const;
 export const TILE_SET = ["base", "river"] as const;

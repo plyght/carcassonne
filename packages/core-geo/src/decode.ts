@@ -3,6 +3,7 @@ import {
   FEATURE_KINDS,
   FIGURE_KINDS,
   KIND_FIGURE,
+  KIND_PROP,
   POSES,
   KIND_2D,
   KIND_3D,
@@ -135,6 +136,27 @@ export interface GeoFigure {
   positions: Float32Array;
   normals: Float32Array;
   uvs: Float32Array;
+  indices: Uint32Array;
+}
+
+/** One procedural prop model (CGEO kind 4) in prop-local space: tile units, +y up, yaw 0 faces +z. */
+export interface GeoPropModel {
+  prop: PropKind;
+  /** Resolved model variant (requested variant % `variants`). */
+  variant: number;
+  variants: number;
+  rounded: boolean;
+  /** Uniform base scale already applied to `positions` (informational). */
+  baseScale: number;
+  min: [number, number, number];
+  max: [number, number, number];
+  positions: Float32Array;
+  /** Flat face normals (unit). */
+  normals: Float32Array;
+  /** Palette part id per vertex (`PROP_PARTS`). */
+  parts: Uint8Array;
+  /** Baked shade factor per vertex (contact darkening, roof undersides), 0..1. */
+  shade: Float32Array;
   indices: Uint32Array;
 }
 
@@ -333,6 +355,29 @@ export function decodeGeoFigure(input: ArrayBuffer | ArrayBufferView): GeoFigure
     positions: f32(bytes, need(sections, TAG.VPOS)),
     normals: f32(bytes, need(sections, TAG.VNRM)),
     uvs: f32(bytes, need(sections, TAG.VUV0)),
+    indices: new Uint32Array(bytes.buffer, bytes.byteOffset + idx.offset, idx.count),
+  };
+}
+
+export function decodeGeoProp(input: ArrayBuffer | ArrayBufferView): GeoPropModel {
+  const { kind, bytes, sections } = readSections(input);
+  if (kind !== KIND_PROP) throw new GeoFormatError(`expected a prop buffer, got kind ${kind}`);
+  const d = need(sections, TAG.PDIM);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset + d.offset, d.length);
+  const prt = need(sections, TAG.VPRT);
+  const idx = need(sections, TAG.INDX);
+  return {
+    prop: PROPS[dv.getUint8(0)] ?? "tree",
+    variant: dv.getUint8(1),
+    variants: dv.getUint8(2),
+    rounded: (dv.getUint8(3) & 1) === 1,
+    baseScale: dv.getFloat32(4, true),
+    min: [dv.getFloat32(8, true), dv.getFloat32(12, true), dv.getFloat32(16, true)],
+    max: [dv.getFloat32(20, true), dv.getFloat32(24, true), dv.getFloat32(28, true)],
+    positions: f32(bytes, need(sections, TAG.VPOS)),
+    normals: f32(bytes, need(sections, TAG.VNRM)),
+    parts: new Uint8Array(bytes.buffer, bytes.byteOffset + prt.offset, prt.count),
+    shade: f32(bytes, need(sections, TAG.VSHD)),
     indices: new Uint32Array(bytes.buffer, bytes.byteOffset + idx.offset, idx.count),
   };
 }

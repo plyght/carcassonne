@@ -3,8 +3,8 @@
 // engine), so the app ships a single wasm.
 import type { EngineEvent } from "@carcassonne/protocol";
 import type { AnimOptions, AnimTimeline } from "./anim";
-import { decodeGeo2D, decodeGeo3D, decodeGeoFigure, type GeoFigure, type GeoTile2D, type GeoTile3D } from "./decode";
-import type { FigurePose, FigureShape } from "./format";
+import { decodeGeo2D, decodeGeo3D, decodeGeoFigure, decodeGeoProp, type GeoFigure, type GeoPropModel, type GeoTile2D, type GeoTile3D } from "./decode";
+import { PROPS, PROP_VARIANTS, type FigurePose, type FigureShape, type PropKind } from "./format";
 
 export interface CoreGeoExports {
   memory: WebAssembly.Memory;
@@ -16,6 +16,7 @@ export interface CoreGeoExports {
   geo_tile_2d(index: number): number;
   geo_tile_3d(index: number, resolution: number, slabPermille: number): number;
   geo_figure(kind: number, pose: number): number;
+  geo_prop(kind: number, variant: number, flags: number): number;
   anim_timeline(evPtr: number, evLen: number, optPtr: number, optLen: number): number;
 }
 
@@ -25,6 +26,7 @@ const dec = new TextDecoder();
 export class CoreGeo {
   readonly exports: CoreGeoExports;
   private cache2d = new Map<string, GeoTile2D>();
+  private cacheProps = new Map<string, GeoPropModel>();
 
   constructor(source: WebAssembly.Instance | CoreGeoExports) {
     this.exports = (source instanceof WebAssembly.Instance ? source.exports : source) as unknown as CoreGeoExports;
@@ -109,6 +111,24 @@ export class CoreGeo {
     const k = shape === "abbot" ? 1 : 0;
     const p = pose === "lying" ? 1 : 0;
     return decodeGeoFigure(this.take(this.exports.geo_figure(k, p)));
+  }
+
+  /**
+   * Procedural prop model for (kind, variant % PROP_VARIANTS[kind]); `rounded` selects the
+   * smoother toon-style models. Cached (models are immutable; don't mutate the arrays).
+   */
+  prop(kind: PropKind, variant = 0, options: { rounded?: boolean } = {}): GeoPropModel {
+    const v = variant % PROP_VARIANTS[kind];
+    const rounded = options.rounded === true;
+    const key = `${kind}:${v}:${rounded ? 1 : 0}`;
+    let m = this.cacheProps.get(key);
+    if (!m) {
+      const k = PROPS.indexOf(kind);
+      if (k < 0) throw new Error(`unknown prop ${kind}`);
+      m = decodeGeoProp(this.take(this.exports.geo_prop(k, v, rounded ? 1 : 0)));
+      this.cacheProps.set(key, m);
+    }
+    return m;
   }
 
   animTimeline(events: EngineEvent[], options: AnimOptions = {}): AnimTimeline {

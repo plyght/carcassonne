@@ -83,7 +83,7 @@ describe.skipIf(!existsSync(wasm))("tile geometry cache", async () => {
   });
 
   test("prop kit: one cached model per (prop, variant) with palette parts", () => {
-    const kit = new PropKit({ rounded: false });
+    const kit = new PropKit(geo, { rounded: false });
     for (const [prop, n] of Object.entries(VARIANTS) as [keyof typeof VARIANTS, number][]) {
       for (let v = 0; v < n; v++) {
         const g = kit.geometry(prop, v);

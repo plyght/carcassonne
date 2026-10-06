@@ -19,13 +19,13 @@ import { createMaterials, type MaterialSet } from "./materials";
 import { cellAt, featureAt, featureExtent, NO_FEATURE, rayPlaneY, type ExtentCell, type ExtentTile } from "./picking";
 import { popupTexture } from "./popups";
 import { buildPost, type PostChain } from "./post";
-import { PropKit } from "./props";
+import { PropKit, type PropSource } from "./props";
 import { DEFAULT_STYLE_ID, getStylePack, type StylePack, type Tier } from "./styles";
 import { TileGeometryCache, type GeoSource, type TileGeometry } from "./tile-cache";
 import { RealClock, TimelinePlayer, type Clock, type PlayingClip } from "./timeline";
 
 /** What the renderer needs from @carcassonne/core-geo's `CoreGeo`. */
-export interface GeoProvider extends GeoSource {
+export interface GeoProvider extends GeoSource, PropSource {
   figure(shape?: FigureShape, pose?: FigurePose): GeoFigure;
   animTimeline(events: EngineEvent[], options?: AnimOptions): AnimTimeline;
 }
@@ -214,7 +214,7 @@ export class BoardRenderer {
     this.reducedMotion = opts.reducedMotion ?? prefersReducedMotion();
     this.clock = opts.clock ?? new RealClock();
     this.cache = new TileGeometryCache(this.geo);
-    this.kit = new PropKit({ rounded: this.style.props.rounded });
+    this.kit = new PropKit(this.geo, { rounded: this.style.props.rounded });
     this.mats = createMaterials(this.style);
     this.props = new PropLayer(this.kit, this.mats.props);
     this.figuresLayer = new FigureLayer((s, p) => this.geo.figure(s, p), this.mats.figure);
@@ -340,7 +340,7 @@ export class BoardRenderer {
     this.mats = createMaterials(next);
     if (prev.props.rounded !== next.props.rounded) {
       this.kit.dispose();
-      this.kit = new PropKit({ rounded: next.props.rounded });
+      this.kit = new PropKit(this.geo, { rounded: next.props.rounded });
       this.props.setKit(this.kit);
     }
     this.props.setMaterial(this.mats.props);
@@ -1043,6 +1043,7 @@ export class BoardRenderer {
       const base = this.kit.geometry(list[0]!.prop, list[0]!.variant);
       const geom = new THREE.BufferGeometry();
       for (const name of Object.keys(base.attributes)) geom.setAttribute(name, base.getAttribute(name));
+      geom.setIndex(base.getIndex());
       geom.setAttribute("aTint", new THREE.InstancedBufferAttribute(Float32Array.from(list.map((x) => x.tint % 4)), 1));
       const im = new THREE.InstancedMesh(geom, this.mats.ghost.props, list.length);
       list.forEach((pr, i) => {

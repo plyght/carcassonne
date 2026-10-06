@@ -8,6 +8,7 @@ const vec = @import("vec.zig");
 const layout = @import("layout.zig");
 const mesh = @import("mesh.zig");
 const figure = @import("figure.zig");
+const props = @import("props.zig");
 const V2 = vec.V2;
 const Allocator = std.mem.Allocator;
 
@@ -16,6 +17,7 @@ pub const VERSION: u16 = 1;
 pub const KIND_2D: u16 = 1;
 pub const KIND_3D: u16 = 2;
 pub const KIND_FIGURE: u16 = 3;
+pub const KIND_PROP: u16 = 4;
 
 pub fn tag(comptime s: *const [4]u8) u32 {
     return std.mem.readInt(u32, s, .little);
@@ -104,8 +106,8 @@ fn putMeta(a: Allocator, b: *Builder, L: *const layout.Layout) !void {
     try putF32(a, s, layout.ROAD_HW);
     try putF32(a, s, layout.RIVER_HW);
     try putU32(a, s, @intCast(L.def.features.len));
-    try putU8(a, s, @intFromEnum(L.def.special));
-    try putU8(a, s, @intFromEnum(L.def.set));
+    try putU8(a, s, @backingInt(L.def.special));
+    try putU8(a, s, @backingInt(L.def.set));
     try putU16(a, s, @intCast(L.def.id.len));
     try s.data.appendSlice(a, L.def.id);
     while (s.data.items.len % 4 != 0) try s.data.append(a, 0);
@@ -114,7 +116,7 @@ fn putMeta(a: Allocator, b: *Builder, L: *const layout.Layout) !void {
 fn putFeatures(a: Allocator, b: *Builder, L: *const layout.Layout) !void {
     const s = try b.section(tag("FEAT"));
     for (L.def.features, 0..) |f, i| {
-        try putU8(a, s, @intFromEnum(f.kind));
+        try putU8(a, s, @backingInt(f.kind));
         try putU8(a, s, f.pennants);
         try putU16(a, s, f.ports);
         try putF32(a, s, L.anchors[i].x);
@@ -129,7 +131,7 @@ const PathSink = struct {
     pnts: *Section,
     fn add(self: *PathSink, feature: u8, kind: u8, role: Role, closed: bool, width: f64, pts: []const V2) !void {
         try putU8(self.a, self.paths, feature);
-        try putU8(self.a, self.paths, @intFromEnum(role));
+        try putU8(self.a, self.paths, @backingInt(role));
         try putU8(self.a, self.paths, if (closed) 1 else 0);
         try putU8(self.a, self.paths, kind);
         try putU32(self.a, self.paths, self.pnts.count);
@@ -152,7 +154,7 @@ pub fn encode2D(a: Allocator, L: *const layout.Layout) ![]u8 {
     var sink = PathSink{ .a = a, .paths = try b.section(tag("PATH")), .pnts = try b.section(tag("PNTS")) };
     const K = struct {
         fn k(x: tile.FeatureKind) u8 {
-            return @intFromEnum(x);
+            return @backingInt(x);
         }
     }.k;
     for (L.fields.items) |r| try sink.add(r.feature, K(.field), .region, true, 0, r.pts);
@@ -214,14 +216,14 @@ pub fn encode3D(a: Allocator, L: *const layout.Layout, opts: mesh.Options) ![]u8
     for (m.groups.items) |g| {
         try putU32(a, grp, g.start);
         try putU32(a, grp, g.count);
-        try putU32(a, grp, @intFromEnum(g.material));
+        try putU32(a, grp, @backingInt(g.material));
         try putU32(a, grp, 0);
         grp.count += 1;
     }
 
     const prop = try b.section(tag("PROP"));
     for (m.props.items) |p| {
-        try putU8(a, prop, @intFromEnum(p.prop));
+        try putU8(a, prop, @backingInt(p.prop));
         try putU8(a, prop, p.feature);
         try putU8(a, prop, p.variant);
         try putU8(a, prop, p.tint);
@@ -241,7 +243,7 @@ pub fn encode3D(a: Allocator, L: *const layout.Layout, opts: mesh.Options) ![]u8
         try putF32(a, anc, p.pos[2]);
         try putF32(a, anc, p.yaw);
         try putF32(a, anc, p.scale);
-        try putU32(a, anc, @intFromEnum(p.pose));
+        try putU32(a, anc, @backingInt(p.pose));
         anc.count += 1;
     }
 
@@ -256,8 +258,8 @@ pub fn encodeFigure(a: Allocator, kind: figure.Kind, pose: figure.Pose) ![]u8 {
     const fm = try figure.build(a, kind, pose);
     var b = Builder.init(a, KIND_FIGURE);
     const dim = try b.section(tag("FDIM"));
-    try putU8(a, dim, @intFromEnum(kind));
-    try putU8(a, dim, @intFromEnum(pose));
+    try putU8(a, dim, @backingInt(kind));
+    try putU8(a, dim, @backingInt(pose));
     try putU16(a, dim, 0);
     try putF32(a, dim, 1.0); // height
     try putF32(a, dim, figure.THICKNESS);
@@ -284,6 +286,43 @@ pub fn encodeFigure(a: Allocator, kind: figure.Kind, pose: figure.Pose) ![]u8 {
     const idx = try b.section(tag("INDX"));
     for (fm.indices.items) |i| try putU32(a, idx, i);
     idx.count = @intCast(fm.indices.items.len);
+    return b.finish();
+}
+
+/// Prop model payload: one (prop kind, variant) model in prop-local space,
+/// with per-vertex palette part ids and baked shade (see props.zig).
+pub fn encodeProp(a: Allocator, prop: mesh.Prop, variant: u8, opts: props.Options) ![]u8 {
+    var m = try props.build(a, prop, variant, opts);
+    defer m.deinit(a);
+    var b = Builder.init(a, KIND_PROP);
+    const dim = try b.section(tag("PDIM"));
+    try putU8(a, dim, @backingInt(prop));
+    try putU8(a, dim, m.variant);
+    try putU8(a, dim, props.variantCount(prop));
+    try putU8(a, dim, if (opts.rounded) 1 else 0);
+    try putF32(a, dim, props.baseScale(prop));
+    for (m.min) |x| try putF32(a, dim, x);
+    for (m.max) |x| try putF32(a, dim, x);
+    dim.count = 1;
+    const pos = try b.section(tag("VPOS"));
+    const nrm = try b.section(tag("VNRM"));
+    const prt = try b.section(tag("VPRT"));
+    const shd = try b.section(tag("VSHD"));
+    for (m.pos.items, m.nrm.items, m.part.items, m.shade.items) |p, n, pt, sh| {
+        for (p) |x| try putF32(a, pos, x);
+        for (n) |x| try putF32(a, nrm, x);
+        try putU8(a, prt, pt);
+        try putF32(a, shd, sh);
+    }
+    const nv: u32 = @intCast(m.pos.items.len);
+    pos.count = nv;
+    nrm.count = nv;
+    prt.count = nv;
+    shd.count = nv;
+    while (prt.data.items.len % 4 != 0) try prt.data.append(a, 0);
+    const idx = try b.section(tag("INDX"));
+    for (m.indices.items) |i| try putU32(a, idx, i);
+    idx.count = @intCast(m.indices.items.len);
     return b.finish();
 }
 

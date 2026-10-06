@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { CoreGeo } from "../src";
+import { CoreGeo, GeoFormatError, PROPS, PROP_PARTS, PROP_PART_COUNT, PROP_VARIANTS, decodeGeoProp } from "../src";
 
 const wasmPath = resolve(import.meta.dir, "../../core-wasm/core.wasm");
 const has = existsSync(wasmPath);
@@ -64,6 +64,36 @@ describe.skipIf(!has)("core-geo over core.wasm", async () => {
         expect(f.thickness).toBeCloseTo(0.35, 5);
       }
     }
+  });
+
+  test("prop models: every kind and variant decodes with valid parts and indices", () => {
+    for (const rounded of [false, true]) {
+      for (const prop of PROPS) {
+        const n = PROP_VARIANTS[prop];
+        for (let v = 0; v < n; v++) {
+          const m = geo.prop(prop, v, { rounded });
+          expect(m.prop).toBe(prop);
+          expect(m.variant).toBe(v);
+          expect(m.variants).toBe(n);
+          expect(m.rounded).toBe(rounded);
+          const nv = m.positions.length / 3;
+          expect(nv).toBeGreaterThan(0);
+          expect(m.normals.length).toBe(nv * 3);
+          expect(m.parts.length).toBe(nv);
+          expect(m.shade.length).toBe(nv);
+          expect(m.indices.length % 3).toBe(0);
+          for (const i of m.indices) expect(i).toBeLessThan(nv);
+          for (const p of m.parts) expect(p).toBeLessThan(PROP_PART_COUNT);
+          for (let i = 0; i < nv; i++) expect(Math.hypot(m.normals[i * 3]!, m.normals[i * 3 + 1]!, m.normals[i * 3 + 2]!)).toBeCloseTo(1, 4);
+          for (let i = 0; i < nv; i++) expect(m.positions[i * 3 + 1]!).toBeGreaterThanOrEqual(m.min[1] - 1e-6);
+          expect(geo.prop(prop, v + n, { rounded })).toBe(m); // variant % count, cached
+        }
+      }
+    }
+    const house = geo.prop("house", 0);
+    expect(house.baseScale).toBeCloseTo(1.3, 5);
+    expect(new Set(house.parts)).toEqual(new Set([PROP_PARTS.plaster, PROP_PARTS.roof, PROP_PARTS.dark]));
+    expect(() => decodeGeoProp(geo.tile3dBytes("D", 8))).toThrow(GeoFormatError);
   });
 
   test("anim timeline JSON", () => {

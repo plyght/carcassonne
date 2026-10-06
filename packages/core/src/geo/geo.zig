@@ -5,6 +5,7 @@ pub const vec = @import("vec.zig");
 pub const layout = @import("layout.zig");
 pub const mesh = @import("mesh.zig");
 pub const figure = @import("figure.zig");
+pub const props = @import("props.zig");
 pub const buffer = @import("buffer.zig");
 pub const fixtures = @import("fixtures.zig");
 pub const registry = @import("registry.zig");
@@ -17,6 +18,7 @@ test {
     _ = layout;
     _ = mesh;
     _ = figure;
+    _ = props;
     _ = buffer;
     _ = registry;
     _ = @import("tests.zig");

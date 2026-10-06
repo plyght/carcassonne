@@ -16,7 +16,7 @@ export { createRenderer, type BackendKind, type BackendPreference } from "./back
 export { TimelinePlayer, ManualClock, RealClock, ease, type Clock } from "./timeline";
 export { TileGeometryCache, buildTileGeometry, rotXZ, type TileGeometry, type GeoSource } from "./tile-cache";
 export { featureAt, featureAtGrid, featureExtent, rayPlaneY, cellAt, toCanonical, rotatePorts, opposingPort } from "./picking";
-export { PropKit, VARIANTS as PROP_VARIANTS } from "./props";
+export { PropKit, VARIANTS as PROP_VARIANTS, type PropSource } from "./props";
 export * from "./styles";
 
 export interface ThreeStyleEntry {

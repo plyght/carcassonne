@@ -72,6 +72,7 @@ export class PropLayer {
     const base = this.kit.geometry(prop, v);
     const g = new THREE.BufferGeometry();
     for (const name of Object.keys(base.attributes)) g.setAttribute(name, base.getAttribute(name));
+    g.setIndex(base.getIndex());
     g.boundingSphere = null;
     g.setAttribute("aTint", new THREE.InstancedBufferAttribute(new Float32Array(cap), 1));
     const next = new THREE.InstancedMesh(g, this.material, cap);

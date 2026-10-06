@@ -234,6 +234,17 @@ export fn geo_figure(kind: u32, pose: u32) u32 {
     return geoReturn(bytes);
 }
 
+/// Prop model buffer ("CGEO" kind 4) for prop kind `kind` (mesh.Prop id,
+/// 0..15) and `variant` (taken modulo the kind's model count). `flags` bit 0
+/// = rounded (toon styles: more segments, smoother foliage).
+export fn geo_prop(kind: u32, variant: u32, flags: u32) u32 {
+    if (kind >= std.enums.values(geo.mesh.Prop).len) return 0;
+    var arena = std.heap.ArenaAllocator.init(gpa);
+    defer arena.deinit();
+    const bytes = geo.buffer.encodeProp(arena.allocator(), @enumFromInt(kind), @intCast(variant % 256), .{ .rounded = flags & 1 != 0 }) catch return 0;
+    return geoReturn(bytes);
+}
+
 /// Animation timeline JSON for a JSON array of engine events.
 /// `opts` is JSON `{style:"realistic"|"cartoon"|"reduced", speed?:number}` (may be empty).
 export fn anim_timeline(events_ptr: [*]const u8, events_len: u32, opts_ptr: [*]const u8, opts_len: u32) u32 {
