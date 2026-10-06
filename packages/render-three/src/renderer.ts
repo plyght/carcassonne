@@ -1127,7 +1127,7 @@ export class BoardRenderer {
 
   private updateBounds(): void {
     const b = this.bounds();
-    this.rig.setBounds(b);
+    this.rig.setBounds(b, [...this.tiles.values()].map((t) => ({ x: t.x, y: t.y })));
     const cx = (b.minX + b.maxX) / 2;
     const cz = (b.minZ + b.maxZ) / 2;
     const r = Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) / 2 + 1.5;

@@ -116,7 +116,24 @@ The terrain is a `(R+1)²` grid (default R = 48). Relief includes:
 
 **Border heights depend only on the edge kind**, so slabs and terrain meet flush, and multi-tile cities have continuous ground. Walls are generated only along city boundaries that face fields (never on tile edges), so adjacent city tiles read as one walled town.
 
-Houses are dart-thrown with no overlaps, kept clear of walls, roads, the tile border and meeple anchors. Bushes line roads, rivers and the outside of walls. Gates (`gatehouse`, with a gap in the wall mesh) sit wherever a road meets a wall.
+Houses are dart-thrown, kept clear of walls, roads, the tile border and meeple anchors. Packing circles (radius `HOUSE_R` 0.045 × scale 0.8–1.3, models ≈ 0.11 × 0.07) may overlap slightly or leave gaps of up to 0.02, so the result is a few large, irregularly packed houses with courtyard ground showing. Houses near a wall line up with it.
+
+Bushes come in clusters of one to three. They line roads, rivers and the outside of walls, and dot the fields. There are a few round trees, some animals and rare subtle crop strips.
+
+Gates (`gatehouse`, with a gap in the wall mesh) sit wherever a road meets a wall.
+
+Tuning toward the tabletop reference (`mesh.zig` constants):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `WALL_H` | 0.085 | Wall height |
+| `WALL_HT` | 0.019 | Wall half thickness |
+| `MERLON` | 0.036 | Merlon pitch |
+| `MERLON_H` | 0.016 | Merlon height |
+| `GATE_R` | 0.055 | Gate radius |
+| `ROAD_Y` | −0.006 | Road depth: sunken roads |
+| `RUT_D` | 0.0015 | Rut depth |
+| `MEEPLE_H` | 0.26 | Meeple height |
 
 Anchors and poses:
 

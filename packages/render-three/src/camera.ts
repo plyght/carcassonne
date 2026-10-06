@@ -72,6 +72,7 @@ export class CameraRig {
   yawOffset = 0;
   private aspect = 1;
   private bounds: BoardBounds = { minX: -1, minZ: -1, maxX: 2, maxZ: 2 };
+  private cells: { x: number; y: number }[] | null = null;
   private focus: { cx: number; cz: number; extent: number; priority: number; until: number } | null = null;
   private clock = 0;
   /** User orbit offsets (orbit mode). */
@@ -98,8 +99,10 @@ export class CameraRig {
     this.goal = this.mode === "orbit" ? this.goal : this.goalFor(this.mode);
   }
 
-  setBounds(b: BoardBounds): void {
+  /** Board extent; `cells` (occupied cells) lets the tabletop framing hug irregular boards. */
+  setBounds(b: BoardBounds, cells?: { x: number; y: number }[]): void {
     this.bounds = b;
+    this.cells = cells && cells.length > 0 ? cells : null;
     if (this.mode !== "orbit") this.goal = this.goalFor(this.mode);
   }
 
@@ -161,14 +164,22 @@ export class CameraRig {
     const b = this.bounds;
     const s = { ...start };
     const cam = new THREE.PerspectiveCamera(s.fov, this.aspect, 0.01, 1000);
-    const pts = [
-      [b.minX, 0, b.minZ],
-      [b.maxX, 0, b.minZ],
-      [b.minX, 0, b.maxZ],
-      [b.maxX, 0, b.maxZ],
-      [b.minX, 0.25, b.minZ],
-      [b.maxX, 0.25, b.minZ],
-    ];
+    const pts: number[][] = this.cells
+      ? this.cells.flatMap((c) => [
+          [c.x, 0, c.y],
+          [c.x + 1, 0, c.y],
+          [c.x, 0, c.y + 1],
+          [c.x + 1, 0, c.y + 1],
+          [c.x + 0.5, 0.25, c.y + 0.5],
+        ])
+      : [
+          [b.minX, 0, b.minZ],
+          [b.maxX, 0, b.minZ],
+          [b.minX, 0, b.maxZ],
+          [b.maxX, 0, b.maxZ],
+          [b.minX, 0.25, b.minZ],
+          [b.maxX, 0.25, b.minZ],
+        ];
     const v = new THREE.Vector3();
     const halfV = Math.tan((s.fov * DEG) / 2);
     for (let it = 0; it < 8; it++) {

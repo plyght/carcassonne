@@ -6,8 +6,8 @@
   "palette": {
     "background": "#e6e6e4",
     "table": "#e9eaea",
-    "grass": "#468020",
-    "grassAlt": "#6c9f2a",
+    "grass": "#45841f",
+    "grassAlt": "#7fb534",
     "road": "#ecdfbd",
     "city": "#c18d55",
     "riverBed": "#3a5f66",
@@ -66,9 +66,9 @@
     "shadowSoftness": 4
   },
   "terrain": {
-    "grassNoise": 0.25,
-    "noiseScale": 3.5,
-    "grain": 0.22,
+    "grassNoise": 0.45,
+    "noiseScale": 3.0,
+    "grain": 0.25,
     "seamWidth": 0.007,
     "seamDarken": 0.7,
     "tileGap": 0.0025,

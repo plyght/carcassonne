@@ -43,9 +43,9 @@ const renderer = await BoardRenderer.create({
   pixelRatio: capture ? 1 : undefined,
 });
 
-let game: EngineGame;
+let game!: EngineGame;
 let rand: () => number;
-let view: GameView;
+let view!: GameView;
 
 function chooseMove(g: EngineGame): Move | null {
   const ps = g.legalPlacements();
@@ -94,7 +94,17 @@ const seed = Number(q.get("seed") ?? 7);
 newGame(seed, Number(q.get("moves") ?? 30));
 if (q.get("zoom")) renderer.rig.zoom(Number(q.get("zoom")));
 // look=cx,cz,extent: hold a cinematic focus (close-ups for comparisons)
-if (q.get("look")) {
+if (q.get("look") === "city") {
+  // frame the densest cluster of city tiles (comparison shots)
+  const cityTiles = game.view().board.filter((b) => geo.tile2d(b.tile).features.some((f) => f.kind === "city"));
+  let best = { x: 0, y: 0, n: -1 };
+  for (const b of cityTiles) {
+    const n = cityTiles.filter((o) => Math.abs(o.x - b.x) <= 1 && Math.abs(o.y - b.y) <= 1).length;
+    if (n > best.n) best = { x: b.x, y: b.y, n };
+  }
+  const ext = Number(q.get("extent") ?? 1.1);
+  renderer.rig.hint(best.x + 0.5, best.y + 0.5, ext, 1, 1e9);
+} else if (q.get("look")) {
   const [cx, cz, ext] = q.get("look")!.split(",").map(Number);
   renderer.rig.hint(cx ?? 0, cz ?? 0, ext ?? 1.5, 1, 1e9);
 }

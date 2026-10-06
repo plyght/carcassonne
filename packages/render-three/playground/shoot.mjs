@@ -5,7 +5,8 @@
 //   node playground/shoot.mjs perf            # frame timings on a full board
 // Uses the Playwright that ships with the environment (PLAYWRIGHT_MODULE to override)
 // and the Chromium under /opt/pw-browsers (CHROMIUM to override).
-import { existsSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,10 +43,11 @@ async function open(query, w = 1600, h = 1000) {
   return page;
 }
 
-async function shot(file, query, w = 1600, h = 1000, settle = 4) {
+async function shot(file, query, w = 1600, h = 1000, settle = 4, before = null) {
   const page = await open(query, w, h);
   // let the camera rig and any animation settle (manual clock)
-  await page.evaluate((s) => window.__pg.advance(s, 30), settle);
+  await page.evaluate((s) => window.__pg.advance(s, 12), settle);
+  if (before) await page.evaluate(before);
   await page.evaluate(() => window.__pg.renderer.settle());
   const stats = await page.evaluate(() => window.__pg.renderer.stats());
   await page.screenshot({ path: file });
@@ -54,28 +56,25 @@ async function shot(file, query, w = 1600, h = 1000, settle = 4) {
 }
 
 async function sideBySide(file, query) {
-  const page = await open(query, 1200, 900);
-  await page.evaluate(() => window.__pg.advance(4, 30));
-  const png = await page.screenshot({ type: "png" });
-  const ours = `data:image/png;base64,${png.toString("base64")}`;
-  const cmp = await browser.newPage({ viewport: { width: 2420, height: 960 } });
-  await cmp.goto(`${base}reference.webp`);
-  await cmp.setContent(`<html><body style="margin:0;background:#1d1b18;color:#eee;font:20px system-ui;display:flex;gap:20px;padding:0 0 0 0">
-    <figure style="margin:0;width:1200px"><img src="${base}reference.webp" style="width:1200px;height:900px;object-fit:cover"><figcaption style="padding:6px">Reference (tabletop-diorama-01.webp)</figcaption></figure>
-    <figure style="margin:0;width:1200px"><img src="${ours}" style="width:1200px;height:900px"><figcaption style="padding:6px">render-three tabletop (WebGL2 / SwiftShader)</figcaption></figure>
-  </body></html>`);
-  await cmp.waitForLoadState("networkidle");
-  await cmp.screenshot({ path: file });
+  // our render next to the reference photo (ImageMagick does the compositing)
+  const tmp = `${file}.ours.png`;
+  await shot(tmp, query, 1200, 900);
+  const ref = resolve(here, "../../../docs/design/inspiration/tabletop-diorama-01.webp");
+  execFileSync("convert", [
+    "(", ref, "-resize", "x900", "-gravity", "south", "-background", "#1d1b18", "-splice", "0x40", "-fill", "#eee", "-pointsize", "22", "-annotate", "+0+8", "Reference: tabletop-diorama-01.webp", ")",
+    "(", tmp, "-gravity", "south", "-background", "#1d1b18", "-splice", "0x40", "-fill", "#eee", "-pointsize", "22", "-annotate", "+0+8", "render-three tabletop (WebGL2 / SwiftShader, high tier)", ")",
+    "-background", "#1d1b18", "-splice", "20x0", "+append", file,
+  ]);
+  unlinkSync(tmp);
   console.log(file);
-  await cmp.close();
-  await page.close();
 }
 
 async function perf(query) {
   const page = await open(query, 1600, 1000);
   await page.evaluate(() => window.__pg.advance(4, 20));
-  const r = await page.evaluate(() => window.__pg.frames(20));
-  console.log(query, JSON.stringify({ medianMs: r.median?.toFixed(1), minMs: r.min?.toFixed(1), draws: r.stats.drawCalls, tris: r.stats.triangles, tiles: r.stats.tiles, figures: r.stats.figures }));
+  const r = await page.evaluate(() => window.__pg.frames(5));
+  r.stats.frameMs = r.stats.frameMs.toFixed(1);
+  console.log(query, JSON.stringify({ medianMs: r.median?.toFixed(1), minMs: r.min?.toFixed(1), cpuMs: r.stats.frameMs, draws: r.stats.drawCalls, tris: r.stats.triangles, tiles: r.stats.tiles, figures: r.stats.figures }));
   await page.close();
 }
 
@@ -83,15 +82,26 @@ const mode = process.argv[2] ?? "all";
 if (mode === "one") {
   await shot(resolve(process.argv[3]), process.argv[4] ?? "", Number(process.argv[5] ?? 1600), Number(process.argv[6] ?? 1000));
 } else if (mode === "perf") {
-  for (const tier of ["low", "medium", "high"]) await perf(`seed=7&moves=200&tier=${tier}&style=tabletop`);
-  await perf(`seed=7&moves=200&tier=medium&style=cartoon`);
+  for (const tier of ["low", "medium", "high"]) await perf(`seed=7&moves=80&tier=${tier}&style=tabletop`);
+  await perf(`seed=7&moves=80&tier=medium&style=cartoon`);
 } else {
-  const mid = "seed=7&moves=34";
-  await shot(`${out}/3d-tabletop-tilt.png`, `${mid}&style=tabletop&camera=tabletop&tier=high`);
-  await shot(`${out}/3d-tabletop-top.png`, `${mid}&style=tabletop&camera=top&tier=high`);
-  await shot(`${out}/3d-cartoon.png`, `${mid}&style=cartoon&camera=tabletop&tier=high`);
-  await shot(`${out}/3d-diorama.png`, `${mid}&style=diorama&camera=tabletop&tier=high`);
-  await shot(`${out}/3d-tabletop-cinematic.png`, `${mid}&style=tabletop&camera=cinematic&tier=high`);
-  await sideBySide(`${out}/3d-tabletop-vs-reference.png`, `${mid}&style=tabletop&camera=cinematic&tier=high`);
+  const only = process.argv[3]?.split(",");
+  const want = (f) => !only || only.some((o) => f.includes(o));
+  const mid = "seed=3&moves=45";
+  if (want("3d-tabletop-tilt")) await shot(`${out}/3d-tabletop-tilt.png`, `${mid}&style=tabletop&camera=tabletop&tier=high`);
+  if (want("3d-tabletop-top")) await shot(`${out}/3d-tabletop-top.png`, `${mid}&style=tabletop&camera=top&tier=high`);
+  if (want("3d-tabletop-closeup")) await shot(`${out}/3d-tabletop-closeup.png`, `${mid}&style=tabletop&camera=cinematic&look=city&tier=high`);
+  if (want("3d-cartoon")) await shot(`${out}/3d-cartoon.png`, `${mid}&style=cartoon&camera=cinematic&look=city&extent=1.6&tier=high`);
+  if (want("3d-diorama")) await shot(`${out}/3d-diorama.png`, `${mid}&style=diorama&camera=cinematic&look=city&extent=1.6&tier=high`);
+  // interaction: legal cells + ghost under the pointer
+  if (want("3d-tabletop-interaction")) await shot(`${out}/3d-tabletop-interaction.png`, `${mid}&style=tabletop&camera=tabletop&tier=medium&hints=1`, 1600, 1000, 4, `(() => {
+    const r = window.__pg.renderer; const p = r.hints.placements[0];
+    const v = r.rig.active.position.clone().set(p.x + 0.5, 0, p.y + 0.5).project(r.rig.active);
+    r.canvas.dispatchEvent(new PointerEvent("pointermove", { clientX: (v.x + 1) / 2 * innerWidth, clientY: (1 - v.y) / 2 * innerHeight, bubbles: true }));
+    window.__pg.advance(0.05, 1);
+  })()`);
+  // scoring moment mid-animation (comic pop, feature pulse, meeple hopping home)
+  if (want("3d-cartoon-score")) await shot(`${out}/3d-cartoon-score.png`, `seed=3&moves=30&style=cartoon&camera=cinematic&tier=high`, 1600, 1000, 3, `(() => { window.__pg.stepUntilScore(); window.__pg.advance(1.35, 12); })()`);
+  if (want("3d-tabletop-vs-reference")) await sideBySide(`${out}/3d-tabletop-vs-reference.png`, `${mid}&style=tabletop&camera=cinematic&look=city&tier=high`);
 }
 await browser.close();
