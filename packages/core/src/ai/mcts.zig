@@ -57,6 +57,11 @@ pub const Config = struct {
     widen_rate: f32,
     /// Children kept per non-root node (best by heuristic).
     max_children: u16,
+    /// Weight of a move's own heuristic as the value of the draws not yet
+    /// explored below it (only where that heuristic sits at the leaf
+    /// horizon, i.e. the searching player moves next). Shrinks thinly
+    /// sampled chance nodes towards a stable estimate.
+    prior_fill: f32 = 1.0,
 };
 
 const Child = struct {
@@ -71,6 +76,8 @@ const Child = struct {
     chance: u32 = NONE,
     /// The move ends the game: `h` is the exact final score.
     terminal: bool = false,
+    /// Player making the move.
+    mover: u8 = 0,
 };
 
 const Node = struct {
@@ -155,7 +162,7 @@ pub const Search = struct {
         const first: u32 = @intCast(self.children.items.len);
         try self.children.ensureUnusedCapacity(self.gpa, k);
         for (order[0..k]) |idx| {
-            self.children.appendAssumeCapacity(.{ .move = moves[idx], .h = self.vals_buf[idx], .terminal = ended.isSet(idx) });
+            self.children.appendAssumeCapacity(.{ .move = moves[idx], .h = self.vals_buf[idx], .terminal = ended.isSet(idx), .mover = player });
         }
         try self.nodes.append(self.gpa, .{ .player = player, .first = first, .len = k });
         return @intCast(self.nodes.items.len - 1);
@@ -315,14 +322,19 @@ pub const Search = struct {
         const cn = self.chances.items[ch.chance];
         var acc: Values = @splat(0);
         var mass: f32 = 0;
+        var live: f32 = 0;
         for (self.outcomes.items[cn.first .. cn.first + cn.len]) |o| {
-            if (o.dead or o.node == NONE) continue;
+            if (o.dead) continue;
+            live += o.prob;
+            if (o.node == NONE) continue;
             const nv = self.nodes.items[o.node].value;
             for (0..engine.MAX_PLAYERS) |p| acc[p] += o.prob * nv[p];
             mass += o.prob;
         }
         if (mass > 0) {
-            for (0..engine.MAX_PLAYERS) |p| ch.value[p] = acc[p] / mass;
+            const same_horizon = (ch.mover + 1) % self.num_players == self.me;
+            const fill = if (same_horizon) self.cfg.prior_fill * @max(0, live - mass) else 0;
+            for (0..engine.MAX_PLAYERS) |p| ch.value[p] = (acc[p] + fill * ch.h[p]) / (mass + fill);
         }
     }
 

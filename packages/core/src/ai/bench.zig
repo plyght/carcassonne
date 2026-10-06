@@ -185,7 +185,7 @@ fn profile() !void {
 
 /// `ai-bench search-profile [ms]`: time Hard searches along a Medium game and
 /// print iteration and work counts per move.
-fn searchProfile(ms: u32) !void {
+fn searchProfile(ms: u32, tier: ai.Tier) !void {
     const ws = try std.heap.page_allocator.create(ai.Workspace);
     ws.* = .{ .gpa = std.heap.smp_allocator };
     for (1..3) |seed| {
@@ -194,7 +194,7 @@ fn searchProfile(ms: u32) !void {
             var buf: [ai.movegen.MAX_MOVES]engine.Move = undefined;
             const n_moves = ai.movegen.generate(&g, &buf).len;
             const t0 = nowNs();
-            _ = ai.chooseWith(ws, &g, .{ .tier = .hard, .seed = g.ply, .budget_ms = ms });
+            _ = ai.chooseWith(ws, &g, .{ .tier = tier, .seed = g.ply, .budget_ms = ms });
             const dt = (nowNs() - t0) / 1_000_000;
             std.debug.print("seed {d} ply {d}: moves {d}, {d} ms, iterations {d}, work {d}, nodes {d}\n", .{ seed, g.ply, n_moves, dt, ws.stats.iterations, ws.stats.work, ws.stats.nodes });
             try g.apply(ai.chooseWith(ws, &g, .{ .tier = .medium, .seed = g.ply }).?, null);
@@ -210,7 +210,10 @@ pub fn main(init: std.process.Init) !void {
         _ = peek.next();
         if (peek.next()) |a| {
             if (std.mem.eql(u8, a, "profile")) return profile();
-            if (std.mem.eql(u8, a, "search-profile")) return searchProfile(if (peek.next()) |v| try std.fmt.parseInt(u32, v, 10) else 1000);
+            if (std.mem.eql(u8, a, "search-profile")) {
+                const ms = if (peek.next()) |v| try std.fmt.parseInt(u32, v, 10) else 1000;
+                return searchProfile(ms, if (peek.next()) |v| parseTier(v) else .hard);
+            }
         }
     }
     var positional: usize = 0;

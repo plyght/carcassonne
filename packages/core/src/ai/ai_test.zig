@@ -99,6 +99,32 @@ test "search does not depend on the hidden draw order" {
     }
 }
 
+test "budget_ms caps search work deterministically" {
+    const gpa = testing.allocator;
+    var rng = Rng.init(8);
+    var g = try Game.init(gpa, .{}, 31, 2);
+    for (0..30) |_| try randomStep(&g, &rng);
+    const ws = try gpa.create(ai.Workspace);
+    defer gpa.destroy(ws);
+    ws.* = .{ .gpa = gpa };
+    const opts: ai.Options = .{ .tier = .hard, .seed = 3, .budget_ms = 20 };
+    const cap: u64 = @intFromFloat(20 * ai.work_per_ms);
+    const a = ai.chooseWith(ws, &g, opts).?;
+    // One iteration may overshoot by at most one node expansion.
+    try testing.expect(ws.stats.work >= cap and ws.stats.work < cap + ai.movegen.MAX_MOVES);
+    const b = ai.chooseWith(ws, &g, opts).?;
+    try testing.expectEqualDeep(a, b);
+    // The last move of a game (every move ends it) still returns at once.
+    var h = g;
+    while (h.deck_len - h.deck_pos > 0) try randomStep(&h, &rng);
+    if (h.status == .playing) {
+        const m = ai.chooseWith(ws, &h, .{ .tier = .expert, .seed = 1, .budget_ms = 50 }).?;
+        var copy = h;
+        try copy.apply(m, null);
+        try testing.expect(copy.status == .ended);
+    }
+}
+
 test "a full AI game finishes" {
     const gpa = testing.allocator;
     var g = try Game.init(gpa, .{}, 8, 2);

@@ -45,7 +45,7 @@ pub const SearchConfig = mcts.Config;
 
 pub const hard_config: SearchConfig = .{
     .default_iterations = 600,
-    .max_depth = 2,
+    .max_depth = 4,
     .rollout_cycles = 0,
     .rollout_samples = 6,
     .opponent_samples = 0,
