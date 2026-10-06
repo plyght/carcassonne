@@ -156,7 +156,7 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  height: clamp(580px, calc(100svh - 56px - 32px), 820px);
+  height: clamp(580px, calc(100svh - var(--header-h, 64px) - 48px), 820px);
   overflow: hidden;
   border-radius: var(--lp-radius);
   background: var(--lp-table);
@@ -1358,4 +1358,9 @@ html[data-reduced-motion="true"] .lp-steps :is(.lp-score-a, .lp-scorer) {
 }
 html[data-reduced-motion="true"] .lp-steps :is(.lp-claim, .lp-claim-chip):first-of-type {
   opacity: 1;
+}
+
+/* The site header floats over the landing page, so the page starts below it. */
+.carc-header[data-overlay] ~ main .lp {
+  padding-top: calc(var(--header-h) + var(--sp-4, 16px));
 }
