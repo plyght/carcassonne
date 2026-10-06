@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import { cn } from "@carcassonne/ui/lib/utils";
-import { ChevronDown, Maximize, Minus, Plus, FaceSmile, Timer } from "reicon-react";
+import { ChevronDown, Maximize, Minus, Plus, Timer } from "reicon-react";
 
 import { REACTIONS, type FeatureKind, type FigureOption, type GameView, type TileId } from "@carcassonne/protocol";
 import { featureRule, type PlayerMeta, type Reaction, type TileCatalog } from "@carcassonne/game-client";
@@ -16,8 +16,6 @@ import {
   type TileArtSource,
 } from "@carcassonne/render-classic";
 
-import { DialSurface } from "../dial/primitives";
-import { RotationDial } from "../dial/rotation-dial";
 import { FEATURE_LABEL, FIGURE_ROLE, formatClock, playerName, type Projection } from "./helpers";
 
 /** A floating cardstock panel over the board. */
@@ -110,7 +108,7 @@ export function ScorePanel({
   reactions,
   hideReactions,
   thinking,
-  footer,
+  head,
   idle,
 }: {
   view: GameView;
@@ -120,8 +118,8 @@ export function ScorePanel({
   hideReactions: boolean;
   thinking: boolean;
   palette?: BoardPalette;
-  /** A quiet last line (e.g. the seed). */
-  footer?: ReactNode;
+  /** The title row drawn above the players (back, game name, whose turn). */
+  head?: ReactNode;
   /** Nobody is to move (a finished lesson). */
   idle?: boolean;
 }) {
@@ -131,7 +129,7 @@ export function ScorePanel({
   return (
     <>
       {/* compact strip for phones */}
-      <Panel className="carc-score-strip" aria-label="Scores">
+      <Panel className="carc-score-strip carc-glass" aria-label="Scores">
         {view.players.map((p, i) => {
           const color = players[i]?.color ?? "red";
           const active = playing && view.currentPlayer === i;
@@ -161,8 +159,9 @@ export function ScorePanel({
           );
         })}
       </Panel>
-      <Panel className="carc-score-panel" aria-label="Scores" data-coach="scores">
-        <ol className="carc-score-list">
+      <Panel className="carc-players carc-glass" aria-label="Scores" data-coach="scores">
+        {head}
+        <ol className="carc-player-list">
           {view.players.map((p, i) => {
             const meta = players[i];
             const color = meta?.color ?? "red";
@@ -172,48 +171,39 @@ export function ScorePanel({
             const local = localSeats.includes(i);
             const name = playerName(players, i);
             const you = local && single && name !== "You";
-            const status = active ? (local ? (single ? "Your turn" : "Playing") : thinking ? "Thinking…" : "Playing") : null;
+            const note = active && !local && thinking ? "thinking…" : meta?.kind === "bot" ? `${TIER_LABEL[meta.tier ?? ""] ?? meta.tier} bot` : you ? "you" : meta?.connected === false ? "offline" : null;
             return (
               <li
                 key={i}
-                className="carc-score-row"
+                className="carc-player"
+                tabIndex={0}
                 data-active={active || undefined}
                 data-local={local || undefined}
                 aria-current={active ? "true" : undefined}
+                aria-label={`${name}, ${p.score} points, ${p.meeples} meeples left`}
                 style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }}
               >
-                <SeatSwatch color={color} title={`${app.label} player`} />
-                <div className="carc-score-who">
-                  <div className="carc-score-name-line">
-                    <span className="carc-score-name">{name}</span>
-                    {you ? <Tag tone="accent">You</Tag> : null}
-                    {meta?.kind === "bot" ? <Tag>{TIER_LABEL[meta.tier ?? ""] ?? meta.tier} bot</Tag> : null}
-                    {meta?.connected === false ? <Tag tone="danger">Offline</Tag> : null}
-                  </div>
-                  <div className="carc-score-supply">
-                    <SupplyChip color={color} label={`${p.meeples} ${p.meeples === 1 ? "meeple" : "meeples"}`} title={`${p.meeples} meeples left to place`} />
-                    {view.ruleset.abbot ? (
-                      <SupplyChip
-                        color={color}
-                        kind="abbot"
-                        label={p.abbotAvailable ? "Abbot" : "Abbot out"}
-                        title={p.abbotAvailable ? "The abbot is ready to place" : "The abbot is on the board"}
-                        away={!p.abbotAvailable}
-                      />
-                    ) : null}
-                    {status ? (
-                      <span className="carc-score-status" data-thinking={status === "Thinking…" || undefined}>
-                        {status}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="carc-score-breakdown">{breakdownText(p.breakdown, view.ruleset.abbot)}</div>
-                </div>
-                <div className="carc-score-side">
-                  <div className="carc-score-total carc-num" data-leader={p.score === leader && leader > 0 ? "true" : undefined} aria-label={`${p.score} points`}>
-                    {p.score}
-                  </div>
-                </div>
+                <SeatSwatch color={color} size={24} title={`${app.label} player`} />
+                <span className="carc-player-name">
+                  <span className="carc-player-name-text">{name}</span>
+                  {note ? <span className="carc-player-note">{note}</span> : null}
+                </span>
+                <span className="carc-player-meeples" title={`${p.meeples} meeples left`}>
+                  <FigureIcon fill={app.fill} ink={app.ink} outline="rgba(0,0,0,0.35)" marker={app.marker} size={16} />
+                  <span className="carc-num">{p.meeples}</span>
+                </span>
+                <span className="carc-player-score carc-num" data-leader={p.score === leader && leader > 0 ? "true" : undefined}>
+                  {p.score}
+                </span>
+                {/* the details, on hover or focus */}
+                <span className="carc-player-pop carc-hud-sheet" role="tooltip">
+                  <span className="carc-player-pop-title">{name}</span>
+                  <span className="carc-player-pop-line">{breakdownText(p.breakdown, view.ruleset.abbot)}</span>
+                  <span className="carc-player-pop-line">
+                    {p.meeples} {p.meeples === 1 ? "meeple" : "meeples"} left
+                    {view.ruleset.abbot ? (p.abbotAvailable ? ", and the abbot is ready." : ", and the abbot is on the board.") : "."}
+                  </span>
+                </span>
                 {!hideReactions
                   ? mine.map((r) => (
                       <span key={r.id} className="reaction-float carc-reaction" aria-hidden>
@@ -225,7 +215,6 @@ export function ScorePanel({
             );
           })}
         </ol>
-        {footer ? <div className="carc-score-footer">{footer}</div> : null}
       </Panel>
     </>
   );
@@ -285,158 +274,6 @@ export function projectionShort(p: Projection): string {
   if (p.ifCompleted !== null) return `${p.ifCompleted} if finished`;
   return `${p.atEnd} at the end`;
 }
-
-export function TileInHand({
-  tile,
-  rot,
-  catalog,
-  art,
-  palette,
-  hidden,
-  canAct,
-  pending,
-  choices,
-  onRotate,
-  onChoose,
-  onBack,
-  onHoverChoice,
-  waitingFor,
-  thinking,
-  discardsNote,
-  legalRots,
-  allowSkip = true,
-  dialSize = 112,
-  color,
-}: {
-  tile: TileId | null;
-  rot: number;
-  catalog: TileCatalog;
-  art: TileArtSource;
-  palette: BoardPalette;
-  hidden: boolean;
-  canAct: boolean;
-  pending: boolean;
-  choices: FigureChoice[];
-  onRotate(dir: 1 | -1): void;
-  onChoose(c: FigureChoice): void;
-  onBack(): void;
-  onHoverChoice?(c: FigureChoice | null): void;
-  waitingFor: string | null;
-  /** The player we wait for is a bot working out its move. */
-  thinking?: boolean;
-  discardsNote?: string | null;
-  /** Rotations legal at the hovered spot (marked on the dial). */
-  legalRots?: number[];
-  allowSkip?: boolean;
-  dialSize?: number;
-  /** Colour of the player choosing (meeples in the list). */
-  color?: PlayerMeta["color"];
-}) {
-  const def = tile ? catalog.get(tile) : undefined;
-  const interactive = canAct && !pending && !hidden && !!def;
-  const tileSize = Math.round(dialSize * 0.6);
-  const shown = choices.filter((c) => allowSkip || c.option !== null);
-  const app = color ? PLAYER_COLORS[color] : null;
-  return (
-    <Panel className="carc-hand" aria-label="Tile in hand" data-pending={pending || undefined} data-coach="hand">
-      <div className="carc-hand-top">
-        <DialSurface className="carc-hand-dial" style={{ ["--dial" as string]: `${dialSize}px` }}>
-          <RotationDial
-            rot={rot}
-            onRotate={onRotate}
-            legal={interactive ? legalRots : undefined}
-            disabled={!interactive}
-            size={dialSize}
-            tileSize={tileSize}
-            label="Rotate the tile in hand"
-          >
-            {def && !hidden ? (
-              // Rotation is painted into the art (not CSS-rotated), so the cloister, houses and lighting stay upright.
-              <TileThumb def={def} art={art} palette={palette} rot={rot} size={tileSize} title={`Tile ${def.id}, rotated ${rot * 90}°`} />
-            ) : (
-              <div className="carc-hand-hidden" style={{ background: palette.table }}>
-                ?
-              </div>
-            )}
-          </RotationDial>
-        </DialSurface>
-        <div className="carc-hand-text">
-          <div className="carc-eyebrow">{canAct || !waitingFor ? "Your tile" : `${waitingFor}’s tile`}</div>
-          {canAct && !pending ? (
-            <>
-              <p className="carc-hand-status">Place it on a glowing spot.</p>
-              <p className="carc-hand-hint">
-                <span className="carc-keys">
-                  Rotate with <Kbd>R</Kbd> or the dial.
-                </span>
-                <span className="carc-touch">Tap the dial to turn it.</span>
-              </p>
-            </>
-          ) : null}
-          {pending ? (
-            <>
-              <p className="carc-hand-status">{allowSkip ? "Claim something? (optional)" : "Claim it with a meeple."}</p>
-              <p className="carc-hand-hint">Tap a meeple on the tile, or pick one below.</p>
-            </>
-          ) : null}
-          {!canAct ? (
-            <p className="carc-hand-status" data-quiet="true">
-              {waitingFor ? (thinking ? `${waitingFor} is thinking…` : `${waitingFor}’s turn`) : "Game over"}
-            </p>
-          ) : null}
-          {discardsNote ? (
-            <p className="carc-hand-hint" data-tone="warn">
-              {discardsNote}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      {pending ? (
-        <div className="carc-figures" role="group" aria-label="Figure choice" data-coach="figures">
-          <div className="carc-figure-list">
-            {shown.map((c, i) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => onChoose(c)}
-                onPointerEnter={() => onHoverChoice?.(c)}
-                onPointerLeave={() => onHoverChoice?.(null)}
-                onFocus={() => onHoverChoice?.(c)}
-                onBlur={() => onHoverChoice?.(null)}
-                className="carc-figure"
-                data-skip={c.option === null || undefined}
-              >
-                <Kbd>{c.option === null ? "S" : c.key === "recall" ? "A" : i + 1}</Kbd>
-                <span className="carc-figure-text">
-                <span className="carc-figure-label">
-                  {app && c.option && c.key !== "recall" ? (
-                    <span className="carc-figure-token" style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }} aria-hidden>
-                      <FigureIcon
-                        kind={c.option.type === "abbot" ? "abbot" : "meeple"}
-                        fill="currentColor"
-                        ink={app.fill}
-                        outline="none"
-                        marker={app.marker}
-                        size={18}
-                      />
-                    </span>
-                  ) : null}
-                  {c.label}
-                </span>
-                {c.detail ? <span className="carc-figure-detail carc-num">{c.detail}</span> : null}
-                </span>
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={onBack} className="carc-btn carc-figure-back" data-variant="ghost" data-size="compact">
-            Put the tile somewhere else <Kbd>Esc</Kbd>
-          </button>
-        </div>
-      ) : null}
-    </Panel>
-  );
-}
-
 
 // ── remaining tiles ─────────────────────────────────────────────────────────
 
@@ -502,41 +339,16 @@ function useReactionLimit() {
   };
 }
 
-export function ReactionBar({ onReact, disabled, reactions, players, hideBubbles }: { onReact(e: string): void; disabled?: boolean; reactions?: Reaction[]; players?: PlayerMeta[]; hideBubbles?: boolean }) {
-  const [open, setOpen] = useState(false);
+/** Every reaction as one row of emoji buttons (opened from the dock's reaction button). */
+export function ReactionBar({ onReact, disabled }: { onReact(e: string): void; disabled?: boolean }) {
   const allow = useReactionLimit();
-  const quick = REACTIONS.slice(0, 6);
-  const shown = open ? REACTIONS : quick;
   return (
-    <div className="carc-reaction-wrap">
-      {reactions && players && !hideBubbles ? <ReactionBubbles reactions={reactions} players={players} /> : null}
-      <Panel className="carc-reactions" data-open={open || undefined} aria-label="Emoji reactions">
-        <div className="carc-reaction-grid">
-          {shown.map((e, i) => (
-            <button
-              key={e}
-              type="button"
-              disabled={disabled}
-              onClick={() => allow() && onReact(e)}
-              className="carc-emoji"
-              data-extra={i >= 4 && !open ? "true" : undefined}
-              aria-label={`React ${e}`}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="carc-icon-btn carc-reaction-more"
-          aria-expanded={open}
-          aria-label={open ? "Fewer reactions" : `${REACTIONS.length - quick.length} more reactions`}
-          title={open ? "Fewer reactions" : "More reactions"}
-        >
-          {open ? <ChevronDown /> : <FaceSmile />}
+    <div className="carc-reaction-grid" aria-label="Emoji reactions">
+      {REACTIONS.map((e) => (
+        <button key={e} type="button" disabled={disabled} onClick={() => allow() && onReact(e)} className="carc-emoji" aria-label={`React ${e}`}>
+          {e}
         </button>
-      </Panel>
+      ))}
     </div>
   );
 }
@@ -623,41 +435,6 @@ export function BoardToolbar({ commands, fitLabel = "Fit board", className }: { 
       <button type="button" className="carc-icon-btn" onClick={() => commands.current?.fit()} aria-label={fitLabel} title={`${fitLabel} (F)`}>
         <Maximize />
       </button>
-    </Panel>
-  );
-}
-
-/** Keyboard and pointer help, on wide screens. */
-export function BoardHelp({ is3d }: { is3d: boolean }) {
-  return (
-    <Panel className="carc-hud-help" aria-label="Board controls">
-      <div className="carc-board-help">
-        {is3d ? (
-          <>
-            <span>
-              <Kbd>R</Kbd> or scroll to rotate
-            </span>
-            <span>Drag to orbit</span>
-            <span>
-              <Kbd>F</Kbd> reframe
-            </span>
-          </>
-        ) : (
-          <>
-            <span>
-              <Kbd>R</Kbd> rotate
-            </span>
-            <span>
-              <Kbd>←</Kbd>
-              <Kbd>→</Kbd> choose a spot
-            </span>
-            <span>
-              <Kbd>F</Kbd> fit
-            </span>
-            <span>Drag to pan</span>
-          </>
-        )}
-      </div>
     </Panel>
   );
 }

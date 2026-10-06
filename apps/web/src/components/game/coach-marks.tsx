@@ -38,7 +38,7 @@ const MARKS: Mark[] = [
   {
     id: "hand",
     title: "This is your tile",
-    text: "Every turn you get one tile and add it to the map, and this is the one you’re holding.",
+    text: "Every turn you get one tile and add it to the map. This is the one you’re holding, and the line beside it says what to do.",
     when: (c) => c.myTurn && !c.pending,
     anchor: bySelector('[data-coach="hand"]'),
   },
@@ -59,14 +59,14 @@ const MARKS: Mark[] = [
   {
     id: "scores",
     title: "Scores and meeples",
-    text: "This panel shows everyone’s points and how many meeples each player has left, and the highlighted row is whoever is playing now.",
+    text: "Everyone’s points and meeples are here, and the tinted row is whoever is playing now. Hover a player for the details.",
     when: (c) => c.ply >= 1 && !c.pending,
     anchor: bySelector('[data-coach="scores"]'),
   },
   {
     id: "pile",
     title: "The draw pile",
-    text: "These are the tiles still to come and how many of each are left, and the game ends when the last one is placed.",
+    text: "This counts the tiles still to come, and it opens the full list. The game ends when the last one is placed.",
     when: (c) => c.ply >= 1 && !c.pending,
     anchor: bySelector('[data-coach="pile"]'),
   },

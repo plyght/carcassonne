@@ -66,6 +66,8 @@ for (const scheme of ["light", "dark"] as const) {
     await ctx.addInitScript((dark) => {
       try {
         localStorage.setItem("theme", dark ? "dark" : "light");
+        // the steady state: the first-game coach marks are already done
+        if (!location.search.includes("first")) localStorage.setItem("carc.coach.v1", JSON.stringify({ done: true, seen: [] }));
       } catch {}
     }, scheme === "dark");
     const p = await ctx.newPage();
@@ -107,9 +109,19 @@ for (const scheme of ["light", "dark"] as const) {
       const skip = p.getByRole("button", { name: "Skip tips" });
       if (await skip.count()) await skip.click().catch(() => {});
       // a few turns so the board, the scores and the log have something in them
-      for (let i = 0; i < 4; i++) await playTurn(p);
+      for (let i = 0; i < 3; i++) await playTurn(p);
+      // the feed, caught while a new line blurs in
+      await playTurn(p);
+      await p.waitForFunction(() => document.querySelectorAll(".carc-feed-line").length > 0, undefined, { timeout: 30_000 }).catch(() => {});
+      await shot(p, `game-feed-mid-${tag}`, 120);
       await waitMyTurn(p);
       await shot(p, `game-${tag}`, 1500);
+      await shot(p, `game-feed-${tag}`, 0);
+      if (!phone) {
+        await p.hover(".carc-feed-history");
+        await shot(p, `game-feed-history-${tag}`, 500);
+        await p.mouse.move(640, 440);
+      }
       // the rules sheet
       await p.getByTestId("how-to-play-button").click();
       await p.getByTestId("how-to-play").waitFor();
@@ -128,6 +140,7 @@ for (const scheme of ["light", "dark"] as const) {
         await p.waitForTimeout(300);
       }
       // a reaction, caught mid-flight
+      await p.getByRole("button", { name: "Reactions" }).click();
       await p.getByRole("button", { name: "React 👍" }).click();
       await p.waitForTimeout(150);
       await p.getByRole("button", { name: "React 👏" }).click().catch(() => {});

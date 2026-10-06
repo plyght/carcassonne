@@ -1145,3 +1145,734 @@ html[data-reduced-motion="true"] .carc-bubble-wobble {
     opacity: 1;
   }
 }
+
+/* ══ the calm HUD (components/game/hud-calm.tsx) ═══════════════════════ */
+/*
+ * The board is the hero. At rest: the players (top-left), icon actions with the feed
+ * under them (top-right), and one dock (bottom-centre) with zoom beside it. Surfaces
+ * are translucent glass with a soft shadow, no borders; everything else opens on
+ * demand. These rules supersede the column layout above.
+ */
+
+.carc-game {
+  --hud-col: 288px;
+  --glass: color-mix(in oklch, var(--sheet) 80%, transparent);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 1px 2px rgba(20, 24, 28, 0.12), 0 12px 32px -14px rgba(10, 16, 22, 0.45);
+}
+
+.dark .carc-game {
+  --glass: color-mix(in oklch, var(--sheet) 74%, transparent);
+  --glass-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 12px 32px -14px rgba(0, 0, 0, 0.9);
+}
+
+.carc-glass {
+  background-color: var(--glass);
+  background-image: none;
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: var(--glass-shadow);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .carc-glass {
+    background-color: var(--sheet);
+    backdrop-filter: none;
+  }
+}
+
+.carc-hud-left,
+.carc-hud-right {
+  top: var(--hud-inset);
+  max-height: calc(100% - 2 * var(--hud-inset) - 120px);
+}
+
+.carc-hud-left {
+  width: var(--hud-col);
+}
+
+.carc-hud-right {
+  width: 340px;
+  align-items: flex-end;
+}
+
+.carc-hud-guide {
+  top: var(--hud-inset);
+  left: calc(var(--hud-inset) + var(--hud-col) + var(--hud-gap));
+  right: calc(var(--hud-inset) + 236px);
+}
+
+/* ── players ─────────────────────────────────────────────────────────── */
+
+.carc-players {
+  padding: var(--sp-1);
+  border-radius: var(--r-sheet);
+}
+
+.carc-players .carc-titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-1) var(--sp-2);
+}
+
+.carc-players .carc-titlebar-title {
+  font-size: var(--fs-body);
+}
+
+.carc-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* swatch | name (+ muted note) | meeples | score */
+.carc-player {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto 36px;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  border-radius: calc(var(--r-sheet) - var(--sp-1));
+  outline-offset: -2px;
+  transition: background-color var(--dur-base) ease;
+}
+
+.carc-player .carc-swatch {
+  border-radius: 7px;
+}
+
+/* whoever is playing: a soft wash of their colour and a 3 px inset bar of it */
+.carc-player[data-active] {
+  background: color-mix(in oklch, var(--seat) 11%, transparent);
+  box-shadow: inset 3px 0 0 var(--seat);
+}
+
+.dark .carc-player[data-active] {
+  background: color-mix(in oklch, var(--seat) 16%, transparent);
+}
+
+.carc-player-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.carc-player-name-text {
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--fw-medium) var(--fs-body) / 1.2 var(--font-ui);
+  color: var(--text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.carc-player-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: var(--fw-regular) var(--fs-small) / 1.2 var(--font-ui);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.carc-player[data-active] .carc-player-note {
+  color: var(--text-1);
+}
+
+.carc-player-meeples {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-num);
+  color: var(--text-2);
+}
+
+.carc-player-meeples svg {
+  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.25));
+}
+
+.carc-player-score {
+  justify-self: end;
+  font: var(--fw-medium) 18px / 1 var(--font-num);
+  color: var(--text-1);
+}
+
+.carc-player-score[data-leader] {
+  color: var(--text-accent);
+}
+
+/* details on hover or focus: the breakdown and the abbot */
+.carc-player-pop {
+  position: absolute;
+  z-index: 30;
+  top: 50%;
+  left: calc(100% + 12px);
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  max-width: 240px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  box-shadow: var(--elev-2);
+  font: var(--fw-regular) var(--fs-small) / 1.4 var(--font-ui);
+  color: var(--text-2);
+  opacity: 0;
+  filter: blur(3px);
+  transform: translateY(-50%) scale(0.97);
+  transform-origin: left center;
+  pointer-events: none;
+  transition:
+    opacity 120ms ease,
+    filter 120ms ease,
+    transform 120ms ease;
+}
+
+.carc-player-pop-title {
+  font-weight: var(--fw-medium);
+  color: var(--text-1);
+}
+
+.carc-player:is(:hover, :focus-visible) .carc-player-pop {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-50%);
+  transition-duration: 200ms;
+  transition-timing-function: var(--ease-reveal);
+}
+
+/* ── top-right actions ───────────────────────────────────────────────── */
+
+.carc-actions {
+  position: relative;
+  flex: none;
+}
+
+.carc-actions-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.carc-actions-bar .carc-icon-btn {
+  width: 36px;
+  height: 36px;
+  color: var(--text-1);
+}
+
+.carc-style-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  box-shadow: var(--swatch-lift);
+}
+
+.carc-style-btn[aria-expanded="true"],
+.carc-actions-bar .carc-icon-btn[aria-expanded="true"] {
+  background: var(--fill-hover);
+}
+
+.carc-pop {
+  position: absolute;
+  z-index: 40;
+  border-radius: var(--r-sheet);
+  box-shadow: var(--elev-3);
+}
+
+.carc-menu-pop {
+  top: calc(100% + 8px);
+  right: 0;
+  width: 248px;
+  padding: var(--sp-1);
+}
+
+.carc-menu-list {
+  display: grid;
+  gap: 2px;
+}
+
+.carc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 40px;
+  padding: 0 var(--sp-3);
+  border: none;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.carc-menu-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-2);
+}
+
+.carc-menu-item .carc-kbd {
+  margin-left: auto;
+}
+
+.carc-menu-item:hover,
+.carc-menu-item:focus-visible {
+  background: var(--fill);
+}
+
+.carc-menu-seed {
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+
+/* ── the feed ────────────────────────────────────────────────────────── */
+
+.carc-feed {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  width: 100%;
+  pointer-events: auto;
+}
+
+.carc-feed-history {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-on-board);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.dark .carc-feed-history {
+  color: var(--text-2);
+}
+
+.carc-feed-history svg {
+  width: 18px;
+  height: 18px;
+}
+
+.carc-feed-history:disabled {
+  visibility: hidden;
+}
+
+.carc-feed:hover .carc-feed-history,
+.carc-feed-history:focus-visible {
+  opacity: 1;
+}
+
+.carc-feed-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.carc-feed[data-expanded] .carc-feed-list {
+  max-height: min(56vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 24px);
+  mask-image: linear-gradient(180deg, transparent 0, #000 24px);
+}
+
+/* one line: a pill of frosted glass whose left end feathers into the board */
+.carc-feed-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  padding: 6px 12px 6px 22px;
+  font: var(--fw-regular) var(--fs-small) / 1.3 var(--font-ui);
+  color: var(--text-1);
+  white-space: nowrap;
+  isolation: isolate;
+}
+
+.carc-feed-line::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--sheet) 76%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 6px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 6px), transparent 100%);
+}
+
+.dark .carc-feed-line::before {
+  background: color-mix(in oklch, var(--sheet) 70%, transparent);
+}
+
+/* a score lights up in the scorer's colour for a moment */
+.carc-feed-line[data-score]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--seat, var(--gold)) 30%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 6px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 6px), transparent 100%);
+  animation: carc-feed-glow 2.4s ease both;
+}
+
+@keyframes carc-feed-glow {
+  0%,
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.carc-feed-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--seat);
+  box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--seat) 30%, transparent);
+}
+
+.carc-feed-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carc-feed-text strong {
+  font-weight: var(--fw-medium);
+}
+
+.carc-feed-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--text-2);
+}
+
+/* ── the dock ────────────────────────────────────────────────────────── */
+
+.carc-dock-wrap {
+  position: relative;
+  pointer-events: none;
+}
+
+.carc-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 64px;
+  max-width: min(680px, calc(100vw - 2 * var(--hud-inset) - 120px));
+  padding: 6px 8px 6px 6px;
+  border-radius: 20px;
+}
+
+.carc-dock .carc-hand-dial {
+  flex: none;
+}
+
+.carc-dock-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-1) 0;
+}
+
+.carc-dock-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-medium) var(--fs-body) / 1.3 var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-steps-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.carc-steps-dots > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--text-1) 22%, transparent);
+}
+
+.carc-steps-dots > span[data-on] {
+  background: var(--primary);
+}
+
+.dark .carc-steps-dots > span[data-on] {
+  background: var(--text-accent);
+}
+
+.carc-dock .carc-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.carc-dock .carc-figure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  min-height: 0;
+  padding: 0 12px 0 8px;
+  border: none;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-ui);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+.carc-dock .carc-figure:hover {
+  background: var(--fill-hover);
+}
+
+.carc-dock .carc-figure:active {
+  transform: scale(var(--press-scale));
+}
+
+.carc-dock .carc-figure[data-skip] {
+  padding: 0 12px;
+  background: var(--text-1);
+  color: var(--sheet);
+}
+
+.carc-dock .carc-figure-back {
+  padding: 0 10px;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.carc-dock .carc-figure-token {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--seat);
+  color: var(--seat-ink);
+}
+
+.carc-dock-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: var(--sp-2);
+}
+
+.carc-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+.carc-chip-btn svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-2);
+}
+
+.carc-chip-btn:hover,
+.carc-chip-btn[aria-expanded="true"] {
+  background: var(--fill-hover);
+}
+
+.carc-chip-btn:active,
+.carc-react-btn:active {
+  transform: scale(var(--press-scale));
+}
+
+.carc-react-btn[aria-expanded="true"] {
+  background: var(--fill-hover);
+}
+
+.carc-pile-pop,
+.carc-react-pop {
+  bottom: calc(100% + 10px);
+  right: 0;
+}
+
+.carc-pile-pop {
+  width: 300px;
+}
+
+.carc-pile-pop .carc-pile {
+  background: none;
+  box-shadow: none;
+}
+
+.carc-react-pop {
+  padding: 4px;
+}
+
+.carc-react-pop .carc-reaction-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 40px);
+  gap: 2px;
+}
+
+/* the bubbles leave from the reaction button, at the dock's right end */
+.carc-dock-wrap .carc-bubbles {
+  left: auto;
+  right: 26px;
+  bottom: calc(100% - 8px);
+}
+
+/* key help, on demand */
+.carc-keyhelp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  max-width: 340px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 14px;
+  font: var(--fw-medium) var(--fs-small) / 1.3 var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-keyhelp > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* zoom: a small vertical stack */
+.carc-zoom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.carc-zoom .carc-icon-btn {
+  width: 36px;
+  height: 36px;
+  color: var(--text-1);
+}
+
+/* feature info floats above the dock */
+.carc-hud-bottom-center {
+  position: relative;
+}
+
+/* ── phones: avatars along the top, the dock at the bottom ───────────── */
+
+@media (max-width: 767px) {
+  .carc-hud-right {
+    top: var(--hud-inset);
+    right: var(--hud-inset);
+    left: auto;
+    bottom: auto;
+    width: auto;
+    max-width: calc(100% - 2 * var(--hud-inset));
+  }
+
+  .carc-hud-left {
+    top: calc(var(--hud-inset) + 44px + var(--hud-gap));
+    left: var(--hud-inset);
+    right: var(--hud-inset);
+    width: auto;
+  }
+
+  .carc-players {
+    display: none;
+  }
+
+  .carc-score-strip {
+    display: flex;
+  }
+
+  .carc-feed {
+    position: absolute;
+    top: calc(100% + var(--hud-gap) + 56px + var(--hud-gap));
+    right: 0;
+    width: calc(100vw - 2 * var(--hud-inset));
+  }
+
+  .carc-feed-history {
+    display: none;
+  }
+
+  .carc-feed-line:nth-last-child(n + 3) {
+    display: none;
+  }
+
+  .carc-hud-guide {
+    top: calc(var(--hud-inset) + 44px + var(--hud-gap) + 56px);
+    left: var(--hud-inset);
+    right: var(--hud-inset);
+  }
+
+  .carc-hud-bottom {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .carc-hud-bottom-start {
+    display: none;
+  }
+
+  .carc-dock {
+    max-width: none;
+  }
+
+  .carc-dock-end .carc-chip-btn {
+    padding: 0 8px;
+  }
+
+  .carc-zoom {
+    display: none;
+  }
+}

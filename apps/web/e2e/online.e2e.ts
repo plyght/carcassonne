@@ -298,6 +298,7 @@ try {
   });
 
   await step("emoji reaction reaches the other client", async () => {
+    await alice.getByRole("button", { name: "Reactions" }).click();
     await alice.getByRole("button", { name: "React 👍" }).click();
     await waitAttr(bob, "data-reactions", "v.includes(a)", "👍", 10_000);
     await bob.screenshot({ path: `${SHOTS}/online-reaction.png` });

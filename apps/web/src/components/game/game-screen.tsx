@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import Link from "next/link";
-import { ArrowLeft, BookOpen, ChevronDown, Lightbulb, Sliders, Undo, Wifi, WifiOff } from "reicon-react";
+import { ArrowLeft, Wifi, WifiOff } from "reicon-react";
 import { toast } from "sonner";
 
 import type { EngineEvent, FigureOption, Move } from "@carcassonne/protocol";
@@ -48,22 +48,11 @@ import { TablePanel } from "../dial/table-panel";
 import { TuneMode } from "../tune/tune-mode";
 import { EndSummary } from "./end-summary";
 import { HowToPlay } from "../learn/how-to-play";
-import { CoachMarks } from "./coach-marks";
+import { CoachMarks, coachDone } from "./coach-marks";
+import { Dock, Feed, feedLines, HudActions, KeyHelp, ZoomStack, type FeedEntry } from "./hud-calm";
 import { playerName, projectExtent, useClientState, type Projection } from "./helpers";
 import { TurnGuide, type GuideScore } from "./turn-guide";
-import {
-  BoardHelp,
-  BoardToolbar,
-  FeatureInfo,
-  figureChoices,
-  Panel,
-  ReactionBar,
-  RemainingTiles,
-  ScorePanel,
-  TileInHand,
-  TurnClock,
-  type FigureChoice,
-} from "./hud-parts";
+import { FeatureInfo, figureChoices, Panel, ScorePanel, TurnClock, type FigureChoice } from "./hud-parts";
 import { PassDevice } from "./pass-device";
 
 export interface GameScreenProps {
@@ -125,6 +114,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [styleOpen, setStyleOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  // the first game (coach marks still to show) gets the full turn guide and key help
+  const [firstGame, setFirstGame] = useState(false);
+  useEffect(() => setFirstGame(!!coach && !coachDone()), [coach]);
+  const [showKeys, setShowKeys] = useState(false);
+  useEffect(() => setShowKeys(firstGame), [firstGame]);
   const closeRules = useCallback(() => setRulesOpen(false), []);
   const [hoverChoice, setHoverChoice] = useState<FigureChoice | null>(null);
   const [flash, setFlash] = useState<NodeRef[] | null>(null);
@@ -179,7 +173,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   useEffect(() => {
     const update = () => {
       setVw(window.innerWidth);
-      setDialSize(window.innerWidth >= 768 ? 112 : 88);
+      setDialSize(window.innerWidth >= 768 ? 76 : 68);
     };
     update();
     window.addEventListener("resize", update);
@@ -196,12 +190,13 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     setGuideH(el.offsetHeight);
     return () => ro.disconnect();
   });
+  // Keep the board clear of the clusters: players top-left, actions + feed top-right,
+  // the dock at the bottom, zoom bottom-right (hud.css).
   const insets = useMemo(() => {
-    const col = vw >= 1024 ? 304 : 280;
     const extra = guideTop && guideH ? guideH + 8 : 0;
     return vw >= 768
-      ? { top: 76 + extra, right: 12 + col + 8, bottom: 68, left: 12 + col + 8 }
-      : { top: 128 + extra, right: 8, bottom: 200, left: 8 };
+      ? { top: 16 + extra, right: 248, bottom: 116, left: 300 }
+      : { top: 196 + extra, right: 8, bottom: 132, left: 8 };
   }, [vw, guideTop, guideH]);
 
   // Score floaters for the newest event batch.
@@ -273,6 +268,19 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     for (const b of narrated.slice(-8)) b.lines.forEach((l, i) => lines.push({ key: `${b.seq}-${i}`, text: l.text, color: seatColor(l.player), score: l.score }));
     return lines.slice(-6);
   }, [narrated, seatColor]);
+  // The feed: terse lines for every move this session (the client keeps only recent ones).
+  const [feed, setFeed] = useState<FeedEntry[]>([]);
+  const feedSeq = useRef(0);
+  useEffect(() => {
+    const fresh = s.recent.filter((b) => b.seq > feedSeq.current);
+    if (!fresh.length) return;
+    const first = feedSeq.current === 0;
+    feedSeq.current = fresh.at(-1)!.seq;
+    // a game opened mid-way starts with its recent moves already aged out
+    const at = first ? Date.now() - 60_000 : Date.now();
+    setFeed((cur) => [...cur, ...fresh.flatMap((b) => feedLines(b.seq, b.events, catalog, at))].slice(-200));
+  }, [s.recent, catalog]);
+
   // Since your last move: what scored (explained) and what the others did.
   const guideScores: GuideScore[] = useMemo(() => {
     const out: GuideScore[] = [];
@@ -417,6 +425,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
       if (k === "-" || k === "_") return commands.current?.zoom(0.83);
       if (k === "f" || k === "F") return commands.current?.fit();
       if (k === "h" || k === "H") return void doHint();
+      if (k === "?") return setShowKeys((v) => !v);
       if (!canAct) return;
       if (pending) {
         if (k === "Escape" || k === "Backspace") {
@@ -566,7 +575,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const shownProjection = hoverChoice?.projection ?? projection;
   const guide = lesson ? (
     typeof lesson.card === "function" ? lesson.card({ pending: !!pending, canAct }) : lesson.card
-  ) : settings.showTurnGuide && !needsPass ? (
+  ) : firstGame && settings.showTurnGuide && !needsPass ? (
     <TurnGuide
       phase={guidePhase}
       waitingFor={waitingName}
@@ -692,80 +701,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         </div>
       ) : null}
 
-      {/* top row: title + turn, actions */}
-      <div className="carc-hud-top">
-        <Panel className="carc-titlebar carc-hud-bar">
-          <Link href={exitHref as "/"} className="carc-icon-btn" aria-label="Leave game" title="Leave game">
-            <ArrowLeft />
-          </Link>
-          <div className="carc-titlebar-text">
-            <div className="carc-titlebar-title">{title}</div>
-            <div className="carc-turn" aria-live="polite" data-mine={canAct || undefined}>
-              {ended || lesson?.idle ? (
-                <span className="carc-turn-who">{lesson ? "Lesson complete" : "Game over"}</span>
-              ) : (
-                <>
-                  <span className="carc-turn-dot" style={{ background: PLAYER_COLORS[currentColor].fill }} aria-hidden />
-                  <span className="carc-turn-who" data-testid="turn-indicator">
-                    {canAct && s.localSeats.length === 1 ? "Your turn" : `${playerName(s.players, current)}’s turn`}
-                  </span>
-                  <TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} />
-                </>
-              )}
-            </div>
-          </div>
-          {online ? (
-            <span className="carc-conn" data-state={s.connection === "open" ? "open" : s.connection === "polling" ? "polling" : "closed"} title={`Connection: ${s.connection}`}>
-              {s.connection === "open" ? <Wifi aria-label="Connected" /> : s.connection === "polling" ? <Wifi className="opacity-50" aria-label="Polling" /> : <WifiOff aria-label="Disconnected" />}
-            </span>
-          ) : null}
-        </Panel>
-        <div className="carc-actions">
-          <Panel className="carc-actions-bar carc-hud-bar">
-            <button type="button" onClick={() => setRulesOpen(true)} className="carc-btn" data-variant="ghost" title="How to play" aria-label="How to play" data-testid="how-to-play-button">
-              <BookOpen /> <span className="carc-btn-label">Rules</span>
-            </button>
-            {isLocal ? (
-              <button type="button" onClick={() => void doUndo()} disabled={!s.canUndo} className="carc-btn" data-variant="ghost" title="Undo (U)" aria-label="Undo">
-                <Undo /> <span className="carc-btn-label">Undo</span>
-              </button>
-            ) : null}
-            {isLocal && settings.showHints ? (
-              <button type="button" onClick={() => void doHint()} disabled={!canAct} className="carc-btn" data-variant="ghost" title="Hint (H)" aria-label="Hint">
-                <Lightbulb /> <span className="carc-btn-label">Hint</span>
-              </button>
-            ) : null}
-            <button
-              ref={tableButton}
-              type="button"
-              onClick={() => setStyleOpen((o) => !o)}
-              className="carc-btn carc-table-button"
-              data-variant="ghost"
-              title="Table: style, camera, quality, sound"
-              aria-label="Table settings"
-              aria-expanded={styleOpen}
-              aria-haspopup="dialog"
-              data-testid="style-button"
-            >
-              <Sliders /> <span className="carc-btn-label carc-table-name">{style.name}</span>
-              <ChevronDown className="carc-chevron" />
-            </button>
-          </Panel>
-          <TablePanel
-            open={styleOpen}
-            onClose={closeTable}
-            camera={camera}
-            onCamera={chooseCamera}
-            is3d={is3d}
-            commands={commands}
-            anchorRef={tableButton}
-          />
-        </div>
-      </div>
-
-      {guideTop && guideSlot ? <div className="carc-hud-guide">{guideSlot}</div> : null}
-
-      {/* left column: scores, recent events */}
+      {/* top-left: whose game, whose turn, and the players */}
       <div className="carc-hud-left">
         <ScorePanel
           view={view}
@@ -775,51 +711,59 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           hideReactions={settings.hideReactions}
           thinking={s.thinking}
           palette={palette}
-          footer={subtitle}
           idle={!!lesson?.idle}
+          head={
+            <div className="carc-titlebar">
+              <Link href={exitHref as "/"} className="carc-icon-btn" aria-label="Leave game" title="Leave game">
+                <ArrowLeft />
+              </Link>
+              <div className="carc-titlebar-text">
+                <div className="carc-titlebar-title">{title}</div>
+                <div className="carc-turn" aria-live="polite" data-mine={canAct || undefined}>
+                  {ended || lesson?.idle ? (
+                    <span className="carc-turn-who">{lesson ? "Lesson complete" : "Game over"}</span>
+                  ) : (
+                    <>
+                      <span className="carc-turn-dot" style={{ background: PLAYER_COLORS[currentColor].fill }} aria-hidden />
+                      <span className="carc-turn-who" data-testid="turn-indicator">
+                        {canAct && s.localSeats.length === 1 ? "Your turn" : `${playerName(s.players, current)}’s turn`}
+                      </span>
+                      <TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} />
+                    </>
+                  )}
+                </div>
+              </div>
+              {online ? (
+                <span className="carc-conn" data-state={s.connection === "open" ? "open" : s.connection === "polling" ? "polling" : "closed"} title={`Connection: ${s.connection}`}>
+                  {s.connection === "open" ? <Wifi aria-label="Connected" /> : s.connection === "polling" ? <Wifi className="opacity-50" aria-label="Polling" /> : <WifiOff aria-label="Disconnected" />}
+                </span>
+              ) : null}
+            </div>
+          }
         />
         {!guideTop ? guideSlot : null}
-        {log.length ? (
-          <Panel className="carc-log" aria-label="What happened">
-            <div className="carc-eyebrow">What happened</div>
-            <ul>
-              {log.map((l) => (
-                <li key={l.key} data-score={l.score || undefined}>
-                  <span className="carc-log-dot" style={{ background: l.color ?? "var(--text-2)" }} aria-hidden />
-                  <span>{l.text}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ) : null}
       </div>
 
-      {/* right column: tile in hand, draw pile */}
+      {/* top-right: icon actions, and the feed under them */}
       <div className="carc-hud-right">
-        {!ended && !lesson?.idle ? (
-          <TileInHand
-            tile={view.currentTile}
-            rot={pending ? pending.rot : ghost ? ghost.rot : rot}
-            catalog={catalog}
-            art={art}
-            palette={palette}
-            hidden={needsPass}
-            canAct={canAct}
-            pending={!!pending}
-            choices={choices}
-            onRotate={rotate}
-            legalRots={legalRots}
-            onChoose={choose}
-            onBack={() => setPending(null)}
-            onHoverChoice={setHoverChoice}
-            waitingFor={!canAct ? playerName(s.players, current) : null}
-            thinking={s.thinking}
-            allowSkip={allowSkip}
-            color={s.players[current]?.color}
-            dialSize={dialSize}
-          />
-        ) : null}
-        {settings.showRemaining && !ended ? <RemainingTiles remaining={view.remaining} catalog={catalog} art={art} palette={palette} /> : null}
+        <HudActions
+          onRules={() => setRulesOpen(true)}
+          onUndo={isLocal ? () => void doUndo() : undefined}
+          canUndo={s.canUndo}
+          onHint={isLocal && settings.showHints ? () => void doHint() : undefined}
+          canHint={canAct}
+          styleName={style.name}
+          styleSwatch={`linear-gradient(135deg, ${style.swatch[0]} 0 45%, ${style.swatch[1]} 45% 70%, ${style.swatch[2]} 70%)`}
+          styleOpen={styleOpen}
+          onStyle={() => setStyleOpen((o) => !o)}
+          tableButton={tableButton}
+          tablePanel={<TablePanel open={styleOpen} onClose={closeTable} camera={camera} onCamera={chooseCamera} is3d={is3d} commands={commands} anchorRef={tableButton} />}
+          exitHref={exitHref}
+          seed={subtitle}
+          showKeys={showKeys}
+          onToggleKeys={() => setShowKeys((v) => !v)}
+        />
+        <Feed entries={feed} players={s.players} />
         {s.error ? (
           <Panel className="carc-hud-panel" role="alert">
             <p className="carc-notice" data-tone="danger">
@@ -829,17 +773,46 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         ) : null}
       </div>
 
-      {/* bottom row: help, feature info + reactions, board toolbar */}
+      {guideTop && guideSlot ? <div className="carc-hud-guide">{guideSlot}</div> : null}
+
+      {/* bottom: key help (on demand), the dock, zoom */}
       <div className="carc-hud-bottom">
-        <div className="carc-hud-bottom-start">
-          <BoardHelp is3d={is3d} />
-        </div>
+        <div className="carc-hud-bottom-start">{showKeys ? <KeyHelp is3d={is3d} /> : null}</div>
         <div className="carc-hud-bottom-center">
           {shownProjection ? <FeatureInfo p={shownProjection} players={s.players} edition={edition} choosing={!!hoverChoice} /> : null}
-          <ReactionBar onReact={(e) => client.react(e)} reactions={s.reactions} players={s.players} hideBubbles={settings.hideReactions} />
+          {!lesson?.idle ? (
+            <Dock
+              tile={view.currentTile}
+              rot={pending ? pending.rot : ghost ? ghost.rot : rot}
+              catalog={catalog}
+              art={art}
+              palette={palette}
+              hidden={needsPass}
+              canAct={canAct}
+              pending={!!pending}
+              choices={choices}
+              onRotate={rotate}
+              legalRots={legalRots}
+              onChoose={choose}
+              onBack={() => setPending(null)}
+              onHoverChoice={setHoverChoice}
+              waitingFor={!canAct ? playerName(s.players, current) : null}
+              thinking={s.thinking}
+              allowSkip={allowSkip}
+              color={s.players[current]?.color}
+              ended={ended}
+              remaining={view.remaining}
+              showPile={settings.showRemaining}
+              reactions={s.reactions}
+              players={s.players}
+              onReact={(e) => client.react(e)}
+              hideBubbles={settings.hideReactions}
+              dialSize={dialSize}
+            />
+          ) : null}
         </div>
         <div className="carc-hud-bottom-end">
-          <BoardToolbar commands={commands} fitLabel={is3d ? "Reframe the board" : "Fit board"} />
+          <ZoomStack commands={commands} fitLabel={is3d ? "Reframe the board" : "Fit board"} />
         </div>
       </div>
 
