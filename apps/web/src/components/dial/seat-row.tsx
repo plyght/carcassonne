@@ -14,11 +14,12 @@ import { FigureIcon, PLAYER_COLORS, proceduralFigures } from "@carcassonne/rende
 import { MeeplePicker } from "./meeple-picker";
 import { DialSelect, type SelectItem } from "./primitives";
 
-export const TIER_INFO: { id: AiTier; label: string; hint: string }[] = [
-  { id: "easy", label: "Easy", hint: "Greedy, loves placing meeples" },
-  { id: "medium", label: "Medium", hint: "Weighs completion and meeple economy" },
-  { id: "hard", label: "Hard", hint: "Searches the remaining tiles" },
-  { id: "expert", label: "Expert", hint: "Deeper search, models opponents" },
+/** Bot levels, described for someone who has never played. */
+export const TIER_INFO: { id: AiTier; label: string; hint: string; recommended?: boolean }[] = [
+  { id: "easy", label: "Easy", hint: "Plays fast and makes beginner mistakes. Good for your very first game." },
+  { id: "medium", label: "Medium", hint: "A fair opponent for new players: finishes what it starts.", recommended: true },
+  { id: "hard", label: "Hard", hint: "Plans ahead with the tiles left in the pile. A real challenge." },
+  { id: "expert", label: "Expert", hint: "Plans further ahead and plays to block you. For experienced players." },
 ];
 
 export type SeatController = "human" | `bot:${AiTier}`;
@@ -66,9 +67,9 @@ export function PlayerSeatRow({
       data-seat={index}
       data-kind={seat.kind}
     >
-      <span className="carc-seat-avatar" style={{ background: `color-mix(in oklch, ${app.fill} 16%, transparent)` }}>
+      <span className="carc-seat-avatar carc-swatch" style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }}>
         <motion.span key={seat.color} initial={reduced ? false : { y: -6, scale: 0.8 }} animate={{ y: 0, scale: 1 }} transition={{ type: "spring", visualDuration: 0.3, bounce: 0.5 }} style={{ display: "grid" }}>
-          <FigureIcon figures={proceduralFigures} fill={app.fill} ink={app.ink} marker={app.marker} size={32} title={`${app.label} meeple`} />
+          <FigureIcon figures={proceduralFigures} fill={app.ink} ink={app.fill} outline="none" marker={app.marker} size={26} title={`${app.label} meeple`} />
         </motion.span>
       </span>
       <input

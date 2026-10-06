@@ -71,7 +71,7 @@ export function MeeplePicker({
               whileTap={{ scale: 0.92 }}
               transition={reduced ? { duration: 0 } : { type: "spring", visualDuration: 0.28, bounce: 0.45 }}
             >
-              <FigureIcon figures={proceduralFigures} fill={app.fill} ink={app.ink} marker={app.marker} size={size} outline={on ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.45)"} />
+              <FigureIcon figures={proceduralFigures} fill={app.fill} ink={app.ink} marker={app.marker} size={size} outline="none" />
             </motion.span>
           </button>
         );

@@ -449,7 +449,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   height: var(--icon);
   border-radius: 4px;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--swatch-lift);
 }
 
 .carc-select-trigger .dialkit-select-value {
@@ -513,7 +513,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   height: var(--h-compact);
   border-radius: calc(var(--r-control) - 2px);
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--swatch-lift);
 }
 
 .carc-select-option .carc-select-icon {
@@ -631,7 +631,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   height: 5px;
   border-radius: 50%;
   transform: translateX(-50%) scale(0.4);
-  background: color-mix(in oklch, var(--text-1) 28%, transparent);
+  background: var(--text-1);
   opacity: 0;
   transition: opacity 0.2s, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -645,9 +645,16 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   background: var(--fill);
 }
 
-.carc-meeple[data-taken="true"] svg {
-  opacity: 0.5;
+/* the chosen colour sits on a solid well */
+.carc-meeple[aria-checked="true"] {
+  background: var(--fill-strong);
 }
+
+.carc-meeple svg {
+  filter: drop-shadow(0 1px 1px rgba(40, 24, 8, 0.45));
+}
+
+/* a colour another seat has: still full strength (picking it swaps the two) */
 
 /* ── player seat rows: flat (no box), aligned columns, grouped by spacing ── */
 
@@ -775,14 +782,14 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
 }
 
 .carc-rot-tick {
-  stroke: color-mix(in oklch, var(--text-2) 55%, transparent);
-  stroke-width: 2;
+  stroke: var(--text-2);
+  stroke-width: 3;
   stroke-linecap: round;
 }
 
 .carc-rot-tick[data-legal="true"] {
   stroke: var(--primary);
-  stroke-width: 3;
+  stroke-width: 4;
 }
 
 .carc-rot-knob {
@@ -796,7 +803,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   position: absolute;
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 6px 14px -6px rgba(40, 25, 10, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 14px -6px rgba(40, 25, 10, 0.55);
   pointer-events: none;
 }
 

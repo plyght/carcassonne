@@ -37,8 +37,13 @@
   width: 88px;
   height: 88px;
   margin-bottom: var(--sp-2);
-  border-radius: var(--r-sheet);
-  background: color-mix(in oklch, var(--seat) 16%, transparent);
+}
+
+/* an open seat: the meeple in solid ink on a plain well */
+.carc-swatch-open {
+  background: var(--fill-strong);
+  color: var(--text-2);
+  box-shadow: none;
 }
 
 /* ── end summary ─────────────────────────────────────────────────────── */
@@ -391,7 +396,7 @@
 
 .carc-seat-card[data-seat-kind="open"] {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--fill-hover);
+  background: var(--fill-strong);
   color: var(--text-2);
 }
 

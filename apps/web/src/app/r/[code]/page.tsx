@@ -10,6 +10,7 @@ import { Bot, Check, Copy, Loader2, Play, User } from "lucide-react";
 import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
 import type { PlayerColorId } from "@carcassonne/game-client";
 
+import { SeatSwatch } from "@/components/game/hud-parts";
 import { EDITION_TEXT } from "@/components/setup/rules-form";
 import { authClient } from "@/lib/auth-client";
 import { getGuest } from "@/lib/guest";
@@ -116,7 +117,13 @@ export default function RoomLobby() {
             const app = PLAYER_COLORS[color];
             return (
               <li key={i} className="carc-seat-card" data-seat-kind={s?.kind ?? "open"}>
-                <FigureIcon fill={s ? app.fill : "transparent"} outline={s ? undefined : "currentColor"} ink={app.ink} marker={app.marker} size={28} />
+                {s ? (
+                  <SeatSwatch color={color} size={36} />
+                ) : (
+                  <span className="carc-swatch carc-swatch-open" style={{ width: 36, height: 36 }} aria-hidden>
+                    <FigureIcon fill="currentColor" ink="transparent" outline="none" marker={app.marker} size={22} />
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="carc-seat-name-line">
                     <span className="truncate">{s ? s.name : "Open seat"}</span>

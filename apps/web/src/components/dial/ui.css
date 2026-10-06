@@ -250,10 +250,9 @@
   height: var(--h-chip);
   padding: 0 var(--sp-1);
   border-radius: var(--r-inner);
-  background: var(--sheet);
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--wood) 18%, transparent) inset,
-    0 -2px 0 color-mix(in oklch, var(--wood) 22%, transparent) inset;
+  /* a solid wooden key: filled, with a pressed-in bottom edge, no outline */
+  background: var(--fill-strong);
+  box-shadow: 0 -2px 0 color-mix(in oklch, var(--wood) 30%, transparent) inset;
   color: var(--text-1);
   font: var(--fw-medium) var(--fs-small) / 1 var(--font-num);
   vertical-align: middle;
@@ -261,10 +260,8 @@
 }
 
 .dark .carc-kbd {
-  background: var(--fill-hover);
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--foreground) 16%, transparent) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.35) inset;
+  background: var(--fill-strong);
+  box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.35) inset;
 }
 
 /* ── labels and links ────────────────────────────────────────────────── */

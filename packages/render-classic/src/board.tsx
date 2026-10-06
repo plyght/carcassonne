@@ -25,6 +25,8 @@ export interface GhostTile {
   rot: number;
   /** Tile is placed tentatively and waits for the figure choice. */
   pending?: boolean;
+  /** The tile does not fit here at this rotation (drawn dimmed with a warning edge). */
+  invalid?: boolean;
 }
 
 export interface Floater {
@@ -87,6 +89,8 @@ export interface BoardCommands {
   reveal(cell: Cell): void;
   /** Centre the view on a cell, optionally at a given scale. */
   focus(cell: Cell, scale?: number): void;
+  /** Where a cell sits on screen (client px): its centre and edge length. */
+  toScreen?(cell: Cell): { x: number; y: number; size: number } | null;
 }
 
 interface Camera {
@@ -121,12 +125,14 @@ const BOARD_CSS = `
 .cc-anim .cc-pulse { animation: cc-pulse 1.4s ease-in-out infinite; }
 .cc-anim .cc-float { animation: cc-float 1.6s ease-out forwards; }
 .cc-anim .cc-ghost { transition: opacity 120ms ease; }
+.cc-anim .cc-glow { animation: cc-glow 1.8s ease-in-out infinite; }
 .cc-anim .cc-hotspot { animation: cc-breathe 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes cc-pop { from { transform: scale(.82); opacity: .4 } to { transform: scale(1); opacity: 1 } }
 @keyframes cc-pulse { 0%,100% { opacity: .55 } 50% { opacity: 1 } }
+@keyframes cc-glow { 0%,100% { opacity: .78 } 50% { opacity: 1 } }
 @keyframes cc-breathe { 0%,100% { transform: scale(1) } 50% { transform: scale(1.12) } }
 @keyframes cc-float { from { transform: translateY(0); opacity: 1 } to { transform: translateY(-46px); opacity: 0 } }
-@media (prefers-reduced-motion: reduce) { .cc-anim .cc-pop, .cc-anim .cc-pulse, .cc-anim .cc-float, .cc-anim .cc-hotspot { animation: none } }
+@media (prefers-reduced-motion: reduce) { .cc-anim .cc-pop, .cc-anim .cc-pulse, .cc-anim .cc-float, .cc-anim .cc-hotspot, .cc-anim .cc-glow { animation: none } }
 `;
 
 export function ClassicBoard(props: ClassicBoardProps) {
@@ -262,6 +268,12 @@ export function ClassicBoard(props: ClassicBoardProps) {
       zoom: zoomCenter,
       pan: (dx, dy) => setCam((c) => ({ ...c, tx: c.tx + dx, ty: c.ty + dy })),
       fit,
+      toScreen: (cell) => {
+        const r = svgRef.current?.getBoundingClientRect();
+        if (!r) return null;
+        const c = camRef.current;
+        return { x: r.left + c.tx + (cell.x + 0.5) * TILE * c.s, y: r.top + c.ty + (cell.y + 0.5) * TILE * c.s, size: TILE * c.s };
+      },
       focus: (cell, scale) =>
         setCam((c) => {
           const s = Math.max(MIN_S, Math.min(MAX_S, scale ?? c.s));
@@ -595,15 +607,15 @@ export function ClassicBoard(props: ClassicBoardProps) {
 
           {lastPlaced ? (
             <rect
-              x={lastPlaced.x * TILE + 1}
-              y={lastPlaced.y * TILE + 1}
-              width={TILE - 2}
-              height={TILE - 2}
+              x={lastPlaced.x * TILE + 2}
+              y={lastPlaced.y * TILE + 2}
+              width={TILE - 4}
+              height={TILE - 4}
+              rx={3}
               fill="none"
               stroke={palette.highlight.stroke}
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              opacity={0.75}
+              strokeWidth={4}
+              opacity={0.9}
               pointerEvents="none"
             />
           ) : null}
@@ -633,18 +645,18 @@ export function ClassicBoard(props: ClassicBoardProps) {
           {targets.map((c) => {
             const hovered = hoverCell && hoverCell.x === c.x && hoverCell.y === c.y;
             return (
+              // A glowing spot: a soft lit square with a solid rim (no thin dashed outline).
               <rect
                 key={`t${c.x},${c.y}`}
-                className="cc-target"
-                x={c.x * TILE + 5}
-                y={c.y * TILE + 5}
-                width={TILE - 10}
-                height={TILE - 10}
-                rx={6}
+                className={hovered ? "cc-target" : "cc-target cc-glow"}
+                x={c.x * TILE + 6}
+                y={c.y * TILE + 6}
+                width={TILE - 12}
+                height={TILE - 12}
+                rx={8}
                 fill={hovered ? palette.target.hover : palette.target.fill}
                 stroke={palette.target.stroke}
-                strokeWidth={2}
-                strokeDasharray="8 6"
+                strokeWidth={5}
                 pointerEvents="none"
               />
             );
@@ -718,6 +730,9 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   opacity={ghost.pending ? 1 : 0.82}
                 />
               )}
+              {ghost.invalid ? (
+                <rect x={ghost.x * TILE} y={ghost.y * TILE} width={TILE} height={TILE} fill="rgba(120, 20, 10, 0.38)" />
+              ) : null}
               <rect
                 className={ghost.pending ? "cc-pulse" : undefined}
                 x={ghost.x * TILE}
@@ -725,8 +740,8 @@ export function ClassicBoard(props: ClassicBoardProps) {
                 width={TILE}
                 height={TILE}
                 fill="none"
-                stroke={palette.highlight.stroke}
-                strokeWidth={3}
+                stroke={ghost.invalid ? "#e0503a" : palette.highlight.stroke}
+                strokeWidth={ghost.invalid ? 6 : 4}
               />
             </g>
           ) : null}
@@ -749,21 +764,22 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   >
                     <title>{h.label ?? `${h.type} on feature ${h.feature}`}</title>
                     {/* generous hit area */}
-                    <circle cx={hx + offset} cy={hy - 4} r={18} fill="transparent" pointerEvents="all" />
+                    <circle cx={hx + offset} cy={hy - 4} r={20} fill="transparent" pointerEvents="all" />
+                    {/* a tap target: a solid cream disc with the player's meeple standing on it */}
                     <g className="cc-hotspot">
+                      <circle cx={hx + offset} cy={hy - 4} r={17} fill={palette.highlight.stroke} opacity={0.94} />
+                      <circle cx={hx + offset} cy={hy - 4} r={17} fill="none" stroke={a.fill} strokeWidth={3} />
                       <FigureToken
                         x={hx + offset}
-                        y={hy - 4}
-                        size={34}
+                        y={hy - 5}
+                        size={26}
                         kind={h.type}
                         lying={catalog.get(ghost.tile)?.features[h.feature]?.kind === "field"}
                         fill={a.fill}
                         ink={a.ink}
                         marker={a.marker}
                         outline={palette.figureOutline}
-                  wood={!!palette.illustrated}
                         figures={figures}
-                        ghost
                       />
                     </g>
                   </g>

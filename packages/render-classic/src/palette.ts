@@ -102,7 +102,7 @@ export const CLASSIC_PALETTE: BoardPalette = {
   garden: { fill: "#6f9c47", hedge: "#3f6a2a", bloom: "#f4d35e" },
   building: { body: "#f1e6cc", roof: "#b5523b", outline: "#5c4a35" },
   pennant: { fill: "#2f5fa8", stroke: "#f6efdc", mark: "#f6efdc" },
-  target: { fill: "rgba(255, 244, 214, 0.18)", stroke: "rgba(255, 244, 214, 0.85)", hover: "rgba(255, 244, 214, 0.42)" },
+  target: { fill: "rgba(255, 240, 196, 0.34)", stroke: "#fff3c4", hover: "rgba(255, 244, 214, 0.62)" },
   highlight: { stroke: "#fff3c4", fill: "rgba(255, 236, 160, 0.45)" },
   figureOutline: "#2b2117",
   ink: "#2b2117",

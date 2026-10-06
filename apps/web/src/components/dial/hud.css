@@ -88,13 +88,11 @@
 }
 
 .carc-turn-dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 2px var(--sheet),
-    0 0 0 3px color-mix(in oklch, var(--text-1) 25%, transparent);
+  border-radius: 4px;
+  box-shadow: var(--swatch-lift);
 }
 
 .carc-turn-who {
@@ -205,45 +203,42 @@
 .carc-score-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-0-5);
+  gap: var(--sp-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* avatar | who | total, the category line under "who"; totals share one right edge */
+/* swatch | who (name, supply, breakdown) | score + status */
 .carc-score-row {
   position: relative;
   display: grid;
-  grid-template-columns: var(--h-compact) minmax(0, 1fr) auto;
-  grid-template-areas:
-    "avatar who total"
-    ". cats cats";
+  grid-template-columns: var(--h-control) minmax(0, 1fr) auto;
   column-gap: var(--sp-3);
-  row-gap: var(--sp-1);
-  align-items: center;
+  align-items: start;
   padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2);
   border-radius: calc(var(--r-sheet) - var(--sp-1));
   transition: background-color var(--dur-base) ease;
 }
 
+/* whoever is playing: a warm gold card with a solid bar, unmistakable at a glance */
 .carc-score-row[data-active] {
-  background: var(--fill-gold);
-  box-shadow: inset 3px 0 0 var(--gold);
+  background: var(--fill-gold-strong);
+  box-shadow: inset var(--bar-current) 0 0 var(--gold);
 }
 
-.carc-score-avatar {
-  grid-area: avatar;
+/* the player's colour: a solid swatch with their meeple on it */
+.carc-swatch {
   display: grid;
   place-items: center;
-  width: var(--h-compact);
-  height: var(--h-compact);
-  border-radius: var(--r-control);
-  background: color-mix(in oklch, var(--seat) 16%, transparent);
+  flex-shrink: 0;
+  border-radius: var(--r-swatch);
+  background: var(--seat);
+  color: var(--seat-ink);
+  box-shadow: var(--swatch-lift);
 }
 
 .carc-score-who {
-  grid-area: who;
   min-width: 0;
 }
 
@@ -252,6 +247,7 @@
   align-items: center;
   gap: var(--sp-1);
   min-width: 0;
+  min-height: var(--h-chip);
 }
 
 .carc-score-name {
@@ -266,28 +262,58 @@
 
 .carc-score-supply {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1px;
-  height: 18px;
-  margin-top: var(--sp-0-5);
-  color: var(--text-2);
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
 }
 
-.carc-score-abbot {
+/* solid chip in the player's colour: meeple ×5, "Abbot ready" */
+.carc-supply {
   display: inline-flex;
-  margin-left: var(--sp-1);
+  align-items: center;
+  gap: var(--sp-1);
+  height: 24px;
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border-radius: var(--r-inner);
+  background: var(--seat);
+  color: var(--seat-ink);
+  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+  white-space: nowrap;
 }
 
-.carc-score-thinking {
-  margin-left: var(--sp-2);
-  font-size: var(--fs-small);
+.carc-supply-count {
+  font-family: var(--font-num);
+}
+
+.carc-supply-label {
+  font-weight: var(--fw-medium);
+}
+
+/* the abbot is out on the board: a plain chip, still in full-contrast ink */
+.carc-supply[data-away] {
+  background: var(--fill-strong);
+  color: var(--text-1);
+}
+
+.carc-score-breakdown {
+  margin-top: var(--sp-1);
+  font: var(--fw-medium) var(--fs-small) / var(--lh-snug) var(--font-ui);
   color: var(--text-2);
-  animation: carc-breathe 1.6s ease-in-out infinite;
+}
+
+.carc-score-part {
+  white-space: nowrap;
+}
+
+.carc-score-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
 }
 
 .carc-score-total {
-  grid-area: total;
-  align-self: start;
   min-width: 2ch;
   font: var(--fw-regular) var(--fs-score) / 1 var(--font-serif);
   color: var(--text-1);
@@ -298,27 +324,26 @@
   color: var(--text-accent);
 }
 
-.carc-score-cats {
-  grid-area: cats;
-  display: flex;
-  gap: var(--sp-3);
-  font: var(--fw-medium) var(--fs-small) / 1 var(--font-ui);
-  color: var(--text-2);
+.carc-score-status {
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-inner);
+  background: var(--text-1);
+  color: var(--sheet);
+  font: var(--fw-strong) var(--fs-small) / 22px var(--font-ui);
+  white-space: nowrap;
 }
 
-.carc-score-cat {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
+.carc-score-status[data-tone="you"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
-.carc-score-cat svg {
-  width: 14px;
-  height: 14px;
+.carc-score-status[data-thinking] {
+  animation: carc-breathe 1.6s ease-in-out infinite;
 }
 
 .carc-score-footer {
-  padding: var(--sp-1) var(--sp-3) var(--sp-2) calc(var(--sp-2) + var(--h-compact) + var(--sp-3));
+  padding: var(--sp-1) var(--sp-3) var(--sp-2) calc(var(--sp-2) + var(--h-control) + var(--sp-3));
   font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
   color: var(--text-2);
 }
@@ -352,8 +377,8 @@
 }
 
 .carc-score-chip[data-active] {
-  background: var(--fill-gold);
-  box-shadow: inset 0 -3px 0 var(--gold);
+  background: var(--fill-gold-strong);
+  box-shadow: inset 0 calc(-1 * var(--bar-current)) 0 var(--gold);
 }
 
 .carc-score-chip-name {
@@ -380,28 +405,38 @@
   font-size: 20px;
 }
 
-/* event log */
+/* "What happened": the last few moves, in sentences */
 .carc-log {
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3);
 }
 
 .carc-log ul {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  margin: 0;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
   padding: 0;
   list-style: none;
   font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
-  color: var(--text-2);
+  color: var(--text-1);
 }
 
 .carc-log li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: var(--sp-2);
   text-wrap: pretty;
 }
 
-.carc-log li:last-child {
-  color: var(--text-1);
+.carc-log li[data-score] {
+  font-weight: var(--fw-medium);
+}
+
+.carc-log-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 3px;
 }
 
 /* ── tile in hand ────────────────────────────────────────────────────── */
@@ -473,11 +508,11 @@
 
 .carc-figure {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--sp-3);
-  height: var(--h-control);
-  padding: 0 var(--sp-3) 0 var(--sp-2);
+  min-height: var(--h-control);
+  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
   border: none;
   border-radius: var(--r-control);
   background: var(--fill);
@@ -498,25 +533,52 @@
   transform: scale(var(--press-scale));
 }
 
+/* skip: a plain solid button, no outline */
 .carc-figure[data-skip] {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--fill-hover);
+  background: var(--fill-strong);
 }
 
 .carc-figure[data-skip]:hover {
-  background: var(--fill);
+  background: var(--fill-press);
 }
 
 .carc-figure-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* the meeple you'd place, solid in your colour */
+.carc-figure-token {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--r-inner);
+  background: var(--seat);
+  color: var(--seat-ink, #fff);
+}
+
+/* label, with what it's worth on its own line underneath */
+.carc-figure-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.carc-figure-label {
+  min-width: 0;
+  line-height: var(--lh-snug);
 }
 
 .carc-figure-detail {
+  padding-left: 32px;
   font-size: var(--fs-small);
-  font-weight: var(--fw-regular);
-  color: var(--text-2);
+  font-weight: var(--fw-medium);
+  color: var(--text-accent);
+  white-space: nowrap;
 }
 
 .carc-figure-back {
@@ -604,13 +666,12 @@
   color: var(--text-1);
 }
 
-.carc-pile-cell[data-empty] > :first-child {
-  opacity: 0.28;
-  filter: grayscale(1);
-}
-
-.carc-pile-cell[data-empty] .carc-pile-count {
+.carc-pile-note {
+  margin: 0;
+  padding: 0 var(--sp-2) var(--sp-2);
+  font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
   color: var(--text-2);
+  text-wrap: pretty;
 }
 
 /* ── bottom row ──────────────────────────────────────────────────────── */
@@ -719,10 +780,10 @@
   color: var(--text-2);
 }
 
-/* feature hover info */
+/* feature glossary: what this is, who claims it, how it scores, what it's worth now */
 .carc-feature {
-  max-width: min(92vw, 520px);
-  padding: var(--sp-2) var(--sp-3);
+  max-width: min(92vw, 460px);
+  padding: var(--sp-3) var(--sp-4);
 }
 
 .carc-feature-head {
@@ -732,37 +793,35 @@
 }
 
 .carc-feature-kind {
-  font: var(--fw-strong) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  font: var(--fw-medium) var(--fs-title) / var(--lh-tight) var(--font-serif);
   color: var(--text-1);
   text-transform: capitalize;
 }
 
-.carc-feature-meta {
+.carc-feature-role {
+  font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
   color: var(--text-2);
 }
 
-.carc-feature-head .carc-feature-meta {
-  font-size: var(--fs-small);
+.carc-feature-role strong {
+  color: var(--text-1);
+  font-weight: var(--fw-strong);
 }
 
-.carc-feature-body {
-  margin-top: var(--sp-0-5);
+.carc-feature-rule,
+.carc-feature-now {
+  margin: var(--sp-1) 0 0;
   font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
   color: var(--text-1);
   text-wrap: pretty;
 }
 
-.carc-feature-holder {
-  font-weight: var(--fw-strong);
+.carc-feature-now {
+  font-weight: var(--fw-medium);
 }
 
-.carc-feature-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin: 0 var(--sp-1) 1px 0;
-  border-radius: 50%;
-  vertical-align: middle;
+.carc-feature-holder {
+  color: var(--text-accent);
 }
 
 /* 3D figure menu (anchored to the clicked tile) */

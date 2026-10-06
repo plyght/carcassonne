@@ -4,7 +4,9 @@ import { Castle, Church, Crown, Flower2, Route, Wheat } from "lucide-react";
 
 import type { GameView } from "@carcassonne/protocol";
 import type { PlayerMeta } from "@carcassonne/game-client";
-import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
+import { PLAYER_COLORS } from "@carcassonne/render-classic";
+
+import { SeatSwatch } from "./hud-parts";
 
 import { playerName } from "./helpers";
 
@@ -78,7 +80,7 @@ export function EndSummary({
                     <td className="carc-end-rank carc-num">{rank + 1}</td>
                     <td className="carc-end-player">
                       <span className="carc-end-name">
-                        <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={20} />
+                        <SeatSwatch color={meta?.color ?? "red"} size={24} />
                         {playerName(players, p.i)}
                       </span>
                     </td>

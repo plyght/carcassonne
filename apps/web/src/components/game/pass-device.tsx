@@ -5,7 +5,9 @@ import { useEffect, useRef } from "react";
 import { Eye } from "lucide-react";
 
 import type { PlayerMeta } from "@carcassonne/game-client";
-import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
+import { PLAYER_COLORS } from "@carcassonne/render-classic";
+
+import { SeatSwatch } from "./hud-parts";
 
 /** Hot-seat: hide the next tile until the next player is at the device (PRD §6.1). */
 export function PassDevice({ player, meta, onReveal }: { player: number; meta: PlayerMeta | undefined; onReveal(): void }) {
@@ -15,8 +17,8 @@ export function PassDevice({ player, meta, onReveal }: { player: number; meta: P
   return (
     <div className="carc-pass" role="dialog" aria-modal="true" aria-labelledby="pass-title">
       <div className="carc-pass-card carc-dialog">
-        <span className="carc-pass-avatar" style={{ ["--seat" as string]: app.fill }}>
-          <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={56} />
+        <span className="carc-pass-avatar">
+          <SeatSwatch color={meta?.color ?? "red"} size={72} title={`${app.label} player`} />
         </span>
         <div className="carc-eyebrow">Pass the device</div>
         <h2 id="pass-title" className="carc-heading">

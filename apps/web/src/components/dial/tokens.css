@@ -6,6 +6,12 @@
  * terracotta for the one primary action and selection; gold only for "it's your turn /
  * the leader". Things are grouped by spacing, never by boxes inside boxes.
  *
+ * No hairlines. Nothing in the HUD is drawn as a thin or pale outline: player colours
+ * are solid swatches (--r-swatch), meeples are solid silhouettes on a solid chip, states
+ * are fills (--fill-strong, --fill-gold-strong) and the current player gets a solid bar
+ * (--bar-current). Where a rim is needed it is at least --rim-firm wide, at full
+ * contrast. Secondary text is --text-2, which still clears 4.5:1 on every surface.
+ *
  *   spacing   4 / 8 px scale (--sp-*)
  *   radii     --r-inner 6 (chips, kbd, inner controls) · --r-control 8 · --r-sheet 16
  *   heights   --h-chip 22 · --h-compact 32 · --h-control 40 · --h-large 48
@@ -84,7 +90,15 @@
   --fill-press: color-mix(in oklch, var(--wood) 21%, transparent);
   --fill-active: color-mix(in oklch, var(--primary) 16%, transparent);
   --fill-gold: color-mix(in oklch, var(--gold) 22%, transparent);
+  --fill-strong: color-mix(in oklch, var(--wood) 17%, transparent); /* a solid-reading neutral chip */
+  --fill-gold-strong: color-mix(in oklch, var(--gold) 34%, var(--sheet)); /* the current player's row */
   --scrim: rgba(28, 18, 8, 0.46);
+
+  /* ── solid states (instead of outlines) ─────────────────────────────── */
+  --r-swatch: 10px; /* player colour swatches */
+  --swatch-lift: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 -2px 0 rgba(0, 0, 0, 0.16) inset, 0 2px 4px -2px rgba(40, 24, 8, 0.45);
+  --bar-current: 4px; /* the current player's bar */
+  --rim-firm: 3px; /* the thinnest rim anything may have (coach ring, focus) */
 
   /* paper grain for cardstock (tiny SVG noise, tinted by the sheet colour) */
   --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.25 0 0 0 0 0.12 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -133,6 +147,8 @@
   --fill-press: color-mix(in oklch, var(--foreground) 15%, transparent);
   --fill-active: color-mix(in oklch, var(--primary) 22%, transparent);
   --fill-gold: color-mix(in oklch, var(--gold) 16%, transparent);
+  --fill-strong: color-mix(in oklch, var(--foreground) 14%, transparent);
+  --fill-gold-strong: color-mix(in oklch, var(--gold) 26%, var(--sheet));
   --scrim: rgba(8, 5, 2, 0.62);
   --sheet-shading: radial-gradient(120% 140% at 50% 0%, rgba(255, 220, 170, 0.035), transparent 60%);
   --edge: 0 1px 0 rgba(255, 236, 210, 0.07) inset, 0 -1px 0 rgba(0, 0, 0, 0.3) inset;
