@@ -1,7 +1,9 @@
-// Style system scaffolding (PRD §6.3). A style pack is data; the renderer picks the
-// drawing backend from `renderer`. 2D packs (classic, blueprint) work today; the 3D
-// packs are registered as "coming soon" so the settings UI and persistence are real.
-// When packages/assets lands, these entries move to assets/styles/<id>/style.json.
+// Style registry (PRD §6.3). A style pack is data; the app picks the drawing backend
+// from `renderer`: "classic-svg" packs (Classic Board, Blueprint) draw with ClassicBoard,
+// "three" packs (Tabletop, Cartoon, Living Diorama) with @carcassonne/render-three, which
+// the web app lazy-loads only when a 3D style is in use. The 3D packs' materials live in
+// packages/assets/styles/<id>/style.json; this registry only carries what the HUD and the
+// settings need without importing three.js. Storybook is still "coming soon".
 
 import { BLUEPRINT_PALETTE, CLASSIC_PALETTE, type BoardPalette } from "./palette";
 
@@ -85,7 +87,7 @@ export const STYLE_PACKS: StylePack[] = [
     description: "PBR wood and linen-textured tiles under warm light. Placed tiles rise into relief: walls, bells, carts and sheep.",
     dimension: "3d",
     renderer: "three",
-    status: "coming-soon",
+    status: "ready",
     ships: "M3",
     shading: "pbr",
     cameras: ALL_CAMERAS,
@@ -101,7 +103,7 @@ export const STYLE_PACKS: StylePack[] = [
     description: "Saturated colours, ink outlines, squash-and-stretch meeples and comic score pops.",
     dimension: "3d",
     renderer: "three",
-    status: "coming-soon",
+    status: "ready",
     ships: "M3–M5",
     shading: "toon",
     cameras: ALL_CAMERAS,
@@ -117,7 +119,7 @@ export const STYLE_PACKS: StylePack[] = [
     description: "Soft pastels, depth of field, villagers and sheep, day/night and weather.",
     dimension: "3d",
     renderer: "three",
-    status: "coming-soon",
+    status: "ready",
     ships: "M8",
     shading: "pbr",
     cameras: ALL_CAMERAS,
@@ -156,6 +158,22 @@ export function getStyle(id: string | null | undefined): StylePack {
 export function renderableStyle(id: StyleId): StylePack {
   const s = getStyle(id);
   return s.status === "ready" ? s : getStyle(DEFAULT_STYLE);
+}
+
+/** Default 3D style (the PRD's default look once 3D is available). */
+export const DEFAULT_3D_STYLE: StyleId = "tabletop";
+
+/** True when the style draws with the Three.js renderer. */
+export function is3DStyle(style: StylePack): boolean {
+  return style.renderer === "three" && style.status === "ready";
+}
+
+/**
+ * 2D palette for HUD chrome (tile in hand, remaining tiles, score chips). 3D styles
+ * have no 2D palette of their own, so they borrow Classic's painted tiles.
+ */
+export function hudPalette(style: StylePack): BoardPalette {
+  return style.palette ?? CLASSIC_PALETTE;
 }
 
 /** Clamp a camera to what the style supports. */

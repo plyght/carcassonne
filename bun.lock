@@ -53,6 +53,7 @@
         "@carcassonne/game-client": "workspace:*",
         "@carcassonne/protocol": "workspace:*",
         "@carcassonne/render-classic": "workspace:*",
+        "@carcassonne/render-three": "workspace:*",
         "@carcassonne/ui": "workspace:*",
         "@swc/helpers": "^0.5.23",
         "@tanstack/react-form": "^1.33.5",

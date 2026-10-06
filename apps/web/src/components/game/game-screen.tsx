@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import Link from "next/link";
 import { ArrowLeft, Lightbulb, Palette, Undo2, Wifi, WifiOff, X } from "lucide-react";
+import { toast } from "sonner";
 
 import type { EngineEvent, FigureOption, Move } from "@carcassonne/protocol";
 import {
@@ -19,20 +20,27 @@ import {
 } from "@carcassonne/game-client";
 import {
   ClassicBoard,
+  effectiveCamera,
+  hudPalette,
+  is3DStyle,
+  PLAYER_COLOR_ORDER,
   PLAYER_COLORS,
   playerFill,
   proceduralArt,
   renderableStyle,
   type BoardCommands,
+  type CameraMode,
   type Cell,
   type Floater,
 } from "@carcassonne/render-classic";
+import type { PickResult } from "@carcassonne/render-three";
 import { cn } from "@carcassonne/ui/lib/utils";
 
 import { useCore } from "@/lib/core";
-import { useReducedMotion, useSettings } from "@/lib/settings";
+import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 
-import { StyleCarousel } from "../style/style-settings";
+import { Board3D } from "../board3d/board-3d";
+import { CameraSwitcher, StyleCarousel } from "../style/style-settings";
 import { EndSummary } from "./end-summary";
 import { describeEvent, playerName, projectExtent, useClientState } from "./helpers";
 import {
@@ -71,7 +79,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const settings = useSettings();
   const reducedMotion = useReducedMotion();
   const style = renderableStyle(settings.style);
-  const palette = style.palette!;
+  const palette = hudPalette(style);
+  const debug = useDebugFlag();
   const core = useCore();
   const art = core?.art ?? proceduralArt;
   const catalog = client.catalog;
@@ -89,6 +98,21 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const [hintMove, setHintMove] = useState<Move | null>(null);
   const [fitSignal] = useState(0);
   const commands = useRef<BoardCommands | null>(null);
+  /** 3D: figure menu opened by clicking the placed tile (ambiguous feature, or skip). */
+  const [figureMenu, setFigureMenu] = useState<{ x: number; y: number; choices: FigureChoice[] } | null>(null);
+  const is3d = is3DStyle(style) && !!core;
+  // Camera actually in use: settings, or free orbit after the player drags the 3D board.
+  const [camera, setCamera] = useState<CameraMode>(() => effectiveCamera(style, settings.camera));
+  useEffect(() => setCamera(effectiveCamera(style, settings.camera)), [style, settings.camera]);
+  const chooseCamera = useCallback((c: CameraMode) => {
+    setCamera(c);
+    updateSettings({ camera: c });
+  }, []);
+  const on3DFail = useCallback((reason: string) => {
+    console.warn("[board3d]", reason);
+    toast.error("3D board unavailable, switched to Classic Board", { description: reason, id: "board3d-fallback" });
+    updateSettings({ style: "classic", camera: "top-down" });
+  }, []);
 
   const isLocal = client instanceof LocalEngineClient;
   const myTurn = !!view && view.status === "playing" && s.localSeats.includes(view.currentPlayer) && !s.thinking;
@@ -104,7 +128,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     setPending(null);
     setHintMove(null);
     setCursor(null);
+    setFigureMenu(null);
   }, [turnKey]);
+  useEffect(() => {
+    if (!pending) setFigureMenu(null);
+  }, [pending]);
 
   // Frame the board inside the HUD panels.
   const [insets, setInsets] = useState({ top: 72, right: 0, bottom: 72, left: 0 });
@@ -257,6 +285,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         return;
       }
       const k = e.key;
+      if (figureMenu && k === "Escape") {
+        e.preventDefault();
+        setFigureMenu(null);
+        return;
+      }
       if ((k === "z" && (e.metaKey || e.ctrlKey)) || k === "u" || k === "U") {
         e.preventDefault();
         void doUndo();
@@ -320,13 +353,53 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
       }
       if (k === "Enter" || k === " ") {
         e.preventDefault();
-        const cell = cursor ?? hover ?? (hintMove ? { x: hintMove.x, y: hintMove.y } : null) ?? targets[0];
-        if (cell && targets.some((t) => t.x === cell.x && t.y === cell.y)) void place(cell);
+        // first of cursor / pointer / hint that is a legal spot, else the first legal spot
+        const isTarget = (c: Cell | null): c is Cell => !!c && targets.some((t) => t.x === c.x && t.y === c.y);
+        const cell = [cursor, hover, hintMove ? { x: hintMove.x, y: hintMove.y } : null].find(isTarget) ?? targets[0];
+        if (isTarget(cell ?? null)) void place(cell!);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canAct, pending, choices, choose, rotate, targets, cursor, hover, hintMove, place, doUndo, doHint, styleOpen]);
+  }, [canAct, pending, choices, choose, rotate, targets, cursor, hover, hintMove, place, doUndo, doHint, styleOpen, figureMenu]);
+
+  // ── 3D board input (same actions as the 2D board) ─────────────────────────
+  const hints3d = useMemo(
+    () => (canAct && !pending && view?.currentTile && s.legalPlacements.length ? { tile: view.currentTile, placements: s.legalPlacements } : null),
+    [canAct, pending, view?.currentTile, s.legalPlacements],
+  );
+  const pending3d = useMemo(
+    () => (pending && view?.currentTile ? { placement: { x: pending.x, y: pending.y, rot: pending.rot }, options: pending.options, tile: view.currentTile } : null),
+    [pending, view?.currentTile],
+  );
+  const playerSlots = useMemo(() => s.players.map((p) => Math.max(0, PLAYER_COLOR_ORDER.indexOf(p.color))), [s.players]);
+  const onHover3d = useCallback((c: Cell | null) => setHover(c), []);
+  const onClick3d = useCallback(
+    (cell: Cell, pick: PickResult, at: { x: number; y: number }) => {
+      setFigureMenu(null);
+      if (!canAct) return;
+      if (pending) {
+        if (recallTarget && cell.x === recallTarget.x && cell.y === recallTarget.y && !(cell.x === pending.x && cell.y === pending.y)) {
+          const r = choices.find((c) => c.key === "recall");
+          if (r) choose(r);
+          return;
+        }
+        if (cell.x !== pending.x || cell.y !== pending.y) {
+          // clicked away from the placed tile: pick another spot
+          setPending(null);
+          return;
+        }
+        const onFeature = choices.filter((c) => c.option && "feature" in c.option && c.option.feature === pick.feature);
+        if (onFeature.length === 1) return choose(onFeature[0]!);
+        const skip = choices.find((c) => c.option === null);
+        setFigureMenu({ x: at.x, y: at.y, choices: onFeature.length ? [...onFeature, ...(skip ? [skip] : [])] : skip ? [skip] : [] });
+        return;
+      }
+      if (!targets.some((t) => t.x === cell.x && t.y === cell.y)) return;
+      void place(active && active.x === cell.x && active.y === cell.y ? active : cell);
+    },
+    [canAct, pending, recallTarget, choices, choose, targets, place, active],
+  );
 
   // ── feature hover ─────────────────────────────────────────────────────────
   const extent = useMemo(() => {
@@ -381,7 +454,36 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
       data-scores={view.players.map((p) => p.score).join(",")}
       data-board={view.board.map((t) => `${t.tile}@${t.x},${t.y},${t.rot}:${t.figures.map((f) => `${f.player}${f.figure[0]}${f.feature}`).join("")}`).join(";")}
       data-reactions={s.reactions.map((r) => r.emoji).join("")}
+      data-style={style.id}
+      data-camera={is3d ? camera : "top-down"}
+      data-pending={pending ? `${pending.x},${pending.y},${pending.rot}` : ""}
+      data-targets={targets.length}
     >
+      {is3d ? (
+        <Board3D
+          geo={core!.geo}
+          styleId={style.id}
+          camera={camera}
+          onCameraChange={setCamera}
+          tier={settings.tier}
+          reducedMotion={reducedMotion}
+          debug={debug}
+          view={view}
+          batches={s.recent}
+          playerSlots={playerSlots}
+          hints={hints3d}
+          ghost={ghost && !ghost.pending ? { x: ghost.x, y: ghost.y, rot: ghost.rot as 0 | 1 | 2 | 3 } : null}
+          pending={pending3d}
+          commandsRef={commands}
+          onCellHover={onHover3d}
+          onFeatureHover={setFeatureNode}
+          onCellClick={onClick3d}
+          onRotate={rotate}
+          onFail={on3DFail}
+          insets={insets}
+          ariaLabel={`${title} board (3D). Use arrow keys to choose a spot, R to rotate, Enter to place.`}
+        />
+      ) : (
       <ClassicBoard
         view={view}
         catalog={catalog}
@@ -416,6 +518,33 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         onFeatureHover={setFeatureNode}
         ariaLabel={`${title} board. Use arrow keys to choose a spot, R to rotate, Enter to place.`}
       />
+      )}
+
+      {figureMenu && figureMenu.choices.length ? (
+        <div
+          className="absolute z-30 -translate-x-1/2 -translate-y-[calc(100%+12px)]"
+          style={{ left: figureMenu.x, top: figureMenu.y }}
+          data-testid="figure-menu"
+        >
+          <Panel className="flex flex-col gap-1 p-1.5" role="menu" aria-label="Figure">
+            {figureMenu.choices.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFigureMenu(null);
+                  choose(c);
+                }}
+                className="rounded-lg px-3 py-1.5 text-left text-sm hover:bg-muted"
+              >
+                <span className="font-semibold">{c.label}</span>
+                {c.detail ? <span className="ml-2 text-xs text-muted-foreground">{c.detail}</span> : null}
+              </button>
+            ))}
+          </Panel>
+        </div>
+      ) : null}
 
       {/* top bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
@@ -470,6 +599,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
               <Lightbulb className="size-4" /> <span className="hidden sm:inline">Hint</span>
             </button>
           ) : null}
+          {is3d ? <CameraSwitcher value={camera} onChange={chooseCamera} /> : null}
           <button
             type="button"
             onClick={() => setStyleOpen(true)}
@@ -541,8 +671,16 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         <ReactionBar onReact={(e) => client.react(e)} />
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 hidden text-[11px] text-white/80 drop-shadow lg:block">
-        <Kbd>+</Kbd> <Kbd>−</Kbd> zoom · <Kbd>F</Kbd> fit · <Kbd>⇧</Kbd>+<Kbd>←</Kbd> pan · drag to pan
+      <div className={cn("pointer-events-none absolute bottom-3 left-3 hidden text-[11px] lg:block", is3d ? "rounded-lg bg-black/45 px-2 py-1 text-white/90" : "text-white/80 drop-shadow")}>
+        {is3d ? (
+          <>
+            <Kbd>R</Kbd>/scroll rotate · drag to orbit · right-drag pan · <Kbd>+</Kbd> <Kbd>−</Kbd> zoom · <Kbd>F</Kbd> reframe
+          </>
+        ) : (
+          <>
+            <Kbd>+</Kbd> <Kbd>−</Kbd> zoom · <Kbd>F</Kbd> fit · <Kbd>⇧</Kbd>+<Kbd>←</Kbd> pan · drag to pan
+          </>
+        )}
       </div>
 
       {needsPass ? <PassDevice player={current} meta={s.players[current]} onReveal={() => setRevealedPly(view.ply)} /> : null}

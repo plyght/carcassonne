@@ -4,9 +4,11 @@ import { useMemo } from "react";
 
 import type { BoardTile, GameView } from "@carcassonne/protocol";
 import { legalPlacementsOn, type TileCatalog } from "@carcassonne/game-client";
-import { ClassicBoard, type StylePack } from "@carcassonne/render-classic";
+import { ClassicBoard, is3DStyle, type StylePack } from "@carcassonne/render-classic";
 
 import { useCore } from "@/lib/core";
+
+import { Board3D } from "../board3d/board-3d";
 
 /** A small, legally connected sample board (built once). */
 function buildSample(catalog: TileCatalog): BoardTile[] {
@@ -33,8 +35,11 @@ let SAMPLE: BoardTile[] | null = null;
 
 const SAMPLE_PLAYERS = [{ color: "red" as const }, { color: "blue" as const }, { color: "yellow" as const }, { color: "green" as const }];
 
-/** Live preview of a style: real renderer for 2D packs, a swatch card for 3D ones. */
-export function StylePreview({ style, className }: { style: StylePack; className?: string }) {
+/**
+ * Live preview of a style: the real renderer for 2D packs and (with `live3d`, which
+ * lazy-loads three.js) for 3D packs; otherwise a swatch card.
+ */
+export function StylePreview({ style, className, live3d = false }: { style: StylePack; className?: string; live3d?: boolean }) {
   const core = useCore();
   const view = useMemo(() => (core ? ({ board: (SAMPLE ??= buildSample(core.catalog)) } as Pick<GameView, "board">) : null), [core]);
   if (style.status === "ready" && style.palette) {
@@ -56,15 +61,32 @@ export function StylePreview({ style, className }: { style: StylePack; className
     );
   }
   const [a, b, c] = style.swatch;
+  const ready3d = is3DStyle(style);
+  if (ready3d && live3d && core && view) {
+    return (
+      <div className={`relative ${className ?? ""}`}>
+        <Board3D
+          geo={core.geo}
+          styleId={style.id}
+          camera="tabletop"
+          tier="low"
+          reducedMotion
+          view={view as GameView}
+          playerSlots={[0, 1, 2, 3]}
+          ariaLabel={`${style.name} preview`}
+        />
+      </div>
+    );
+  }
   return (
-    <div className={className} aria-label={`${style.name}: coming soon`}>
+    <div className={className} aria-label={ready3d ? `${style.name}: 3D style` : `${style.name}: coming soon`}>
       <div
         className="relative grid h-full w-full place-items-center overflow-hidden"
         style={{ background: `radial-gradient(circle at 30% 20%, ${b}, ${a} 70%)` }}
       >
         <div className="absolute inset-0 opacity-40" style={{ background: `repeating-linear-gradient(45deg, transparent 0 14px, ${c}55 14px 16px)` }} />
         <div className="relative rounded-full bg-black/55 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
-          Coming {style.ships}
+          {ready3d ? "3D · plays in game" : `Coming ${style.ships}`}
         </div>
       </div>
     </div>

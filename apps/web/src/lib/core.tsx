@@ -17,6 +17,8 @@ export interface CoreAssets {
   art: TileArtSource;
   figures: FigureArtSource;
   rules: ViewRules;
+  /** Geo/anim side of the same core.wasm instance (the 3D renderer's GeoProvider). */
+  geo: CoreGeo;
 }
 
 let loading: Promise<CoreAssets> | null = null;
@@ -33,6 +35,7 @@ export function loadCoreAssets(): Promise<CoreAssets> {
       art: createGeoArt(geo),
       figures: createGeoFigures(geo),
       rules: viewRules(kit),
+      geo,
     };
     installArt({ tiles: assets.art, figures: assets.figures });
     loaded = assets;

@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Armchair, ChevronLeft, ChevronRight, Clapperboard, Map as MapIcon, Rotate3d, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@carcassonne/ui/lib/utils";
-import { CAMERA_MODES, effectiveCamera, getStyle, STYLE_PACKS, type StyleId } from "@carcassonne/render-classic";
+import { CAMERA_MODES, effectiveCamera, getStyle, STYLE_PACKS, type CameraMode, type StyleId } from "@carcassonne/render-classic";
 
 import { updateSettings, useSettings, type Settings } from "@/lib/settings";
 
@@ -30,7 +30,7 @@ export function StyleCarousel({ compact = false }: { compact?: boolean }) {
           if (e.key === "ArrowRight") go(1);
         }}
       >
-        <StylePreview key={style.id} style={style} className={compact ? "h-40" : "h-64"} />
+        <StylePreview key={style.id} style={style} live3d={!compact} className={compact ? "h-40" : "h-64"} />
         <button
           type="button"
           onClick={() => go(-1)}
@@ -82,7 +82,7 @@ export function StyleCarousel({ compact = false }: { compact?: boolean }) {
             role="option"
             aria-selected={s.id === focus}
             onClick={() => setFocus(s.id)}
-            onDoubleClick={() => s.status === "ready" && updateSettings({ style: s.id })}
+            onDoubleClick={() => s.status === "ready" && updateSettings({ style: s.id, camera: effectiveCamera(s, settings.camera) })}
             className={cn(
               "group relative flex w-24 shrink-0 flex-col items-center gap-1 rounded-xl border p-1.5 text-xs transition-colors",
               s.id === focus ? "border-primary bg-accent/60" : "border-border hover:bg-muted",
@@ -99,6 +99,42 @@ export function StyleCarousel({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
     </section>
+  );
+}
+
+const CAMERA_ICONS: Record<CameraMode, LucideIcon> = {
+  "top-down": MapIcon,
+  tabletop: Armchair,
+  orbit: Rotate3d,
+  cinematic: Clapperboard,
+};
+
+/** Compact HUD camera switcher for 3D styles. */
+export function CameraSwitcher({ value, onChange }: { value: CameraMode; onChange(c: CameraMode): void }) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg bg-muted/70 p-0.5" role="radiogroup" aria-label="Camera" data-testid="camera-switcher">
+      {CAMERA_MODES.map((c) => {
+        const Icon = CAMERA_ICONS[c.id];
+        return (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={value === c.id}
+            aria-label={c.label}
+            title={`${c.label}: ${c.description}`}
+            data-camera={c.id}
+            onClick={() => onChange(c.id)}
+            className={cn(
+              "grid size-7 place-items-center rounded-md transition-colors",
+              value === c.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="size-4" />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -130,6 +166,18 @@ export function CameraPicker() {
         })}
       </div>
       {style.dimension === "2d" ? <p className="text-xs text-muted-foreground">2D styles lock to the top-down camera.</p> : null}
+      <Segmented
+        label="3D quality"
+        value={settings.tier}
+        options={[
+          { value: "auto", label: "Auto" },
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+        ]}
+        onChange={(v) => updateSettings({ tier: v })}
+      />
+      <p className="px-1 text-xs text-muted-foreground">Auto picks Low on phones and integrated GPUs. Low turns off shadows and post effects.</p>
     </section>
   );
 }

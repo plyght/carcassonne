@@ -18,6 +18,8 @@ export interface Settings {
   showHints: boolean;
   botSpeed: "slow" | "normal" | "fast";
   uiScale: 1 | 1.1 | 1.25;
+  /** 3D performance tier; "auto" detects from the GPU and device. */
+  tier: "auto" | "low" | "medium" | "high";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showHints: false,
   botSpeed: "normal",
   uiScale: 1,
+  tier: "auto",
 };
 
 const KEY = "carc.settings.v1";
@@ -95,6 +98,17 @@ export function useApplyGlobalSettings() {
     el.dataset.reducedMotion = String(reduced);
     el.style.fontSize = s.uiScale === 1 ? "" : `${s.uiScale * 100}%`;
   }, [reduced, s.uiScale]);
+}
+
+const noop = () => () => {};
+
+/** `?debug` in the URL: FPS / renderer stats overlay on the 3D board. */
+export function useDebugFlag(): boolean {
+  return useSyncExternalStore(
+    noop,
+    () => new URLSearchParams(window.location.search).has("debug"),
+    () => false,
+  );
 }
 
 export const BOT_DELAY: Record<Settings["botSpeed"], number> = { slow: 1200, normal: 650, fast: 150 };

@@ -1,32 +1,49 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
 import { simulateReplay, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
-import { ClassicBoard, renderableStyle } from "@carcassonne/render-classic";
+import { ClassicBoard, effectiveCamera, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle, type CameraMode } from "@carcassonne/render-classic";
 
+import { Board3D, type Board3DBatch } from "@/components/board3d/board-3d";
 import { describeEvent, playerName } from "@/components/game/helpers";
 import { Panel, ScorePanel } from "@/components/game/hud-parts";
+import { CameraSwitcher } from "@/components/style/style-settings";
 import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { getGame, type LocalGameRecord } from "@/lib/local-games";
-import { useReducedMotion, useSettings } from "@/lib/settings";
+import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 
 export default function ReplayViewer() {
   const { id } = useParams<{ id: string }>();
   const [rec, setRec] = useState<LocalGameRecord | null | undefined>(undefined);
   const [rep, setRep] = useState<SimulatedReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ply, setPly] = useState(0);
+  // `seq` / `step` let the 3D board tell a single step forward (animate that ply's
+  // events) from a scrub (rebuild the view).
+  const [nav, setNav] = useState({ ply: 0, seq: 0, step: false });
+  const ply = nav.ply;
+  const setPly = useCallback(
+    (u: number | ((p: number) => number)) =>
+      setNav((n) => {
+        const next = typeof u === "function" ? u(n.ply) : u;
+        return next === n.ply ? n : { ply: next, seq: n.seq + 1, step: next === n.ply + 1 };
+      }),
+    [],
+  );
   const [playing, setPlaying] = useState(false);
   const settings = useSettings();
   const reduced = useReducedMotion();
-  const palette = renderableStyle(settings.style).palette!;
+  const style = renderableStyle(settings.style);
+  const palette = hudPalette(style);
+  const debug = useDebugFlag();
   const core = useCore();
+  const [camera, setCamera] = useState<CameraMode>(() => effectiveCamera(style, settings.camera));
+  useEffect(() => setCamera(effectiveCamera(style, settings.camera)), [style, settings.camera]);
   const catalog = core?.catalog;
 
   useEffect(() => {
@@ -56,6 +73,11 @@ export default function ReplayViewer() {
   const total = rep?.plies.length ?? 0;
   const view = useMemo(() => (rep ? viewAtPly(rep, ply, catalog) : null), [rep, ply, catalog]);
   const prev = useMemo(() => (rep && ply > 0 ? viewAtPly(rep, ply - 1, catalog) : null), [rep, ply, catalog]);
+  const batches = useMemo<Board3DBatch[]>(
+    () => (rep && nav.step && nav.ply > 0 ? [{ seq: nav.seq, events: rep.plies[nav.ply - 1]! }] : []),
+    [rep, nav],
+  );
+  const playerSlots = useMemo(() => rec?.players.map((p) => Math.max(0, PLAYER_COLOR_ORDER.indexOf(p.color))), [rec]);
 
   useEffect(() => {
     if (!playing) return;
@@ -79,7 +101,7 @@ export default function ReplayViewer() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [total]);
+  }, [total, setPly]);
 
   if (rec === null) return <div className="p-10 text-center">Replay not found.</div>;
   if (error) return <div className="p-10 text-center text-destructive">{error}</div>;
@@ -92,17 +114,35 @@ export default function ReplayViewer() {
 
   return (
     <div className="relative h-full min-h-0">
-      <ClassicBoard
-        view={view}
-        catalog={catalog}
-        palette={palette}
-        players={rec.players}
-        lastPlaced={placed && placed.type === "tilePlaced" ? { x: placed.x, y: placed.y } : null}
-        reducedMotion={reduced}
-        ariaLabel="Replay board"
-        autoFit
-        insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
-      />
+      {is3DStyle(style) && core ? (
+        <Board3D
+          geo={core.geo}
+          styleId={style.id}
+          camera={camera}
+          onCameraChange={setCamera}
+          tier={settings.tier}
+          reducedMotion={reduced}
+          debug={debug}
+          view={view}
+          batches={batches}
+          playerSlots={playerSlots}
+          onFail={() => updateSettings({ style: "classic", camera: "top-down" })}
+          insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
+          ariaLabel="Replay board (3D)"
+        />
+      ) : (
+        <ClassicBoard
+          view={view}
+          catalog={catalog}
+          palette={palette}
+          players={rec.players}
+          lastPlaced={placed && placed.type === "tilePlaced" ? { x: placed.x, y: placed.y } : null}
+          reducedMotion={reduced}
+          ariaLabel="Replay board"
+          autoFit
+          insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
+        />
+      )}
       <div className="pointer-events-none absolute top-3 left-3 flex w-[min(300px,calc(100vw-24px))] flex-col gap-2">
         <Panel className="flex items-center gap-2 px-3 py-2">
           <Link href="/replays" className="grid size-8 place-items-center rounded-lg hover:bg-muted" aria-label="Back to replays">
@@ -112,6 +152,14 @@ export default function ReplayViewer() {
             <div className="font-display">Replay</div>
             <div className="font-mono text-[11px] text-muted-foreground">seed {rec.seed}</div>
           </div>
+          {is3DStyle(style) && core ? (
+            <div className="ml-auto">
+              <CameraSwitcher value={camera} onChange={(c) => {
+                setCamera(c);
+                updateSettings({ camera: c });
+              }} />
+            </div>
+          ) : null}
         </Panel>
         <ScorePanel view={view} players={rec.players} localSeats={[]} reactions={[]} hideReactions thinking={false} palette={palette} />
       </div>

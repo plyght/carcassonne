@@ -7,7 +7,8 @@ import { catalogFromKit } from "@carcassonne/game-client/engine";
 import { createGeoArt, createGeoFigures } from "./geo-art";
 import { buildProceduralArt } from "./procedural-art";
 import { rotatePoint } from "./tile-art";
-import { getStyle, renderableStyle, STYLE_PACKS } from "./styles";
+import { CLASSIC_PALETTE } from "./palette";
+import { getStyle, hudPalette, is3DStyle, renderableStyle, STYLE_PACKS } from "./styles";
 
 const kit = await loadCoreKit();
 const geo = new CoreGeo(kit.instance);
@@ -68,9 +69,15 @@ describe("procedural tile art", () => {
 });
 
 describe("style registry", () => {
-  test("six styles; 3D ones fall back to classic for rendering", () => {
+  test("six styles; three.js styles are playable, storybook falls back to classic", () => {
     expect(STYLE_PACKS.map((s) => s.id).sort()).toEqual(["blueprint", "cartoon", "classic", "diorama", "storybook", "tabletop"]);
-    expect(renderableStyle("tabletop").id).toBe("classic");
+    for (const id of ["tabletop", "cartoon", "diorama"] as const) {
+      expect(renderableStyle(id).id).toBe(id);
+      expect(is3DStyle(getStyle(id))).toBe(true);
+      expect(hudPalette(getStyle(id))).toBe(CLASSIC_PALETTE);
+    }
+    expect(renderableStyle("storybook").id).toBe("classic");
+    expect(is3DStyle(getStyle("classic"))).toBe(false);
     expect(renderableStyle("blueprint").id).toBe("blueprint");
     expect(getStyle("nope").id).toBe("classic");
   });

@@ -9,8 +9,10 @@
 // E2E_EXTERNAL_SERVER=1, in which case the polling phase is skipped.
 //
 // Covers: sign-up + guest join of an invite room by code, 10+ turns over WebSockets
-// with both clients in sync, reload/resume, an emoji reaction, forced polling mode,
-// and a bot seat played by the server's queue consumer (in-process scheduler).
+// with both clients in sync, reload/resume, an emoji reaction, one client switching
+// live to the 3D Tabletop style and playing by picking on the WebGL canvas while the
+// other stays on Classic, forced polling mode, and a bot seat played by the server's
+// queue consumer (in-process scheduler).
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -131,15 +133,37 @@ async function assertInSync(pages: Page[]) {
   for (const b of rest) assert(JSON.stringify(a) === JSON.stringify(b), `clients out of sync:\n${JSON.stringify(a)}\n${JSON.stringify(b)}`);
 }
 
+/** Legal cells shown by the 3D board ("" when it is not mounted / not this client's turn). */
+async function hints3d(p: Page): Promise<string> {
+  const b = p.locator("[data-testid=board-3d][data-ready='1']");
+  return (await b.count()) ? ((await b.getAttribute("data-hints")) ?? "") : "";
+}
+
 /** Whoever has the turn places the tile at a legal spot and maybe a figure. */
 async function playTurn(pages: Page[], turn: number) {
   const before = await ply(pages[0]!);
   let mover = null as Page | null;
-  for (let i = 0; i < 100 && !mover; i++) {
-    for (const p of pages) if ((await attr(p, "data-my-turn")) === "1" && (await p.locator(".cc-target").count()) > 0) mover = p;
+  for (let i = 0; i < 300 && !mover; i++) {
+    for (const p of pages)
+      if ((await attr(p, "data-my-turn")) === "1" && ((await p.locator(".cc-target").count()) > 0 || (await hints3d(p)) !== "")) mover = p;
     if (!mover) await sleep(100);
   }
   assert(mover, `nobody can move at ply ${before}`);
+  const cells3d = await hints3d(mover);
+  if (cells3d) {
+    // 3D: click the projected centre of a legal cell on the WebGL canvas
+    const list = cells3d.split(";");
+    const [x, y] = list[turn % list.length]!.split(",").map(Number) as [number, number];
+    const pt = await mover.evaluate(([x, y]) => window.__carc3d!.project(x + 0.5, y + 0.5), [x, y] as const);
+    await mover.mouse.move(pt.x, pt.y);
+    await mover.mouse.click(pt.x, pt.y);
+    await waitAttr(mover, "data-pending", "v !== ''", null, 15_000);
+    await mover.keyboard.press(turn % 3 === 0 ? "1" : "s");
+    await mover.waitForTimeout(200);
+    if ((await ply(mover)) === before) await mover.keyboard.press("s");
+    for (const p of pages) await waitPly(p, before + 1, 60_000);
+    return;
+  }
   const targets = mover.locator(".cc-target");
   const n = await targets.count();
   const box = await targets.nth(turn % n).boundingBox();
@@ -253,6 +277,28 @@ try {
     await alice.getByRole("button", { name: "React 👍" }).click();
     await waitAttr(bob, "data-reactions", "v.includes(a)", "👍", 10_000);
     await bob.screenshot({ path: `${SHOTS}/online-reaction.png` });
+  });
+
+  await step("guest switches live to 3D Tabletop; turns stay in sync with a 2D client", async () => {
+    const before = await ply(bob);
+    await bob.getByTestId("style-button").click();
+    const dialog = bob.getByRole("dialog", { name: "Board style" });
+    await dialog.getByRole("option", { name: /tabletop/i }).click();
+    await dialog.getByRole("button", { name: /use this style/i }).click();
+    await bob.keyboard.press("Escape");
+    await bob.waitForSelector("[data-testid=board-3d][data-ready='1']", { timeout: 90_000 });
+    assert((await ply(bob)) >= before, "style switch lost the game state");
+    for (let t = 0; t < 4; t++) {
+      await playTurn([alice, bob], 30 + t);
+      await assertInSync([alice, bob]);
+    }
+    await bob.screenshot({ path: `${SHOTS}/web-3d-online-bob.png` });
+    await alice.screenshot({ path: `${SHOTS}/web-3d-online-alice-2d.png` });
+    // back to Classic for the remaining steps
+    await bob.evaluate(() => {
+      const k = "carc.settings.v1";
+      localStorage.setItem(k, JSON.stringify({ ...JSON.parse(localStorage.getItem(k) ?? "{}"), style: "classic", camera: "top-down" }));
+    });
   });
 
   if (!EXTERNAL) {
