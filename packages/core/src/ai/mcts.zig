@@ -69,6 +69,8 @@ const Child = struct {
     sum: Values = @splat(0),
     visits: u32 = 0,
     chance: u32 = NONE,
+    /// The move ends the game: `h` is the exact final score.
+    terminal: bool = false,
 };
 
 const Node = struct {
@@ -108,6 +110,7 @@ pub const Search = struct {
     /// Work done so far, in apply+evaluate calls (the unit `budget_ms` is
     /// calibrated in, since an iteration's cost grows with the move count).
     work: u64 = 0,
+    iterations: u32 = 0,
 
     pub fn deinit(self: *Search) void {
         self.nodes.deinit(self.gpa);
@@ -127,6 +130,7 @@ pub const Search = struct {
         const player = sim.current_player;
         const n = moves.len;
         self.work += n;
+        var ended: std.StaticBitSet(movegen.MAX_MOVES) = .empty;
         for (moves, 0..) |m, i| {
             var c = sim.*;
             c.apply(m, null) catch {
@@ -134,6 +138,7 @@ pub const Search = struct {
                 continue;
             };
             self.vals_buf[i] = eval.evaluate(&c, self.params);
+            if (c.status != .playing) ended.set(i);
         }
         const order = self.order_buf[0..n];
         for (order, 0..) |*o, i| o.* = @intCast(i);
@@ -150,7 +155,7 @@ pub const Search = struct {
         const first: u32 = @intCast(self.children.items.len);
         try self.children.ensureUnusedCapacity(self.gpa, k);
         for (order[0..k]) |idx| {
-            self.children.appendAssumeCapacity(.{ .move = moves[idx], .h = self.vals_buf[idx] });
+            self.children.appendAssumeCapacity(.{ .move = moves[idx], .h = self.vals_buf[idx], .terminal = ended.isSet(idx) });
         }
         try self.nodes.append(self.gpa, .{ .player = player, .first = first, .len = k });
         return @intCast(self.nodes.items.len - 1);
@@ -349,6 +354,14 @@ pub const Search = struct {
             path[depth] = .{ .node = ni, .child = ci };
             depth += 1;
             self.work += 1;
+            if (self.children.items[ci].terminal or (depth >= self.cfg.max_depth and self.cfg.rollout_cycles == 0 and
+                (self.nodes.items[ni].player + 1) % self.num_players == self.me))
+            {
+                // The move's heuristic is exactly what the leaf would evaluate
+                // to (same board, same unseen tiles), so skip replaying it.
+                leaf = self.children.items[ci].h;
+                break;
+            }
             sim.apply(self.children.items[ci].move, null) catch {
                 leaf = self.children.items[ci].h;
                 break;
@@ -441,12 +454,19 @@ pub const Search = struct {
         _ = try self.expand(root, @intCast(self.moves_buf.len));
         const r = self.nodes.items[0];
         if (r.len == 1) return self.children.items[r.first].move;
+        // Every move ends the game: the heuristic values are exact scores.
+        if (self.children.items[r.first].terminal) {
+            var all = true;
+            for (self.children.items[r.first .. r.first + r.len]) |ch| all = all and ch.terminal;
+            if (all) return self.children.items[r.first].move;
+        }
         var it: u32 = 0;
         while (it < iterations) : (it += 1) {
             if (max_work) |w| {
                 if (self.work >= w) break;
             }
             try self.iterate(root);
+            self.iterations += 1;
         }
         // Most visited root child; ties go to the better value.
         var best: u32 = r.first;

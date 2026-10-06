@@ -183,6 +183,25 @@ fn profile() !void {
     std.debug.print("gen {d} ns/call, apply {d} ns (hasPlacement {d} ns), eval {d} ns, moves/turn {d} ({d})\n", .{ t_gen / n_gen, t_apply / n_apply, t_draw / n_apply, t_eval / n_apply, n_apply / n_gen, sink });
 }
 
+/// `ai-bench search-profile [ms]`: time Hard searches along a Medium game and
+/// print iteration and work counts per move.
+fn searchProfile(ms: u32) !void {
+    const ws = try std.heap.page_allocator.create(ai.Workspace);
+    ws.* = .{ .gpa = std.heap.smp_allocator };
+    for (1..3) |seed| {
+        var g = try engine.Game.init(std.heap.page_allocator, .{}, seed, 2);
+        while (g.status == .playing) {
+            var buf: [ai.movegen.MAX_MOVES]engine.Move = undefined;
+            const n_moves = ai.movegen.generate(&g, &buf).len;
+            const t0 = nowNs();
+            _ = ai.chooseWith(ws, &g, .{ .tier = .hard, .seed = g.ply, .budget_ms = ms });
+            const dt = (nowNs() - t0) / 1_000_000;
+            std.debug.print("seed {d} ply {d}: moves {d}, {d} ms, iterations {d}, work {d}, nodes {d}\n", .{ seed, g.ply, n_moves, dt, ws.stats.iterations, ws.stats.work, ws.stats.nodes });
+            try g.apply(ai.chooseWith(ws, &g, .{ .tier = .medium, .seed = g.ply }).?, null);
+        }
+    }
+}
+
 pub fn main(init: std.process.Init) !void {
     var args = init.minimal.args.iterate();
     _ = args.next();
@@ -191,6 +210,7 @@ pub fn main(init: std.process.Init) !void {
         _ = peek.next();
         if (peek.next()) |a| {
             if (std.mem.eql(u8, a, "profile")) return profile();
+            if (std.mem.eql(u8, a, "search-profile")) return searchProfile(if (peek.next()) |v| try std.fmt.parseInt(u32, v, 10) else 1000);
         }
     }
     var positional: usize = 0;

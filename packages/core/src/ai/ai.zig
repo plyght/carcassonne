@@ -110,7 +110,11 @@ pub const Workspace = struct {
     order: [movegen.MAX_MOVES]u32 = undefined,
     /// Allocator for the search tree.
     gpa: std.mem.Allocator = std.heap.page_allocator,
+    /// Statistics of the last Hard/Expert search (for tuning and benches).
+    stats: Stats = .{},
 };
+
+pub const Stats = struct { iterations: u32 = 0, work: u64 = 0, nodes: usize = 0 };
 
 /// Choose a move for the current player. Returns null only when the game is
 /// over. The returned move is always legal.
@@ -249,7 +253,9 @@ fn search(ws: *Workspace, g: *const Game, opts: Options, cfg: SearchConfig, rng:
     };
     defer s.deinit();
     const b = budgetFor(opts, cfg);
-    return s.run(g, b.iterations, b.max_work) catch null;
+    const m = s.run(g, b.iterations, b.max_work) catch null;
+    ws.stats = .{ .iterations = s.iterations, .work = s.work, .nodes = s.nodes.items.len };
+    return m;
 }
 
 test {
