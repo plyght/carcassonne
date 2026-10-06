@@ -251,3 +251,71 @@ test "buffer round trip: sections parse and counts match" {
     try testing.expect(r3.find(buffer.tag("VPOS")).?.count >= 81);
     try testing.expect(std.mem.readInt(u32, b3[8..12], .little) == b3.len);
 }
+
+/// Margin (tile units) every meeple anchor keeps from other features, roads,
+/// rivers, ponds and walls. Figures are big; a farmer must never sit on water.
+const ANCHOR_MARGIN: F = 0.035;
+
+test "anchors lie strictly inside their own feature, clear of roads, rivers and walls" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    var failures: usize = 0;
+    for (registry.tiles) |*def| {
+        var L = try layout.build(testing.allocator, def);
+        defer L.deinit();
+        const m = try mesh.build(arena.allocator(), &L, .{ .resolution = 16 });
+        for (def.features, 0..) |f, fi| {
+            const k: u8 = @intCast(fi);
+            const p = L.anchors[fi];
+            // 3D anchors sit on the 2D anchor (cloisters step in front of the chapel)
+            const a3 = m.anchors[fi];
+            if (f.kind != .cloister) {
+                try testing.expectApproxEqAbs(@as(f32, @floatCast(p.x)), a3.pos[0], 1e-5);
+                try testing.expectApproxEqAbs(@as(f32, @floatCast(p.y)), a3.pos[2], 1e-5);
+            }
+            var bad: ?[]const u8 = null;
+            if (L.classify(p) != k) bad = "classifies as another feature";
+            if (f.kind == .field or f.kind == .city) {
+                // a ring around the anchor stays on the feature
+                for (0..16) |s| {
+                    const ang = @as(F, @floatFromInt(s)) * std.math.pi / 8.0;
+                    const q = p.add(V2.init(@cos(ang), @sin(ang)).scale(ANCHOR_MARGIN));
+                    if (L.classify(q) != k) bad = "margin ring leaves the feature";
+                }
+                for (L.lines.items) |l| {
+                    const d = vec.distPointPolyline(p, l.pts);
+                    const need: F = if (l.kind == .wall) ANCHOR_MARGIN else l.hw + ANCHOR_MARGIN;
+                    if (d < need) bad = "too close to a road, river or wall";
+                }
+                for (L.ponds.items) |d| if (p.dist(d.center) < d.r + ANCHOR_MARGIN) {
+                    bad = "too close to a pond";
+                };
+                // and is (close to) the pole of inaccessibility: no grid point
+                // of the region has much more room than the anchor
+                const have = layout.clearance(&L, k, p);
+                var most: F = 0;
+                const G = 64;
+                for (0..G) |j| for (0..G) |i| {
+                    const q = V2.init((@as(F, @floatFromInt(i)) + 0.5) / G, (@as(F, @floatFromInt(j)) + 0.5) / G);
+                    most = @max(most, layout.clearance(&L, k, q));
+                };
+                if (have < most * 0.85 - 0.004) {
+                    std.debug.print("  clearance {d:.3} vs best {d:.3}\n", .{ have, most });
+                    bad = "not the roomiest spot of its region";
+                }
+            }
+            if (f.kind == .road or f.kind == .river) {
+                for (L.lines.items) |l| {
+                    if (l.feature == k or l.kind == .wall) continue;
+                    if (vec.distPointPolyline(p, l.pts) < l.hw + ANCHOR_MARGIN * 0.5) bad = "on another road or river";
+                }
+            }
+            if (vec.borderDistance(p) < ANCHOR_MARGIN) bad = "too close to the tile border";
+            if (bad) |why| {
+                std.debug.print("tile {s} feature {d} ({s}) anchor ({d:.3},{d:.3}): {s}\n", .{ def.id, fi, @tagName(f.kind), p.x, p.y, why });
+                failures += 1;
+            }
+        }
+    }
+    try testing.expectEqual(@as(usize, 0), failures);
+}

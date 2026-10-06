@@ -905,7 +905,7 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
                 for (L.ponds.items) |d| if (d.feature == k) break :blk d.center;
                 break :blk center;
             },
-            .city, .field => searchSpot(&L, null, regionCentroid(&L, k), 0.12, k),
+            .city, .field => poleOfInaccessibility(&L, k),
         };
     }
     for (feats, 0..) |f, fi| {
@@ -917,6 +917,75 @@ pub fn build(gpa: Allocator, def: *const tile.TileDef) !Layout {
         }
     }
     return L;
+}
+
+/// Clearance of p inside feature f's region: distance to the nearest edge of
+/// the region polygon it lies in (which already excludes the road / river
+/// ribbons, junction plazas and other features), clipped further by every
+/// road / river ribbon, pond, building and wall. 0 when p is not on f.
+pub fn clearance(L: *const Layout, f: u8, p: V2) F {
+    const list = if (L.kind(f) == .city) L.cities.items else L.fields.items;
+    var c: F = -1;
+    for (list) |r| {
+        if (r.feature != f or !vec.pointInPoly(p, r.pts)) continue;
+        c = @max(c, vec.distPointRing(p, r.pts));
+    }
+    if (c <= 0) return 0;
+    for (L.lines.items) |l| {
+        const d = vec.distPointPolyline(p, l.pts) - (if (l.kind == .wall) 0 else l.hw);
+        c = @min(c, d);
+    }
+    for (L.ponds.items) |d| c = @min(c, p.dist(d.center) - d.r);
+    for (L.plazas.items) |d| c = @min(c, p.dist(d.center) - d.r);
+    for (L.buildings.items) |b| {
+        if (vec.pointInPoly(p, b.pts)) return 0;
+        c = @min(c, vec.distPointRing(p, b.pts));
+    }
+    c = @min(c, vec.borderDistance(p));
+    if (L.classify(p) != f) return 0;
+    return @max(c, 0);
+}
+
+/// Meeple anchor for a field or city: the pole of inaccessibility (centre of
+/// the largest inscribed circle) of the feature's region clipped against the
+/// road / river ribbons, with a faint pull toward the region centroid to break
+/// ties. Grid search, then a shrinking-step local refinement.
+fn poleOfInaccessibility(L: *const Layout, f: u8) V2 {
+    const centroid = regionCentroid(L, f);
+    const w: F = 0.02;
+    const G = 48;
+    var best = centroid;
+    var best_s: F = -std.math.inf(F);
+    for (0..G) |j| for (0..G) |i| {
+        const p = V2.init((@as(F, @floatFromInt(i)) + 0.5) / G, (@as(F, @floatFromInt(j)) + 0.5) / G);
+        const c = clearance(L, f, p);
+        if (c <= 0) continue;
+        const sc = c - w * p.dist(centroid);
+        if (sc > best_s) {
+            best_s = sc;
+            best = p;
+        }
+    };
+    if (best_s == -std.math.inf(F)) return searchSpot(L, null, centroid, 0.12, f);
+    var step: F = 0.5 / @as(F, G);
+    while (step > 1e-4) : (step *= 0.5) {
+        var moved = true;
+        while (moved) {
+            moved = false;
+            for ([_][2]F{ .{ 1, 0 }, .{ -1, 0 }, .{ 0, 1 }, .{ 0, -1 }, .{ 0.7071, 0.7071 }, .{ -0.7071, 0.7071 }, .{ 0.7071, -0.7071 }, .{ -0.7071, -0.7071 } }) |d| {
+                const q = best.add(V2.init(d[0], d[1]).scale(step));
+                const c = clearance(L, f, q);
+                if (c <= 0) continue;
+                const sc = c - w * q.dist(centroid);
+                if (sc > best_s + 1e-9) {
+                    best_s = sc;
+                    best = q;
+                    moved = true;
+                }
+            }
+        }
+    }
+    return best;
 }
 
 fn regionCentroid(L: *const Layout, f: u8) V2 {
