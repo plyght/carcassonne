@@ -48,7 +48,7 @@ export default function OnlinePage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-5xl items-start gap-[var(--sp-6)] px-[var(--sp-4)] py-[var(--sp-8)] md:grid-cols-[1fr_1.3fr]">
+    <div className="carc-page grid items-start gap-[var(--sp-6)] md:grid-cols-[1fr_1.3fr]" data-width="wide">
       <section className="carc-sheet">
         <h1 className="carc-heading">Join a room</h1>
         <p className="carc-sub">Got an invite code? Guests can join with a nickname.</p>
@@ -64,10 +64,10 @@ export default function OnlinePage() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="e.g. ABBEY7"
-            className="h-10 min-w-0 flex-1 rounded-[var(--r-control)] bg-[var(--fill)] px-[var(--sp-3)] font-mono text-base tracking-widest uppercase placeholder:text-[var(--text-2)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
+            className="carc-field flex-1 font-mono tracking-[0.12em] uppercase placeholder:tracking-normal placeholder:normal-case"
             aria-label="Room code"
           />
-          <button type="submit" className="h-10 rounded-[var(--r-control)] bg-primary px-[var(--sp-4)] font-semibold text-primary-foreground">
+          <button type="submit" className="carc-btn" data-variant="primary">
             Join
           </button>
         </form>
@@ -103,14 +103,14 @@ export default function OnlinePage() {
           <ClockSettings value={clock} onChange={setClock} />
         </DialSurface>
         {error ? (
-          <p className="mt-[var(--sp-4)] rounded-[var(--r-control)] bg-destructive/10 px-[var(--sp-3)] py-[var(--sp-2)] text-sm text-destructive" role="alert">
+          <p className="carc-notice mt-[var(--sp-4)]" data-tone="danger" role="alert">
             {error}
           </p>
         ) : null}
         {!isPending && !session ? (
-          <p className="mt-[var(--sp-4)] text-sm text-pretty text-[var(--text-2)]">
+          <p className="carc-notice mt-[var(--sp-4)]">
             Hosting needs an account.{" "}
-            <a href="/login" className="font-semibold text-primary underline">
+            <a href="/login" className="carc-link">
               Sign in or sign up
             </a>
             ; guests can join with a code.
@@ -121,9 +121,11 @@ export default function OnlinePage() {
           onClick={create}
           disabled={busy || !session}
           data-testid="create-room"
-          className="mt-[var(--sp-4)] inline-flex h-12 items-center gap-[var(--sp-2)] rounded-[var(--r-control)] bg-primary px-[var(--sp-6)] font-semibold text-primary-foreground shadow-[0_10px_22px_-12px_var(--primary)] disabled:opacity-60"
+          className="carc-btn mt-[var(--sp-6)]"
+          data-variant="primary"
+          data-size="large"
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Swords className="size-4" />} Create room
+          {busy ? <Loader2 className="animate-spin" /> : <Swords />} Create room
         </button>
       </section>
     </div>

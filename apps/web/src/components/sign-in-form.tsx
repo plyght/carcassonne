@@ -49,8 +49,10 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
   }
 
   return (
-    <div className="mx-auto w-full mt-10 max-w-md p-6">
-      <h1 className="mb-6 text-center text-3xl font-bold">Welcome Back</h1>
+    <div className="carc-auth">
+      <div className="carc-sheet">
+      <h1 className="carc-heading">Welcome back</h1>
+      <p className="carc-sub">Sign in to host rooms, play ranked and keep your stats.</p>
 
       <form
         onSubmit={(e) => {
@@ -58,12 +60,12 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="carc-form mt-[var(--sp-6)]"
       >
         <div>
           <form.Field name="email">
             {(field) => (
-              <div className="space-y-2">
+              <div className="carc-form-field">
                 <Label htmlFor={field.name}>Email</Label>
                 <Input
                   id={field.name}
@@ -74,7 +76,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="carc-field-error">
                     {error?.message}
                   </p>
                 ))}
@@ -86,7 +88,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
         <div>
           <form.Field name="password">
             {(field) => (
-              <div className="space-y-2">
+              <div className="carc-form-field">
                 <Label htmlFor={field.name}>Password</Label>
                 <Input
                   id={field.name}
@@ -97,7 +99,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="carc-field-error">
                     {error?.message}
                   </p>
                 ))}
@@ -110,20 +112,20 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
           selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}
         >
           {({ canSubmit, isSubmitting }) => (
-            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Sign In"}
+            <Button type="submit" className="mt-[var(--sp-2)] w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Working…" : "Sign in"}
             </Button>
           )}
         </form.Subscribe>
       </form>
 
-      <div className="mt-4 text-center">
+      </div>
+      <div className="mt-[var(--sp-4)] text-center">
         <Button
           variant="link"
           onClick={onSwitchToSignUp}
-          className="text-indigo-600 hover:text-indigo-800"
         >
-          Need an account? Sign Up
+          Need an account? Sign up
         </Button>
       </div>
     </div>

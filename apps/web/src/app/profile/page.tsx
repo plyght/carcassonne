@@ -6,7 +6,6 @@ import Link from "next/link";
 
 import type { PlayerColorId } from "@carcassonne/game-client";
 import { FigureIcon, PLAYER_COLOR_ORDER, PLAYER_COLORS } from "@carcassonne/render-classic";
-import { cn } from "@carcassonne/ui/lib/utils";
 
 import { authClient } from "@/lib/auth-client";
 import { listGames, type LocalGameRecord } from "@/lib/local-games";
@@ -42,19 +41,22 @@ export default function ProfilePage() {
   }, [games]);
 
   const app = PLAYER_COLORS[color];
+  const MODE_LABEL: Record<string, string> = { ai: "vs AI", hotseat: "Hot-seat", tutorial: "Tutorial" };
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="flex items-center gap-4">
-        <span className="grid size-20 place-items-center rounded-3xl" style={{ background: `${app.fill}22` }}>
-          <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={56} />
+    <div className="carc-page">
+      <div className="flex items-center gap-[var(--sp-4)]">
+        <span className="carc-pass-avatar mb-0!" style={{ ["--seat" as string]: app.fill, width: 80, height: 80 }}>
+          <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={52} />
         </span>
-        <div>
-          <h1 className="font-display text-4xl tracking-tight">{server?.displayName ?? session?.user.name ?? "Guest"}</h1>
-          <p className="text-muted-foreground">
-            {session ? session.user.email : (
+        <div className="min-w-0">
+          <h1 className="carc-page-title truncate">{server?.displayName ?? session?.user.name ?? "Guest"}</h1>
+          <p className="carc-page-lead mt-[var(--sp-1)]!">
+            {session ? (
+              session.user.email
+            ) : (
               <>
                 Playing as a guest.{" "}
-                <Link href="/login" className="font-semibold text-primary underline">
+                <Link href="/login" className="carc-link">
                   Sign in
                 </Link>{" "}
                 for ranked play and synced stats.
@@ -64,62 +66,66 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <dl className="carc-stats mt-[var(--sp-6)]">
         {[
           ["Games", server?.stats.games ?? stats.played],
           ["Wins", server?.stats.wins ?? stats.wins],
-          ["Avg. score", (server ? Math.round(server.stats.averageScore) : stats.avg)],
+          ["Avg. score", server ? Math.round(server.stats.averageScore) : stats.avg],
           ["Rating", server?.ratings.length ? `${Math.round(Math.max(...server.ratings.map((r) => r.rating)))}` : "—"],
         ].map(([k, v]) => (
-          <div key={k as string} className="rounded-2xl border border-border/80 bg-card/80 p-4 shadow-sm">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">{k}</div>
-            <div className="font-display text-3xl tabular-nums">{v}</div>
+          <div key={k as string} className="carc-sheet carc-stat">
+            <dt className="carc-eyebrow">{k}</dt>
+            <dd className="carc-stat-value">{v}</dd>
           </div>
         ))}
-      </div>
+      </dl>
 
-      <section className="mt-6 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="font-display text-2xl">Meeple colour</h2>
-        <p className="text-sm text-muted-foreground">Your preferred colour when a room has it free.</p>
-        <div className="mt-3 flex gap-3">
+      <section className="carc-sheet mt-[var(--sp-6)]">
+        <h2 className="carc-heading">Meeple colour</h2>
+        <p className="carc-sub">Your preferred colour when a room has it free.</p>
+        <div className="mt-[var(--sp-4)] flex flex-wrap gap-[var(--sp-2)]" role="radiogroup" aria-label="Meeple colour">
           {PLAYER_COLOR_ORDER.map((c) => {
             const a = PLAYER_COLORS[c];
             return (
               <button
                 key={c}
                 type="button"
+                role="radio"
                 onClick={() => {
                   setColor(c);
                   writeJSON("carc.preferredColor", c);
                 }}
-                className={cn("grid size-14 place-items-center rounded-2xl border-2 transition", color === c ? "border-foreground" : "border-transparent hover:bg-muted")}
+                className="carc-swatch"
                 aria-label={a.label}
-                aria-pressed={color === c}
+                aria-checked={color === c}
+                style={{ ["--seat" as string]: a.fill }}
               >
-                <FigureIcon fill={a.fill} ink={a.ink} marker={a.marker} size={36} />
+                <FigureIcon fill={a.fill} ink={a.ink} marker={a.marker} size={32} />
               </button>
             );
           })}
         </div>
       </section>
 
-      <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-display text-2xl">Recent games</h2>
-          <Link href="/replays" className="text-sm text-primary underline">
+      <section className="carc-sheet mt-[var(--sp-6)]">
+        <div className="carc-section-head">
+          <h2 className="carc-heading">Recent games</h2>
+          <Link href="/replays" className="carc-link text-[length:var(--fs-body)]">
             All replays
           </Link>
         </div>
-        <ul className="mt-2 divide-y divide-border/60 text-sm">
+        <ul className="carc-list mt-[var(--sp-4)]">
           {games.slice(0, 5).map((g) => (
-            <li key={g.id} className="flex justify-between py-2">
-              <span>
-                {g.mode} · {g.players.length} players
+            <li key={g.id} className="carc-row justify-between">
+              <span className="font-medium">
+                {MODE_LABEL[g.mode] ?? g.mode} <span className="text-[var(--text-2)]">· {g.players.length} players</span>
               </span>
-              <span className="text-muted-foreground">{g.status === "ended" ? `final ${g.scores.join(" / ")}` : `turn ${g.moves.length + 1}`}</span>
+              <span className="carc-num text-[length:var(--fs-small)] text-[var(--text-2)]">
+                {g.status === "ended" ? `Final ${g.scores.join(" / ")}` : `Turn ${g.moves.length + 1}`}
+              </span>
             </li>
           ))}
-          {games.length === 0 ? <li className="py-2 text-muted-foreground">No games yet.</li> : null}
+          {games.length === 0 ? <li className="carc-hint">No games yet.</li> : null}
         </ul>
       </section>
     </div>

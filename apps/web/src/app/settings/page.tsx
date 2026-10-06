@@ -29,7 +29,7 @@ export default function SettingsPage() {
         <StylePreview key={style.id} style={style} live3d className="h-60" />
         <div className="p-[var(--sp-6)] max-[519px]:p-[var(--sp-4)]">
           <h2 className="carc-heading">
-            {style.name} <span className="align-middle font-sans text-[length:var(--fs-small)] font-medium text-[var(--text-2)]">{style.dimension.toUpperCase()}</span>
+            {style.name} <span className="carc-tag align-middle">{style.dimension.toUpperCase()}</span>
           </h2>
           <p className="carc-sub">{style.description}</p>
           <DialSurface className="carc-dial-stack mt-[var(--sp-4)] gap-[var(--sp-3)]!">
@@ -65,7 +65,7 @@ export default function SettingsPage() {
             ["H", "Hint (when enabled)"],
           ].map(([k, v]) => (
             <div key={k} className="contents">
-              <dt className="font-mono font-medium text-[var(--text-1)]">{k}</dt>
+              <dt className="font-mono font-medium whitespace-nowrap text-[var(--text-1)]">{k}</dt>
               <dd className="text-pretty text-[var(--text-2)]">{v}</dd>
             </div>
           ))}

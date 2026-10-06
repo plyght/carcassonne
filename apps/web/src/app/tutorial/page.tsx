@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Castle, Church, GraduationCap, Route as RoadIcon, Wheat } from "lucide-react";
+import { Castle, Church, GraduationCap, Play, Route as RoadIcon, Wheat } from "lucide-react";
 
 import { DEFAULT_RULESET } from "@carcassonne/protocol";
 import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
@@ -34,35 +34,39 @@ export default function TutorialPage() {
   };
   const blue = PLAYER_COLORS.blue;
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="flex items-center gap-3">
-        <FigureIcon fill={blue.fill} ink={blue.ink} marker={blue.marker} size={44} />
-        <div>
-          <h1 className="font-display text-4xl tracking-tight">Tutorial</h1>
-          <p className="text-muted-foreground">The rules in two minutes, then a gentle seeded game against an Easy bot.</p>
+    <div className="carc-page">
+      <div className="flex items-center gap-[var(--sp-4)]">
+        <span className="carc-pass-avatar mb-0!" style={{ ["--seat" as string]: blue.fill, width: 72, height: 72 }}>
+          <FigureIcon fill={blue.fill} ink={blue.ink} marker={blue.marker} size={44} />
+        </span>
+        <div className="min-w-0">
+          <h1 className="carc-page-title">Tutorial</h1>
+          <p className="carc-page-lead mt-[var(--sp-1)]!">The rules in two minutes, then a gentle seeded game against an Easy bot.</p>
         </div>
       </div>
-      <ol className="mt-6 grid gap-3">
+      <ol className="carc-sheet carc-lessons mt-[var(--sp-6)]">
         {LESSONS.map((l, i) => (
-          <li key={l.title} className="flex gap-4 rounded-2xl border border-border/80 bg-card/80 p-4 shadow-sm">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-              <l.icon className="size-5" />
+          <li key={l.title} className="carc-lesson">
+            <span className="carc-well">
+              <l.icon />
             </span>
-            <div>
-              <div className="font-display text-lg">
-                {i + 1}. {l.title}
+            <div className="min-w-0">
+              <div className="carc-lesson-title">
+                <span className="carc-num text-[var(--text-2)]">{i + 1}.</span> {l.title}
               </div>
-              <p className="text-sm text-muted-foreground">{l.text}</p>
+              <p className="carc-sub">{l.text}</p>
             </div>
           </li>
         ))}
       </ol>
-      <p className="mt-4 text-xs text-muted-foreground">
-        The scripted, step-by-step tutorial with on-board callouts arrives with the full engine; this practice game uses a fixed seed.
-      </p>
-      <button type="button" onClick={start} className="mt-5 rounded-2xl bg-primary px-6 py-3 font-semibold text-primary-foreground">
-        Start the practice game
-      </button>
+      <div className="mt-[var(--sp-6)] flex flex-wrap items-center justify-between gap-[var(--sp-4)]">
+        <p className="carc-hint max-w-[44ch]">
+          The scripted, step-by-step tutorial with on-board callouts arrives with the full engine; this practice game uses a fixed seed.
+        </p>
+        <button type="button" onClick={start} className="carc-btn" data-variant="primary" data-size="large">
+          <Play className="fill-current" /> Start the practice game
+        </button>
+      </div>
     </div>
   );
 }

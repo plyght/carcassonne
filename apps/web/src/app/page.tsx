@@ -7,7 +7,6 @@ import Link from "next/link";
 import { Bot, Film, GraduationCap, Play, Settings, Swords, Trophy, Users } from "lucide-react";
 
 import { getStyle } from "@carcassonne/render-classic";
-import { cn } from "@carcassonne/ui/lib/utils";
 
 import { StylePreview } from "@/components/style/style-preview";
 import { listGames, type LocalGameRecord } from "@/lib/local-games";
@@ -16,7 +15,7 @@ const MODES: { href: string; title: string; blurb: string; icon: typeof Bot; acc
   { href: "/play/new?mode=ai", title: "Play vs AI", blurb: "Bots from Easy to Expert, running in your browser.", icon: Bot, accent: true },
   { href: "/play/new?mode=hotseat", title: "Hot-seat", blurb: "Pass one device around the table.", icon: Users },
   { href: "/online", title: "Online room", blurb: "Invite friends with a link. Mix in bots.", icon: Swords },
-  { href: "/ranked", title: "Ranked", blurb: "3- and 4-player free-for-all, Glicko-2 rated.", icon: Trophy },
+  { href: "/ranked", title: "Ranked", blurb: "3- and 4-player free-for-all, Glicko‑2 rated.", icon: Trophy },
   { href: "/tutorial", title: "Tutorial", blurb: "Relearn the rules in a guided game.", icon: GraduationCap },
   { href: "/replays", title: "Replays", blurb: "Scrub through finished games turn by turn.", icon: Film },
   { href: "/settings", title: "Settings", blurb: "Board style, camera, motion and more.", icon: Settings },
@@ -29,51 +28,38 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-8 lg:grid-cols-[1.05fr_1fr] lg:py-14">
+    <div className="carc-menu">
       <section className="flex min-w-0 flex-col justify-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">A tile-laying classic</p>
-        <h1 className="mt-3 font-display text-5xl leading-[1.02] tracking-tight sm:text-6xl">
-          Build the countryside,
-          <br />
-          <span className="italic text-primary">one tile at a time.</span>
+        <p className="carc-eyebrow" data-tone="accent">
+          A tile-laying classic
+        </p>
+        <h1 className="carc-hero-title">
+          Build the countryside, <em>one tile at a time.</em>
         </h1>
-        <p className="mt-4 max-w-lg text-base text-muted-foreground">
+        <p className="carc-hero-lead">
           Draw a tile, fit it to the land, and send a meeple to claim a road, a city, a cloister or a field. The base game, The River and The
           Abbot, with every rule edition.
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href={"/play/new?mode=ai" as Route}
-            className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:-translate-y-0.5"
-          >
-            <Play className="size-4 fill-current" /> Quick game vs AI
+        <div className="mt-[var(--sp-6)] flex flex-wrap gap-[var(--sp-3)]">
+          <Link href={"/play/new?mode=ai" as Route} className="carc-btn" data-variant="primary" data-size="large">
+            <Play className="fill-current" /> Quick game vs AI
           </Link>
           {resume ? (
-            <Link
-              href={`/play/local/${resume.id}` as Route}
-              className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 font-semibold transition-colors hover:bg-muted"
-            >
-              Continue game · turn {resume.moves.length + 1}
+            <Link href={`/play/local/${resume.id}` as Route} className="carc-btn" data-size="large">
+              Continue game <span className="carc-num text-[var(--text-2)]">· turn {resume.moves.length + 1}</span>
             </Link>
           ) : null}
         </div>
 
-        <nav aria-label="Game modes" className="mt-10 grid gap-3 sm:grid-cols-2">
+        <nav aria-label="Game modes" className="carc-modes">
           {MODES.map(({ href, title, blurb, icon: Icon, accent }) => (
-            <Link
-              key={href}
-              href={href as Route}
-              className={cn(
-                "group flex items-start gap-3 rounded-2xl border border-border/80 bg-card/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
-                accent && "sm:col-span-2 bg-[linear-gradient(120deg,color-mix(in_oklch,var(--felt)_16%,var(--card)),var(--card))]",
-              )}
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                <Icon className="size-5" />
+            <Link key={href} href={href as Route} className="carc-card-link" data-wide={accent || undefined}>
+              <span className="carc-well">
+                <Icon />
               </span>
-              <span>
-                <span className="block font-display text-lg leading-tight">{title}</span>
-                <span className="block text-sm text-muted-foreground">{blurb}</span>
+              <span className="min-w-0">
+                <span className="carc-mode-title">{title}</span>
+                <span className="carc-mode-blurb">{blurb}</span>
               </span>
             </Link>
           ))}
@@ -81,8 +67,7 @@ export default function Home() {
       </section>
 
       <section aria-hidden className="relative hidden min-w-0 lg:block">
-        <div className="absolute -inset-4 rotate-2 rounded-[2.5rem] bg-wood/30 blur-2xl" />
-        <div className="relative h-full min-h-[560px] overflow-hidden rounded-[2rem] border-8 border-[color-mix(in_oklch,var(--wood)_80%,black)] shadow-2xl">
+        <div className="carc-tray">
           <StylePreview style={getStyle("classic")} className="h-full min-h-[560px]" />
         </div>
       </section>

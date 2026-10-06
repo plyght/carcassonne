@@ -227,7 +227,7 @@ async function guestJoin(guest: Page, code: string, nickname: string) {
   await guest.waitForURL(new RegExp(`/r/${code}$`), { timeout: T });
   await guest.getByLabel("Nickname").fill(nickname);
   await guest.getByTestId("take-seat").click();
-  await guest.getByText("(you)").waitFor({ timeout: T });
+  await guest.getByTestId("my-seat").waitFor({ timeout: T });
 }
 
 async function startGame(host: Page, others: Page[]) {

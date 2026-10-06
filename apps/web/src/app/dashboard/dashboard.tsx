@@ -9,8 +9,6 @@ export default function Dashboard({ session }: { session: typeof authClient.$Inf
   const privateData = useQuery(trpc.privateData.queryOptions());
 
   return (
-    <>
-      <p>API: {privateData.data?.message}</p>
-    </>
+    <p className="carc-hint mt-[var(--sp-6)]">Server: {privateData.data?.message ?? "connecting…"}</p>
   );
 }

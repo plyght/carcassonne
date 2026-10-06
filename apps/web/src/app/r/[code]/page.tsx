@@ -72,14 +72,14 @@ export default function RoomLobby() {
   const loadError = roomQuery.error?.message;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8" data-testid="room-lobby" data-room-status={room?.status ?? "loading"}>
-      <div className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">Room</div>
-      <h1 className="font-display text-5xl tracking-[0.12em]" data-testid="room-code">
+    <div className="carc-page" data-testid="room-lobby" data-room-status={room?.status ?? "loading"}>
+      <div className="carc-eyebrow">Room</div>
+      <h1 className="carc-room-code" data-testid="room-code">
         {code}
       </h1>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-card/80 p-2 pl-4">
-        <span className="min-w-0 flex-1 truncate font-mono text-sm text-muted-foreground" suppressHydrationWarning>
+      <div className="carc-sheet carc-invite">
+        <span className="carc-invite-link" suppressHydrationWarning>
           {link}
         </span>
         <button
@@ -91,35 +91,40 @@ export default function RoomLobby() {
               setTimeout(() => setCopied(false), 1500);
             } catch {}
           }}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-secondary px-3 py-2 text-sm font-semibold"
+          className="carc-btn"
         >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Copied" : "Copy invite link"}
+          {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy invite link"}
         </button>
       </div>
 
       {error || (loadError && !room) ? (
-        <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+        <p className="carc-notice mt-[var(--sp-4)]" data-tone="danger" role="alert">
           {error ?? `${loadError}. This page retries automatically.`}
-        </div>
+        </p>
       ) : null}
 
-      <section className="mt-6 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="mb-3 font-display text-2xl">Seats</h2>
-        <ol className="grid gap-2 sm:grid-cols-2" data-testid="room-seats">
+      <section className="carc-sheet mt-[var(--sp-6)]">
+        <div className="carc-section-head">
+          <h2 className="carc-heading">Seats</h2>
+          <span className="carc-sub carc-num mt-0!">
+            {room?.seats.length ?? 0} of {max} taken
+          </span>
+        </div>
+        <ol className="carc-seat-grid mt-[var(--sp-4)]" data-testid="room-seats">
           {seats.map((s, i) => {
             const color = SEAT_COLORS[i % SEAT_COLORS.length]!;
             const app = PLAYER_COLORS[color];
             return (
-              <li key={i} className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/60 p-3" data-seat-kind={s?.kind ?? "open"}>
+              <li key={i} className="carc-seat-card" data-seat-kind={s?.kind ?? "open"}>
                 <FigureIcon fill={s ? app.fill : "transparent"} outline={s ? undefined : "currentColor"} ink={app.ink} marker={app.marker} size={28} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">
-                    {s ? s.name : "Open seat"}
-                    {room && i === room.mySeat ? <span className="ml-1 text-xs text-muted-foreground">(you)</span> : null}
+                  <div className="carc-seat-name-line">
+                    <span className="truncate">{s ? s.name : "Open seat"}</span>
+                    {room && i === room.mySeat ? <span className="carc-tag" data-tone="accent" data-testid="my-seat">You</span> : null}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    {s?.kind === "bot" ? <Bot className="size-3" /> : s ? <User className="size-3" /> : null}
-                    {s?.kind === "bot" ? `Bot · ${s.tier}` : s ? ("isGuest" in s && s.isGuest ? "guest" : "player") : "waiting…"}
+                  <div className="carc-seat-meta">
+                    {s?.kind === "bot" ? <Bot aria-hidden /> : s ? <User aria-hidden /> : null}
+                    {s?.kind === "bot" ? `Bot · ${s.tier}` : s ? ("isGuest" in s && s.isGuest ? "Guest" : "Player") : "Waiting for a player…"}
                   </div>
                 </div>
               </li>
@@ -128,52 +133,54 @@ export default function RoomLobby() {
         </ol>
 
         {room && !seated && room.status === "lobby" ? (
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="mt-[var(--sp-6)] flex flex-wrap items-center gap-[var(--sp-2)]">
             {!isPending && !session ? (
               <input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value.slice(0, 20))}
                 placeholder={getGuest()?.name ?? "Your nickname"}
-                className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                className="carc-field max-w-64 flex-1"
                 aria-label="Nickname"
               />
             ) : null}
-            <button
-              type="button"
-              onClick={join}
-              disabled={busy}
-              data-testid="take-seat"
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-            >
+            <button type="button" onClick={join} disabled={busy} data-testid="take-seat" className="carc-btn" data-variant="primary">
               Take a seat
             </button>
           </div>
         ) : null}
         {room?.isHost ? (
-          <button
-            type="button"
-            onClick={start}
-            disabled={busy || room.seats.length < 2}
-            data-testid="start-online"
-            className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-60"
-          >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start game
-          </button>
+          <div className="mt-[var(--sp-6)] flex flex-wrap items-center justify-between gap-[var(--sp-3)]">
+            <p className="carc-hint">{room.seats.length < 2 ? "Waiting for at least one more player." : "Everyone seated? Deal the first tile."}</p>
+            <button
+              type="button"
+              onClick={start}
+              disabled={busy || room.seats.length < 2}
+              data-testid="start-online"
+              className="carc-btn"
+              data-variant="primary"
+              data-size="large"
+            >
+              {busy ? <Loader2 className="animate-spin" /> : <Play className="fill-current" />} Start game
+            </button>
+          </div>
         ) : (
-          <p className="mt-4 text-sm text-muted-foreground">The host starts the game when everyone is seated.</p>
+          <p className="carc-hint mt-[var(--sp-4)]">The host starts the game when everyone is seated.</p>
         )}
       </section>
 
       {room ? (
-        <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 text-sm shadow-sm">
-          <h2 className="mb-2 font-display text-2xl">Rules</h2>
-          <ul className="space-y-1 text-muted-foreground">
-            <li>
-              Field scoring, {["", "1st", "2nd", "3rd"][room.ruleset.fieldEdition]} edition: {EDITION_TEXT[room.ruleset.fieldEdition]}
-            </li>
-            <li>The River: {room.ruleset.river ? "on" : "off"}</li>
-            <li>The Abbot: {room.ruleset.abbot ? "on" : "off"}</li>
-          </ul>
+        <section className="carc-sheet mt-[var(--sp-6)]">
+          <h2 className="carc-heading">Rules</h2>
+          <dl className="carc-rules-list">
+            <dt>Field scoring</dt>
+            <dd>
+              {["", "1st", "2nd", "3rd"][room.ruleset.fieldEdition]} edition: {EDITION_TEXT[room.ruleset.fieldEdition]}
+            </dd>
+            <dt>The River</dt>
+            <dd>{room.ruleset.river ? "On" : "Off"}</dd>
+            <dt>The Abbot</dt>
+            <dd>{room.ruleset.abbot ? "On" : "Off"}</dd>
+          </dl>
         </section>
       ) : null}
     </div>

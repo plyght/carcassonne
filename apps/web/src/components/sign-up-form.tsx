@@ -52,8 +52,10 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
   }
 
   return (
-    <div className="mx-auto w-full mt-10 max-w-md p-6">
-      <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
+    <div className="carc-auth">
+      <div className="carc-sheet">
+      <h1 className="carc-heading">Create an account</h1>
+      <p className="carc-sub">Host rooms, play ranked, and keep your stats across devices.</p>
 
       <form
         onSubmit={(e) => {
@@ -61,12 +63,12 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="carc-form mt-[var(--sp-6)]"
       >
         <div>
           <form.Field name="name">
             {(field) => (
-              <div className="space-y-2">
+              <div className="carc-form-field">
                 <Label htmlFor={field.name}>Name</Label>
                 <Input
                   id={field.name}
@@ -76,7 +78,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="carc-field-error">
                     {error?.message}
                   </p>
                 ))}
@@ -88,7 +90,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         <div>
           <form.Field name="email">
             {(field) => (
-              <div className="space-y-2">
+              <div className="carc-form-field">
                 <Label htmlFor={field.name}>Email</Label>
                 <Input
                   id={field.name}
@@ -99,7 +101,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="carc-field-error">
                     {error?.message}
                   </p>
                 ))}
@@ -111,7 +113,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         <div>
           <form.Field name="password">
             {(field) => (
-              <div className="space-y-2">
+              <div className="carc-form-field">
                 <Label htmlFor={field.name}>Password</Label>
                 <Input
                   id={field.name}
@@ -122,7 +124,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
                   onChange={(e) => field.handleChange(e.target.value)}
                 />
                 {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
+                  <p key={error?.message} className="carc-field-error">
                     {error?.message}
                   </p>
                 ))}
@@ -135,20 +137,20 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
           selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}
         >
           {({ canSubmit, isSubmitting }) => (
-            <Button type="submit" className="w-full" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Sign Up"}
+            <Button type="submit" className="mt-[var(--sp-2)] w-full" disabled={!canSubmit || isSubmitting}>
+              {isSubmitting ? "Working…" : "Sign up"}
             </Button>
           )}
         </form.Subscribe>
       </form>
 
-      <div className="mt-4 text-center">
+      </div>
+      <div className="mt-[var(--sp-4)] text-center">
         <Button
           variant="link"
           onClick={onSwitchToSignIn}
-          className="text-indigo-600 hover:text-indigo-800"
         >
-          Already have an account? Sign In
+          Already have an account? Sign in
         </Button>
       </div>
     </div>
