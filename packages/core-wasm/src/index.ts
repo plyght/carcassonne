@@ -2,6 +2,7 @@
 // browsers. See docs/CONTRACT.md "WASM ABI" for the raw exports.
 import {
   DEFAULT_RULESET,
+  type AiTier,
   type ApplyResult,
   type FigureOption,
   type GameView,
@@ -35,6 +36,16 @@ interface CoreExports {
   game_snapshot(handle: number): number;
   game_restore(ptr: number, len: number): number;
   game_hash(handle: number): bigint;
+  ai_choose(handle: number, tier: number, budgetMs: number, seedLo: number, seedHi: number): number;
+}
+
+/** Bot tiers in `ai_choose` order (PRD §6.10). */
+export const AI_TIERS: readonly AiTier[] = ["easy", "medium", "hard", "expert"];
+
+function tierIndex(tier: AiTier | number): number {
+  const i = typeof tier === "number" ? tier : AI_TIERS.indexOf(tier);
+  if (!Number.isInteger(i) || i < 0 || i > 3) throw new Error(`core-wasm: unknown AI tier ${String(tier)}`);
+  return i;
 }
 
 const encoder = new TextEncoder();
@@ -164,6 +175,12 @@ export class Core {
     return BigInt.asUintN(64, this.#x.game_hash(handle));
   }
   /** @internal */
+  _aiChoose(handle: number, tier: AiTier | number, budgetMs: number, seed: number | bigint): Move | null {
+    const [lo, hi] = splitSeed(seed);
+    const ms = Math.max(0, Math.min(0xffffffff, Math.round(budgetMs)));
+    return this.#read(this.#x.ai_choose(handle, tierIndex(tier), ms, lo, hi));
+  }
+  /** @internal */
   _free(handle: number): void {
     this.#x.game_free(handle);
   }
@@ -216,11 +233,21 @@ export class EngineGame {
     return this.#core._hash(this.#live());
   }
 
+  /**
+   * Ask the bot for a move for the current player (always legal; `null` once
+   * the game has ended). `budgetMs` caps Hard/Expert think time (0 = tier
+   * default; Easy/Medium ignore it). Deterministic for the same state, tier,
+   * budget and seed.
+   */
+  aiChoose(tier: AiTier | 0 | 1 | 2 | 3, budgetMs: number, seed: number | bigint): Move | null {
+    return this.#core._aiChoose(this.#live(), tier, budgetMs, seed);
+  }
+
   free(): void {
     if (this.#handle !== 0) this.#core._free(this.#handle);
     this.#handle = 0;
   }
 }
 
-export type { ApplyResult, FigureOption, GameView, Move, Placement, Ruleset };
+export type { AiTier, ApplyResult, FigureOption, GameView, Move, Placement, Ruleset };
 export * from "./view";

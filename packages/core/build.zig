@@ -16,6 +16,25 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run core unit tests");
     test_step.dependOn(&b.addRunArtifact(tests).step);
 
+    // AI tournament harness: zig build ai-bench -- medium easy --seeds 200
+    const bench = b.addExecutable(.{
+        .name = "ai-bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/ai/bench.zig"),
+            .target = target,
+            .optimize = if (optimize == .debug) .ReleaseFast else optimize,
+            .imports = &.{.{ .name = "core", .module = b.createModule(.{
+                .root_source_file = b.path("src/root.zig"),
+                .target = target,
+                .optimize = if (optimize == .debug) .ReleaseFast else optimize,
+            }) }},
+        }),
+    });
+    const run_bench = b.addRunArtifact(bench);
+    run_bench.addPassthruArgs();
+    b.step("ai-bench", "Run the AI tournament (args after --)").dependOn(&run_bench.step);
+    b.step("ai-bench-install", "Install the ai-bench binary to zig-out/bin").dependOn(&b.addInstallArtifact(bench, .{}).step);
+
     // WASM build for web + server: zig build wasm -> zig-out/bin/core.wasm
     const wasm = b.addExecutable(.{
         .name = "core",

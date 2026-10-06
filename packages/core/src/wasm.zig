@@ -279,3 +279,56 @@ export fn tiles_catalog() ?[*]u8 {
     };
     return finish(&out);
 }
+
+// ========================================================================= ai
+// Owned by the AI workstream (packages/core/src/ai). Self-contained: it only
+// uses `getGame`, `begin`/`finish` and the JSON writer from the engine section.
+//
+// ai_choose(handle, tier, budget_ms, seed_lo, seed_hi) -> json Move
+//   tier: 0 easy, 1 medium, 2 hard, 3 expert (larger values clamp to expert).
+//   budget_ms: think-time cap for Hard/Expert, turned into an MCTS iteration
+//   count with a calibrated rate (there is no clock on wasm32-freestanding);
+//   0 = the tier's default. Easy and Medium ignore it. Deterministic for the
+//   same state, tier, budget and seed. Returns JSON `null` once the game has
+//   ended, and 0 only for a bad handle or when memory runs out.
+
+const ai = core.ai;
+
+var ai_workspace: ?*ai.Workspace = null;
+
+fn aiWorkspace() ?*ai.Workspace {
+    if (ai_workspace) |ws| return ws;
+    const ws = gpa.create(ai.Workspace) catch return null;
+    ws.* = .{ .gpa = gpa };
+    ai_workspace = ws;
+    return ws;
+}
+
+export fn ai_choose(handle: u32, tier: u32, budget_ms: u32, seed_lo: u32, seed_hi: u32) ?[*]u8 {
+    const g = getGame(handle) orelse return null;
+    const opts: ai.Options = .{
+        .tier = ai.Tier.fromInt(@min(tier, 3)).?,
+        .seed = (@as(u64, seed_hi) << 32) | seed_lo,
+        .budget_ms = if (budget_ms == 0) null else budget_ms,
+    };
+    var move: ?engine.Move = null;
+    if (g.status == .playing) {
+        if (aiWorkspace()) |ws| {
+            move = ai.chooseWith(ws, g, opts);
+        } else {
+            // No memory for the search buffers: any legal placement will do.
+            var buf: [engine.MAX_PLACEMENTS]engine.Placement = undefined;
+            const ps = g.legalPlacements(&buf);
+            if (ps.len > 0) move = .{ .x = ps[0].x, .y = ps[0].y, .rot = ps[0].rot };
+        }
+    }
+    var out = begin() orelse return null;
+    const w: ejson.Writer = .{ .out = &out, .gpa = gpa };
+    (if (move) |m| ejson.writeMove(w, m) else w.raw("null")) catch {
+        out.deinit(gpa);
+        return null;
+    };
+    return finish(&out);
+}
+
+// ===================================================================== end ai
