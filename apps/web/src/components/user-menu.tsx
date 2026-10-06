@@ -1,4 +1,3 @@
-import { Button } from "@carcassonne/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@carcassonne/ui/components/dropdown-menu";
-import { Skeleton } from "@carcassonne/ui/components/skeleton";
+import { ChevronDown, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -19,27 +18,33 @@ export default function UserMenu() {
   const { data: session, isPending } = authClient.useSession();
 
   if (isPending) {
-    return <Skeleton className="h-9 w-24" />;
+    return <span className="carc-header-placeholder" aria-hidden />;
   }
 
   if (!session) {
     return (
-      <Link href="/login">
-        <Button variant="outline">Sign In</Button>
+      <Link href="/login" className="carc-btn" data-variant="ghost">
+        Sign in
       </Link>
     );
   }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {session.user.name}
+      <DropdownMenuTrigger render={<button type="button" className="carc-btn carc-user-trigger" data-variant="ghost" />}>
+        <span className="carc-user-initial" aria-hidden>
+          {session.user.name.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="carc-user-name">{session.user.name}</span>
+        <ChevronDown />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-card">
+      <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuLabel>{session.user.email}</DropdownMenuLabel>
+          <DropdownMenuItem render={<Link href="/profile" />}>
+            <UserRound /> Profile
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             onClick={() => {
@@ -52,7 +57,7 @@ export default function UserMenu() {
               });
             }}
           >
-            Sign Out
+            <LogOut /> Sign out
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

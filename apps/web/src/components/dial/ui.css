@@ -1,0 +1,483 @@
+/*
+ * Shared components, built only from tokens.css. One language for every screen:
+ *
+ *   .carc-btn        40 px button: primary (terracotta), secondary (wood fill), ghost
+ *   .carc-icon-btn   square icon button (32 or 40 px), same states
+ *   .carc-tag        13 px label chip ("Bot · medium", "you", "finished")
+ *   .carc-kbd        a little wooden key cap
+ *   .carc-eyebrow    the only caps label: 13 px / 600 / 0.08em
+ *   .carc-field      40 px text field (filled, no border)
+ *   .carc-row        a filled 8 px-radius row inside a sheet (lists, seats)
+ *   .carc-link       inline text link
+ *   .carc-notice     inline error / info message
+ *   .carc-hud-*      floating game panels and the board toolbar
+ *
+ * States: hover darkens the fill, press scales to --press-scale, focus shows the one
+ * ring (--focus), disabled drops to 0.5 opacity. Durations and easings come from the
+ * tokens; reduced motion zeroes the press scale.
+ */
+
+/* ── focus ring (everything interactive) ─────────────────────────────── */
+
+:is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+/* ── buttons ─────────────────────────────────────────────────────────── */
+
+.carc-btn,
+.carc-dial-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--h-control);
+  padding: 0 var(--sp-4);
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+:is(.carc-btn, .carc-dial-button) svg {
+  width: var(--icon);
+  height: var(--icon);
+  flex-shrink: 0;
+}
+
+:is(.carc-btn, .carc-dial-button):hover {
+  background: var(--fill-hover);
+}
+
+:is(.carc-btn, .carc-dial-button):active:not(:disabled) {
+  background: var(--fill-press);
+  transform: scale(var(--press-scale));
+}
+
+:is(.carc-btn, .carc-dial-button):disabled,
+:is(.carc-btn, .carc-dial-button)[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="primary"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: var(--fw-strong);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.14) inset,
+    0 8px 18px -10px color-mix(in oklch, var(--primary) 85%, black);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="primary"]:hover {
+  background: color-mix(in oklch, var(--primary) 90%, black);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="primary"]:active:not(:disabled) {
+  background: color-mix(in oklch, var(--primary) 84%, black);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="ghost"] {
+  background: transparent;
+  color: var(--text-2);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="ghost"]:hover {
+  background: var(--fill);
+  color: var(--text-1);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="gold"] {
+  background: var(--gold);
+  color: oklch(0.22 0.03 60);
+  font-weight: var(--fw-strong);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -2px 0 rgba(0, 0, 0, 0.12) inset,
+    0 10px 22px -12px rgba(0, 0, 0, 0.6);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="gold"]:hover {
+  background: color-mix(in oklch, var(--gold) 92%, black);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-variant="danger"]:hover {
+  background: color-mix(in oklch, var(--destructive) 14%, transparent);
+  color: var(--destructive);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-size="compact"] {
+  height: var(--h-compact);
+  padding: 0 var(--sp-3);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-size="large"] {
+  height: var(--h-large);
+  padding: 0 var(--sp-6);
+  font-size: var(--fs-lead);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-size="large"] svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+:is(.carc-btn, .carc-dial-button)[data-pressed="true"],
+:is(.carc-btn, .carc-dial-button)[aria-expanded="true"] {
+  background: var(--fill-active);
+  color: var(--text-accent);
+}
+
+/* icon-only: square, optically centred glyph */
+.carc-icon-btn,
+.carc-icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--h-control);
+  height: var(--h-control);
+  padding: 0;
+  border: none;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-2);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+:is(.carc-icon-btn, .carc-icon-button) svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+:is(.carc-icon-btn, .carc-icon-button):hover {
+  background: var(--fill-hover);
+  color: var(--text-1);
+}
+
+:is(.carc-icon-btn, .carc-icon-button):active:not(:disabled) {
+  background: var(--fill-press);
+  transform: scale(0.94);
+}
+
+:is(.carc-icon-btn, .carc-icon-button):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+:is(.carc-icon-btn, .carc-icon-button)[data-size="compact"],
+.carc-icon-button {
+  width: var(--h-compact);
+  height: var(--h-compact);
+  border-radius: var(--r-inner);
+}
+
+.carc-icon-btn[data-variant="filled"] {
+  background: var(--fill);
+  color: var(--text-1);
+}
+
+.carc-icon-btn[data-variant="primary"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.carc-icon-btn[data-variant="primary"]:hover {
+  background: color-mix(in oklch, var(--primary) 90%, black);
+  color: var(--primary-foreground);
+}
+
+/* ── tags (badges) ───────────────────────────────────────────────────── */
+
+.carc-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--h-chip);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-inner);
+  background: var(--fill);
+  color: var(--text-2);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-ui);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.carc-tag svg {
+  width: 14px;
+  height: 14px;
+}
+
+.carc-tag[data-tone="accent"] {
+  background: var(--fill-active);
+  color: var(--text-accent);
+}
+
+.carc-tag[data-tone="gold"] {
+  background: var(--fill-gold);
+  color: var(--gold-ink);
+}
+
+.carc-tag[data-tone="danger"] {
+  background: color-mix(in oklch, var(--destructive) 13%, transparent);
+  color: var(--destructive);
+}
+
+/* ── keyboard key cap ────────────────────────────────────────────────── */
+
+.carc-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--h-chip);
+  height: var(--h-chip);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-inner);
+  background: var(--sheet);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--wood) 18%, transparent) inset,
+    0 -2px 0 color-mix(in oklch, var(--wood) 22%, transparent) inset;
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-num);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── labels and links ────────────────────────────────────────────────── */
+
+.carc-eyebrow {
+  font: var(--fw-strong) var(--fs-small) / var(--lh-snug) var(--font-ui);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.carc-eyebrow[data-tone="accent"] {
+  color: var(--text-accent);
+}
+
+.carc-label {
+  display: block;
+  font: var(--fw-medium) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-hint {
+  font-size: var(--fs-small);
+  line-height: var(--lh-text);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.carc-link {
+  color: var(--text-accent);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in oklch, currentColor 45%, transparent);
+  border-radius: 2px;
+  transition: text-decoration-color var(--dur-fast) ease;
+}
+
+.carc-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ── fields ──────────────────────────────────────────────────────────── */
+
+.carc-field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--h-control);
+  padding: 0 var(--sp-3);
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-body) var(--font-ui);
+  transition:
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
+}
+
+.carc-field::placeholder {
+  color: var(--text-2);
+  font-weight: var(--fw-regular);
+  opacity: 1;
+}
+
+.carc-field:hover {
+  background: var(--fill-hover);
+}
+
+.carc-field:focus-visible {
+  background: var(--fill-hover);
+}
+
+.carc-field[aria-invalid="true"] {
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--destructive) 60%, transparent) inset;
+}
+
+/* ── rows inside a sheet ─────────────────────────────────────────────── */
+
+.carc-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-large);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: var(--fill);
+}
+
+.carc-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 0;
+  list-style: none;
+}
+
+/* ── notices ─────────────────────────────────────────────────────────── */
+
+.carc-notice {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  line-height: var(--lh-text);
+  text-wrap: pretty;
+}
+
+.carc-notice[data-tone="danger"] {
+  background: color-mix(in oklch, var(--destructive) 11%, transparent);
+  color: var(--destructive);
+}
+
+/* ── icon well (menu cards, tutorial steps) ──────────────────────────── */
+
+.carc-well {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--h-control);
+  height: var(--h-control);
+  border-radius: var(--r-control);
+  background: var(--fill-active);
+  color: var(--text-accent);
+}
+
+.carc-well svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+/* ── pressable cardstock (menu modes, replays) ───────────────────────── */
+
+.carc-card-link {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-sheet);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain), var(--sheet-shading);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  text-decoration: none;
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .carc-card-link:hover {
+    box-shadow: var(--elev-2);
+    transform: translateY(-2px);
+  }
+}
+
+.carc-card-link:active {
+  transform: scale(0.99);
+  transition-duration: var(--dur-press);
+}
+
+/* ══ HUD ═══════════════════════════════════════════════════════════════ */
+
+.carc-hud-panel {
+  padding: var(--hud-pad);
+}
+
+/* 40 px controls in a 56 px bar */
+.carc-hud-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: var(--hud-bar);
+  padding: 0 var(--sp-2);
+}
+
+.carc-hud-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: var(--sp-3) var(--sp-1);
+  background: color-mix(in oklch, var(--wood) 18%, transparent);
+}
+
+/* board toolbar: zoom in / out / fit as one cardstock strip */
+.carc-hud-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  padding: var(--sp-1);
+}
+
+.carc-hud-toolbar[data-orientation="horizontal"] {
+  flex-direction: row;
+}
+
+.carc-hud-toolbar .carc-icon-btn {
+  color: var(--text-1);
+}
+
+/* keyboard help, printed on the table edge */
+.carc-board-help {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  font: var(--fw-medium) var(--fs-small) / var(--h-chip) var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-board-help > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* app-level reduced motion (settings → Motion) */
+html[data-reduced-motion="true"] {
+  --dur-press: 0ms;
+  --press-scale: 1;
+}

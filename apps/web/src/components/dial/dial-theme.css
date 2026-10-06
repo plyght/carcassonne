@@ -40,17 +40,17 @@ html .dialkit-root[data-theme] {
   --dial-radius: var(--r-control);
   --dial-row-height: var(--h-control);
   --dial-row-gap: var(--sp-2);
-  --dial-shadow: var(--sheet-lift);
-  --dial-shadow-collapsed: var(--sheet-lift);
-  --dial-shadow-dropdown: 0 18px 40px -16px rgba(70, 44, 16, 0.5), 0 2px 6px -3px rgba(70, 44, 16, 0.25);
+  --dial-shadow: var(--elev-2);
+  --dial-shadow-collapsed: var(--elev-2);
+  --dial-shadow-dropdown: var(--elev-3);
 
   --row-inset: var(--sp-3);
   --row-inset-control: var(--sp-1);
 
   /* app fonts (next/font variables live on <body>; Tailwind's @theme inline doesn't emit --font-*) */
-  --carc-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --carc-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --carc-display: var(--font-display-serif), ui-serif, Georgia, serif;
+  --carc-sans: var(--font-ui);
+  --carc-mono: var(--font-num);
+  --carc-display: var(--font-serif);
 
   font-family: var(--carc-sans);
   color: var(--text-1);
@@ -60,7 +60,6 @@ html.dark .dialkit-root[data-theme] {
   --dial-surface-subtle: color-mix(in oklch, var(--foreground) 10%, transparent);
   --dial-border: color-mix(in oklch, var(--foreground) 14%, transparent);
   --dial-timeline-clip-overlay: color-mix(in oklch, var(--primary) 28%, rgba(0, 0, 0, 0.25));
-  --dial-shadow-dropdown: 0 18px 40px -14px rgba(0, 0, 0, 0.75);
 }
 
 /* ── type: 14 px labels and values, 13 px secondary ───────────────────── */
@@ -288,7 +287,7 @@ html .dialkit-root .dialkit-timeline-dock {
   border: none;
   border-radius: var(--r-sheet);
   background-image: var(--paper-grain);
-  box-shadow: var(--sheet-lift), 0 20px 40px -24px rgba(40, 24, 8, 0.5);
+  box-shadow: var(--elev-2);
   /* DialKit's default dock (400 px) would bury the board; drag the top edge to grow it */
   max-height: min(296px, 42vh) !important;
 }
@@ -322,7 +321,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   background-color: var(--sheet);
   background-image: var(--paper-grain);
   border-radius: var(--r-sheet);
-  box-shadow: var(--sheet-lift), 0 24px 48px -24px rgba(40, 24, 8, 0.5);
+  box-shadow: var(--elev-3);
   padding: var(--sp-2) var(--sp-4) var(--sp-4);
 }
 
@@ -374,100 +373,6 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-2);
-}
-
-.carc-icon-button {
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--h-compact);
-  height: var(--h-compact);
-  border: none;
-  border-radius: calc(var(--r-control) - 2px);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, transform 0.15s;
-}
-
-.carc-icon-button svg {
-  width: var(--icon);
-  height: var(--icon);
-}
-
-.carc-icon-button:hover {
-  background: var(--fill-hover);
-  color: var(--text-1);
-}
-
-.carc-icon-button:active {
-  transform: scale(0.94);
-}
-
-:is(.carc-icon-button, .carc-dial-button, .carc-select-trigger, .carc-meeple, .carc-seat-name, .carc-seed-input):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-.carc-dial-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  height: var(--h-control);
-  padding: 0 var(--sp-4);
-  border: none;
-  border-radius: var(--r-control);
-  background: var(--fill);
-  color: var(--text-1);
-  font: 500 var(--fs-body) var(--carc-sans);
-  cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
-}
-
-.carc-dial-button svg {
-  width: var(--icon);
-  height: var(--icon);
-}
-
-.carc-dial-button:hover {
-  background: var(--fill-hover);
-}
-
-.carc-dial-button:active {
-  transform: scale(0.97);
-}
-
-.carc-dial-button:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.carc-dial-button[data-variant="primary"] {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 600;
-  box-shadow: 0 10px 22px -12px color-mix(in oklch, var(--primary) 80%, black);
-}
-
-.carc-dial-button[data-variant="primary"]:hover {
-  background: color-mix(in oklch, var(--primary) 88%, black);
-}
-
-.carc-dial-button[data-variant="ghost"] {
-  background: transparent;
-  color: var(--text-2);
-}
-
-.carc-dial-button[data-variant="ghost"]:hover {
-  background: var(--fill);
-  color: var(--text-1);
-}
-
-.carc-dial-button[data-size="large"] {
-  height: var(--sp-12);
-  padding: 0 var(--sp-6);
-  font-size: var(--fs-lead);
 }
 
 /* Segmented row with icons; stacked = label above, options full width. */
@@ -656,12 +561,6 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   height: var(--icon);
   color: var(--primary);
   flex-shrink: 0;
-}
-
-.carc-badge {
-  font-size: var(--fs-small);
-  font-weight: 500;
-  color: var(--text-2);
 }
 
 /* ── seed row: one 40 px row with the text field and re-roll inside ───── */
@@ -937,7 +836,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   border-radius: var(--r-sheet);
   background-color: var(--sheet);
   background-image: var(--paper-grain);
-  box-shadow: var(--sheet-lift), 0 18px 36px -20px rgba(40, 24, 8, 0.5);
+  box-shadow: var(--elev-2);
   overflow: hidden;
 }
 

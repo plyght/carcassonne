@@ -84,7 +84,7 @@ export function TablePanel({
                   <div className="carc-dial-sub">Only you see your style. Switches live.</div>
                 </div>
                 <DialIconButton label="Close" variant="ghost" onClick={onClose}>
-                  <X className="size-[18px]" />
+                  <X />
                 </DialIconButton>
               </div>
               <Folder title="Board" defaultOpen>

@@ -419,7 +419,7 @@ export function DialSelect({
                         <span className="carc-select-option-text">
                           <span className="carc-select-option-label">
                             {it.label}
-                            {it.badge ? <span className="carc-badge">{it.badge}</span> : null}
+                            {it.badge ? <span className="carc-tag">{it.badge}</span> : null}
                           </span>
                           {it.hint ? <span className="carc-select-option-hint">{it.hint}</span> : null}
                         </span>
