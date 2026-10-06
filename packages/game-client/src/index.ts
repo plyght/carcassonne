@@ -9,3 +9,5 @@ export * from "./online-client";
 export * from "./replay";
 export * from "./placement";
 export { serveEngine, workerEngine } from "./worker/engine-worker";
+export * from "./tutorial";
+export * from "./narrate";
