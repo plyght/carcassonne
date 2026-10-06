@@ -2,8 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
-import type { EngineEvent, FeatureKind } from "@carcassonne/protocol";
-import type { FeatureExtent, GameClient, GameClientState, PlayerMeta } from "@carcassonne/game-client";
+import type { EngineEvent, FeatureKind, FieldEdition } from "@carcassonne/protocol";
+import { explainScore, playerName, type FeatureExtent, type GameClient, type GameClientState, type PlayerMeta } from "@carcassonne/game-client";
 import { PLAYER_COLORS } from "@carcassonne/render-classic";
 
 export function useClientState(client: GameClient): GameClientState {
@@ -19,37 +19,23 @@ export const FEATURE_LABEL: Record<FeatureKind, string> = {
   river: "river",
 };
 
-export const FIGURE_ROLE: Record<FeatureKind, string> = {
-  road: "thief",
-  city: "knight",
-  field: "farmer",
-  cloister: "monk",
-  garden: "abbot",
-  river: "—",
-};
-
-export function playerName(players: PlayerMeta[], i: number | null | undefined): string {
-  if (i === null || i === undefined) return "Spectator";
-  return players[i]?.name ?? `Player ${i + 1}`;
-}
+export { FIGURE_ROLE, playerName } from "@carcassonne/game-client";
 
 export function playerColor(players: PlayerMeta[], i: number): string {
   return PLAYER_COLORS[players[i]?.color ?? "red"].fill;
 }
 
-export function describeEvent(e: EngineEvent, players: PlayerMeta[]): string | null {
+/** One event as a plain sentence (replays); live games narrate whole moves (narrateBatch). */
+export function describeEvent(e: EngineEvent, players: PlayerMeta[], edition: FieldEdition = 3): string | null {
   switch (e.type) {
     case "tileDiscarded":
-      return `Tile ${e.tile} could not be placed and was discarded`;
+      return `Tile ${e.tile} fit nowhere, so it was set aside`;
     case "figurePlaced":
       return `${playerName(players, e.player)} placed ${e.figure === "abbot" ? "the abbot" : "a meeple"}`;
-    case "featureScored": {
-      if (!e.winners.length || !e.points) return null;
-      const who = e.winners.map((w) => playerName(players, w)).join(" & ");
-      return `${who} scored ${e.points} for ${e.kind === "field" ? "a field" : `${e.final ? "an unfinished" : "a completed"} ${FEATURE_LABEL[e.kind]}`}`;
-    }
+    case "featureScored":
+      return explainScore(e, players, edition);
     case "abbotRecalled":
-      return `${playerName(players, e.player)} recalled the abbot for ${e.points}`;
+      return `${playerName(players, e.player)} brought the abbot home for ${e.points}`;
     case "gameEnded":
       return "Game over: final scoring done";
     default:

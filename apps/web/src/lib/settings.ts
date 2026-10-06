@@ -16,6 +16,8 @@ export interface Settings {
   /** Hot-seat: hide the next tile behind a "pass the device" screen. */
   hotseatPrivacy: boolean;
   showHints: boolean;
+  /** The "what to do now" turn guide over the board (hide it once learned). */
+  showTurnGuide: boolean;
   botSpeed: "slow" | "normal" | "fast";
   uiScale: 1 | 1.1 | 1.25;
   /** 3D performance tier; "auto" detects from the GPU and device. */
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideReactions: false,
   hotseatPrivacy: true,
   showHints: false,
+  showTurnGuide: true,
   botSpeed: "normal",
   uiScale: 1,
   tier: "auto",

@@ -8,6 +8,7 @@ import "@/components/dial/ui.css";
 import "@/components/dial/chrome.css";
 import "@/components/dial/hud.css";
 import "@/components/dial/screens.css";
+import "@/components/dial/learn.css";
 import "@/components/dial/dial-theme.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";

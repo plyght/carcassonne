@@ -1,0 +1,712 @@
+/*
+ * Learning surfaces: the turn guide over the board, first-game coach marks, the rules
+ * sheet with its small real boards, the tutorial and the quick-start setup.
+ * Built from tokens.css only. Plain sentences, solid shapes, no hairlines.
+ */
+
+/* ── turn guide ──────────────────────────────────────────────────────── */
+
+.carc-hud-guide {
+  position: absolute;
+  z-index: 15;
+  top: var(--hud-top);
+  left: calc(var(--hud-inset) + var(--hud-col) + var(--hud-gap));
+  right: calc(var(--hud-inset) + var(--hud-col) + var(--hud-gap));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.carc-guide-slot {
+  width: 100%;
+  max-width: 640px;
+}
+
+.carc-guide-slot > * {
+  pointer-events: auto;
+}
+
+.carc-guide {
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.carc-guide-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.carc-guide-steps {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.carc-guide-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-medium) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  color: var(--text-2);
+}
+
+.carc-guide-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--fill-strong);
+  color: var(--text-1);
+  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+}
+
+.carc-guide-step[data-state="current"] {
+  color: var(--text-1);
+  font-weight: var(--fw-strong);
+}
+
+.carc-guide-step[data-state="current"] .carc-guide-num {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.carc-guide-step[data-state="done"] .carc-guide-num {
+  background: var(--text-2);
+  color: var(--sheet);
+}
+
+.carc-guide-optional {
+  font-weight: var(--fw-regular);
+  color: var(--text-2);
+}
+
+.carc-guide-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+}
+
+.carc-guide-link {
+  height: var(--h-compact);
+  padding: 0 var(--sp-2);
+  border: none;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-accent);
+  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+.carc-guide-link:hover {
+  background: var(--fill);
+}
+
+.carc-guide-close {
+  width: var(--h-compact);
+  height: var(--h-compact);
+  color: var(--text-2);
+}
+
+.carc-guide-body {
+  margin: var(--sp-2) 0 0;
+  max-width: 64ch;
+  font: var(--fw-regular) var(--fs-body) / var(--lh-text) var(--font-ui);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+.carc-guide-body strong {
+  font-weight: var(--fw-strong);
+}
+
+.carc-guide-last {
+  margin: var(--sp-1) 0 0;
+  font: var(--fw-regular) var(--fs-small) / var(--lh-snug) var(--font-ui);
+  color: var(--text-2);
+}
+
+.carc-guide-scores {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* "Your city is complete: …" — a warm, solid note */
+.carc-guide-score {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: var(--fill-gold-strong);
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  text-wrap: pretty;
+  animation: carc-rise var(--dur-slow) var(--ease-out);
+}
+
+.carc-guide-dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border-radius: 4px;
+  box-shadow: var(--swatch-lift);
+}
+
+@keyframes carc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* between 768 and 1100 px the guide lives in the left column */
+.carc-guide-slot[data-place="column"] {
+  max-width: none;
+}
+
+.carc-guide-slot[data-place="column"] .carc-guide-steps {
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+@media (max-width: 767px) {
+  .carc-hud-guide {
+    top: calc(var(--hud-top) + var(--h-control) + 2 * var(--sp-1) + var(--hud-gap));
+    left: var(--hud-inset);
+    right: var(--hud-inset);
+  }
+
+  .carc-guide {
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .carc-guide-step:not([data-state="current"]) .carc-guide-label {
+    display: none;
+  }
+
+  .carc-guide-body,
+  .carc-guide-score {
+    font-size: var(--fs-small);
+  }
+
+  .carc-guide-last {
+    display: none;
+  }
+}
+
+/* ── coach marks ─────────────────────────────────────────────────────── */
+
+.carc-coach-ring {
+  position: fixed;
+  z-index: 59;
+  border-radius: calc(var(--r-sheet) + 4px);
+  box-shadow:
+    0 0 0 var(--rim-firm) var(--primary),
+    0 0 0 calc(var(--rim-firm) + 6px) color-mix(in oklch, var(--primary) 28%, transparent);
+  pointer-events: none;
+  transition:
+    left var(--dur-base) var(--ease-out),
+    top var(--dur-base) var(--ease-out),
+    width var(--dur-base) var(--ease-out),
+    height var(--dur-base) var(--ease-out);
+}
+
+.carc-coach {
+  position: fixed;
+  z-index: 60;
+  padding: var(--sp-4);
+  border-radius: var(--r-sheet);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--elev-3);
+  color: var(--text-1);
+  animation: carc-rise var(--dur-base) var(--ease-out);
+}
+
+.carc-coach-count {
+  font: var(--fw-strong) var(--fs-small) / var(--lh-snug) var(--font-ui);
+  color: var(--text-accent);
+}
+
+.carc-coach-title {
+  margin-top: var(--sp-1);
+  font: var(--fw-regular) var(--fs-title) / var(--lh-tight) var(--font-serif);
+  letter-spacing: var(--ls-display);
+}
+
+.carc-coach-text {
+  margin-top: var(--sp-2);
+  font: var(--fw-regular) var(--fs-body) / var(--lh-text) var(--font-ui);
+  text-wrap: pretty;
+}
+
+.carc-coach-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carc-coach,
+  .carc-guide-score {
+    animation: none;
+  }
+
+  .carc-coach-ring {
+    transition: none;
+  }
+}
+
+/* ── modal + rules sheet ─────────────────────────────────────────────── */
+
+.carc-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: var(--scrim);
+  animation: carc-fade var(--dur-base) ease;
+}
+
+@keyframes carc-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.carc-rules-dialog {
+  width: min(780px, 100%);
+  max-height: calc(100svh - 2 * var(--sp-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-shadow: var(--elev-3);
+  padding: var(--sp-8);
+}
+
+.carc-rules-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.carc-rules-head .carc-sub {
+  max-width: 52ch;
+  font-size: var(--fs-lead);
+}
+
+.carc-rules {
+  margin-top: var(--sp-4);
+}
+
+.carc-rules-sub {
+  margin-top: var(--sp-8);
+  font: var(--fw-strong) var(--fs-small) / var(--lh-snug) var(--font-ui);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.carc-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-5) 0;
+}
+
+.carc-rule-title {
+  font: var(--fw-regular) var(--fs-title) / var(--lh-tight) var(--font-serif);
+  letter-spacing: var(--ls-display);
+  color: var(--text-1);
+}
+
+.carc-rule-text p,
+.carc-steps-list {
+  margin-top: var(--sp-2);
+  max-width: 52ch;
+  font: var(--fw-regular) 15px / 1.55 var(--font-ui);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+.carc-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.carc-steps-list li {
+  position: relative;
+  padding-left: 36px;
+  counter-increment: step;
+}
+
+.carc-steps-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+}
+
+.carc-steps-list strong {
+  font-weight: var(--fw-strong);
+}
+
+.carc-rule-figure {
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+.carc-rules-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-6);
+}
+
+@media (max-width: 639px) {
+  .carc-rules-dialog {
+    padding: var(--sp-5);
+  }
+
+  .carc-rule {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-3);
+  }
+
+  .carc-rule-figure {
+    justify-items: start;
+    place-items: start;
+  }
+}
+
+/* ── mini boards (real tiles as illustrations) ───────────────────────── */
+
+.carc-mini {
+  position: relative;
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 10px rgba(40, 24, 8, 0.28));
+}
+
+.carc-mini-cell {
+  position: absolute;
+}
+
+.carc-mini-cell[data-focus] {
+  z-index: 1;
+  transform: translate(-2px, -3px);
+  filter: drop-shadow(0 6px 6px rgba(40, 24, 8, 0.4));
+}
+
+.carc-mini-cell img,
+.carc-mini-cell svg:first-child {
+  border-radius: 0 !important;
+}
+
+.carc-mini-figure {
+  position: absolute;
+  display: grid;
+  pointer-events: none;
+  filter: drop-shadow(1px 2px 1px rgba(20, 30, 5, 0.35));
+}
+
+/* ── new game: quick start, customize ────────────────────────────────── */
+
+.carc-quick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+}
+
+.carc-quick-lead {
+  margin-top: var(--sp-2);
+  max-width: 44ch;
+  font: var(--fw-regular) var(--fs-lead) / var(--lh-text) var(--font-ui);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+.carc-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+
+.carc-quick-link {
+  font: var(--fw-medium) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.carc-quick-figure {
+  margin: 0;
+}
+
+@media (max-width: 639px) {
+  .carc-quick {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--sp-5);
+  }
+
+  .carc-quick-figure {
+    order: -1;
+  }
+}
+
+/* a full-width row that opens a section: label, a plain hint, a chevron */
+.carc-disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--h-control);
+  padding: 0 var(--sp-3);
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-strong) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+.carc-disclosure:hover {
+  background: var(--fill-hover);
+}
+
+.carc-disclosure:active {
+  transform: scale(0.99);
+}
+
+.carc-disclosure-large {
+  min-height: var(--h-large);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-sheet);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--elev-1);
+  font-size: var(--fs-lead);
+}
+
+.carc-disclosure-large:hover {
+  background-color: var(--sheet-sunk);
+}
+
+.carc-disclosure-hint {
+  flex: 1;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+
+.carc-disclosure-chevron {
+  width: var(--icon);
+  height: var(--icon);
+  color: var(--text-2);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.carc-disclosure[aria-expanded="true"] .carc-disclosure-chevron {
+  transform: rotate(180deg);
+}
+
+.carc-advanced[data-open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* "Recommended": a small solid gold label */
+.carc-recommended {
+  display: inline-block;
+  margin-right: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-inner);
+  background: var(--fill-strong);
+  color: var(--text-1);
+  font: var(--fw-strong) var(--fs-small) / 20px var(--font-ui);
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.carc-recommended[data-on] {
+  background: var(--gold);
+  color: oklch(0.27 0.05 70);
+}
+
+/* a short explanation inside a sheet */
+.carc-explain {
+  padding: var(--sp-4);
+  border-radius: var(--r-control);
+  background: var(--fill);
+}
+
+.carc-explain-title {
+  font: var(--fw-strong) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-explain-text {
+  margin-top: var(--sp-1);
+  font: var(--fw-regular) var(--fs-body) / var(--lh-text) var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-explain-list {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.carc-explain-list dt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--fw-strong) var(--fs-body) / var(--lh-snug) var(--font-ui);
+  color: var(--text-1);
+}
+
+.carc-explain-list dd {
+  margin: 0;
+  font: var(--fw-regular) var(--fs-body) / var(--lh-text) var(--font-ui);
+  color: var(--text-2);
+}
+
+/* ── tutorial lesson card (sits where the turn guide does) ───────────── */
+
+.carc-lesson-card {
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.carc-lesson-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.carc-lesson-count {
+  font: var(--fw-strong) var(--fs-small) / var(--lh-snug) var(--font-ui);
+  color: var(--text-accent);
+}
+
+.carc-lesson-dots {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.carc-lesson-dots li {
+  width: 18px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fill-strong);
+}
+
+.carc-lesson-dots li[data-state="current"] {
+  background: var(--primary);
+}
+
+.carc-lesson-dots li[data-state="done"] {
+  background: var(--text-2);
+}
+
+.carc-lesson-tools {
+  margin-left: auto;
+}
+
+.carc-lesson-tools .carc-guide-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-2);
+}
+
+.carc-lesson-title {
+  margin-top: var(--sp-2);
+  font: var(--fw-regular) var(--fs-heading) / var(--lh-tight) var(--font-serif);
+  letter-spacing: var(--ls-display);
+  color: var(--text-1);
+}
+
+.carc-lesson-text {
+  margin-top: var(--sp-2);
+  max-width: 62ch;
+  font: var(--fw-regular) var(--fs-lead) / var(--lh-text) var(--font-ui);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+.carc-lesson-text strong {
+  font-weight: var(--fw-strong);
+}
+
+/* "Not like that…": a solid warm note, not a red outline */
+.carc-lesson-note {
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-control);
+  background: color-mix(in oklch, var(--destructive) 16%, var(--sheet));
+  color: var(--text-1);
+  font: var(--fw-medium) var(--fs-body) / var(--lh-snug) var(--font-ui);
+}
+
+.carc-lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+@media (max-width: 767px) {
+  .carc-lesson-card {
+    padding: var(--sp-3);
+  }
+
+  .carc-lesson-title {
+    font-size: var(--fs-title);
+  }
+
+  .carc-lesson-text {
+    font-size: var(--fs-body);
+  }
+}

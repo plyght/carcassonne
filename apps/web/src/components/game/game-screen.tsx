@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Lightbulb, SlidersHorizontal, Undo2, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, Lightbulb, SlidersHorizontal, Undo2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import type { EngineEvent, FigureOption, Move } from "@carcassonne/protocol";
 import {
+  analyzeBoard,
   boardFromTiles,
   LocalEngineClient,
+  narrateBatch,
   legalCells,
   neighbourCount,
   nextRotation,
@@ -37,14 +39,17 @@ import { cn } from "@carcassonne/ui/lib/utils";
 import { playTick, useAudioLevels } from "@/lib/audio";
 import { useCore } from "@/lib/core";
 import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
-import { useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
+import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 import { useTunedPalette, useTuneMode } from "@/lib/tuning";
 
 import { Board3D } from "../board3d/board-3d";
 import { TablePanel } from "../dial/table-panel";
 import { TuneMode } from "../tune/tune-mode";
 import { EndSummary } from "./end-summary";
-import { describeEvent, playerName, projectExtent, useClientState } from "./helpers";
+import { HowToPlay } from "../learn/how-to-play";
+import { CoachMarks } from "./coach-marks";
+import { playerName, projectExtent, useClientState, type Projection } from "./helpers";
+import { TurnGuide, type GuideScore } from "./turn-guide";
 import {
   BoardHelp,
   BoardToolbar,
@@ -68,6 +73,26 @@ export interface GameScreenProps {
   hotseat?: boolean;
   endActions?: ReactNode;
   exitHref?: string;
+  /** First-game coach marks (local games). */
+  coach?: boolean;
+  /** Lesson mode: the lesson card replaces the turn guide, and the lesson sets the rules of the hand. */
+  lesson?: LessonHud | null;
+}
+
+export interface LessonHud {
+  /** The instruction card, shown where the turn guide sits (told whether a figure is being chosen). */
+  card: ReactNode | ((ctx: { pending: boolean; canAct: boolean }) => ReactNode);
+  /** Snap the preview to a legal rotation on hover (off when the lesson teaches rotating). */
+  snap: boolean;
+  allowSkip: boolean;
+  /** Rotation of the tile in hand when the step starts. */
+  startRot?: number;
+  /** Changes when the lesson step changes (resets the hand). */
+  stepKey: string;
+  /** Tell the lesson the player tried a rotation that does not fit. */
+  onMisfit?(): void;
+  /** The lesson is over: nobody is to move (hide the hand and the turn). */
+  idle?: boolean;
 }
 
 interface Pending {
@@ -77,7 +102,7 @@ interface Pending {
   options: FigureOption[];
 }
 
-export function GameScreen({ client, title, subtitle, hotseat, endActions, exitHref = "/" }: GameScreenProps) {
+export function GameScreen({ client, title, subtitle, hotseat, endActions, exitHref = "/", coach, lesson }: GameScreenProps) {
   const s = useClientState(client);
   const settings = useSettings();
   const reducedMotion = useReducedMotion();
@@ -98,6 +123,12 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [styleOpen, setStyleOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const closeRules = useCallback(() => setRulesOpen(false), []);
+  const [hoverChoice, setHoverChoice] = useState<FigureChoice | null>(null);
+  const [flash, setFlash] = useState<NodeRef[] | null>(null);
+  const snap = lesson ? lesson.snap : true;
+  const allowSkip = lesson ? lesson.allowSkip : true;
   const tableButton = useRef<HTMLButtonElement>(null);
   const closeTable = useCallback(() => setStyleOpen(false), []);
   useAudioLevels();
@@ -125,31 +156,52 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const targets = useMemo(() => (canAct && !pending ? legalCells(s.legalPlacements) : []), [canAct, pending, s.legalPlacements]);
 
   // Reset hand state when the turn changes.
-  const turnKey = `${view?.ply}:${view?.currentPlayer}`;
+  const turnKey = `${view?.ply}:${view?.currentPlayer}:${lesson?.stepKey ?? ""}`;
   useEffect(() => {
     setPending(null);
     setHintMove(null);
     setCursor(null);
     setFigureMenu(null);
+    setHoverChoice(null);
+    if (lesson?.startRot !== undefined) setRot(lesson.startRot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnKey]);
   useEffect(() => {
     if (!pending) setFigureMenu(null);
   }, [pending]);
 
   // Frame the board inside the HUD panels (hud.css: inset 12, bar 56, column 304 / 280, gap 8).
-  const [insets, setInsets] = useState({ top: 76, right: 0, bottom: 68, left: 0 });
+  const [vw, setVw] = useState(1440);
   const [dialSize, setDialSize] = useState(112);
+  const [guideH, setGuideH] = useState(0);
+  const guideRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const update = () => {
-      const w = window.innerWidth;
-      const col = w >= 1024 ? 304 : 280;
-      setInsets(w >= 768 ? { top: 76, right: 12 + col + 8, bottom: 68, left: 12 + col + 8 } : { top: 128, right: 8, bottom: 200, left: 8 });
-      setDialSize(w >= 768 ? 112 : 88);
+      setVw(window.innerWidth);
+      setDialSize(window.innerWidth >= 768 ? 112 : 88);
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
+  // The guide sits top-centre on wide screens and under the score strip on phones; the
+  // board frames itself below it. Between those it lives in the left column.
+  const guideTop = vw >= 1100 || vw < 768;
+  useEffect(() => {
+    const el = guideRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return setGuideH(0);
+    const ro = new ResizeObserver(() => setGuideH(el.offsetHeight));
+    ro.observe(el);
+    setGuideH(el.offsetHeight);
+    return () => ro.disconnect();
+  });
+  const insets = useMemo(() => {
+    const col = vw >= 1024 ? 304 : 280;
+    const extra = guideTop && guideH ? guideH + 8 : 0;
+    return vw >= 768
+      ? { top: 76 + extra, right: 12 + col + 8, bottom: 68, left: 12 + col + 8 }
+      : { top: 128 + extra, right: 8, bottom: 200, left: 8 };
+  }, [vw, guideTop, guideH]);
 
   // Score floaters for the newest event batch.
   const lastBatch = s.recent.at(-1);
@@ -177,6 +229,30 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastBatch?.seq]);
 
+  // Point at what just happened: a scored feature, or what another player claimed.
+  useEffect(() => {
+    if (!lastBatch) return;
+    const a = client.analysis();
+    if (!a) return;
+    const placed = lastBatch.events.find((e) => e.type === "tilePlaced");
+    const mover = placed && placed.type === "tilePlaced" ? placed.player : null;
+    let nodes: NodeRef[] | null = null;
+    const sc = lastBatch.events.find((e) => e.type === "featureScored" && e.winners.length > 0);
+    if (sc && sc.type === "featureScored") {
+      const want = new Set(sc.cells.map(([x, y]) => `${x},${y}`));
+      const ext = a.extents.find((x) => x.kind === sc.kind && x.cells.length === want.size && x.cells.every(([x2, y2]) => want.has(`${x2},${y2}`)));
+      nodes = ext?.nodes ?? null;
+    } else if (mover !== null && !s.localSeats.includes(mover)) {
+      const fig = lastBatch.events.find((e) => e.type === "figurePlaced");
+      if (fig && fig.type === "figurePlaced") nodes = a.extentOf(fig.x, fig.y, fig.feature)?.nodes ?? null;
+    }
+    if (!nodes) return;
+    setFlash(nodes);
+    const id = setTimeout(() => setFlash(null), 2600);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastBatch?.seq]);
+
   const lastPlaced = useMemo(() => {
     for (let i = s.recent.length - 1; i >= 0; i--) {
       const e = [...s.recent[i]!.events].reverse().find((x): x is Extract<EngineEvent, { type: "tilePlaced" }> => x.type === "tilePlaced");
@@ -185,26 +261,43 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     return null;
   }, [s.recent]);
 
+  const edition = view?.ruleset.fieldEdition ?? 3;
+  const narrated = useMemo(
+    () => s.recent.map((b) => ({ seq: b.seq, mover: moverOf(b.events), lines: narrateBatch(b.events, s.players, catalog, edition) })),
+    [s.recent, s.players, catalog, edition],
+  );
+  const seatColor = useCallback((p: number | null) => (p === null ? null : PLAYER_COLORS[s.players[p]?.color ?? "red"].fill), [s.players]);
   const log = useMemo(() => {
-    const lines: { key: string; text: string }[] = [];
-    for (const b of s.recent.slice(-8))
-      b.events.forEach((e, i) => {
-        const t = describeEvent(e, s.players);
-        if (t) lines.push({ key: `${b.seq}-${i}`, text: t });
-      });
-    return lines.slice(-5);
-  }, [s.recent, s.players]);
+    const lines: { key: string; text: string; color: string | null; score?: boolean }[] = [];
+    for (const b of narrated.slice(-8)) b.lines.forEach((l, i) => lines.push({ key: `${b.seq}-${i}`, text: l.text, color: seatColor(l.player), score: l.score }));
+    return lines.slice(-6);
+  }, [narrated, seatColor]);
+  // Since your last move: what scored (explained) and what the others did.
+  const guideScores: GuideScore[] = useMemo(() => {
+    const out: GuideScore[] = [];
+    for (let i = narrated.length - 1; i >= 0; i--) {
+      const b = narrated[i]!;
+      b.lines.forEach((l, k) => l.score && out.unshift({ key: `${b.seq}-${k}`, text: l.text, color: seatColor(l.player) }));
+      if (b.mover !== null && s.localSeats.includes(b.mover)) break;
+    }
+    return out.slice(-3);
+  }, [narrated, s.localSeats, seatColor]);
+  const lastOtherMove = useMemo(() => {
+    const b = [...narrated].reverse().find((x) => x.mover !== null && !s.localSeats.includes(x.mover));
+    return b?.lines.find((l) => !l.score)?.text ?? null;
+  }, [narrated, s.localSeats]);
 
   // ── tile in hand ──────────────────────────────────────────────────────────
   const active = hover ?? cursor;
   const activeIsTarget = !!active && targets.some((t) => t.x === active.x && t.y === active.y);
-  const shownRot = activeIsTarget && active ? (snapRotation(s.legalPlacements, active.x, active.y, rot) ?? rot) : rot;
+  const shownRot = activeIsTarget && active && snap ? (snapRotation(s.legalPlacements, active.x, active.y, rot) ?? rot) : rot;
+  const fitsHere = (x: number, y: number, r: number) => s.legalPlacements.some((p) => p.x === x && p.y === y && p.rot === r);
   const ghost =
     view?.currentTile && canAct
       ? pending
         ? { tile: view.currentTile, x: pending.x, y: pending.y, rot: pending.rot, pending: true }
         : activeIsTarget && active
-          ? { tile: view.currentTile, x: active.x, y: active.y, rot: shownRot }
+          ? { tile: view.currentTile, x: active.x, y: active.y, rot: shownRot, invalid: !fitsHere(active.x, active.y, shownRot) }
           : hintMove
             ? { tile: view.currentTile, x: hintMove.x, y: hintMove.y, rot: hintMove.rot }
             : null
@@ -214,9 +307,9 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     (dir: 1 | -1) => {
       if (pending) return;
       playTick(dir > 0 ? 1 : 0.9);
-      setRot((r) => nextRotation(s.legalPlacements, activeIsTarget ? active : null, activeIsTarget ? shownRot : r, dir));
+      setRot((r) => (snap ? nextRotation(s.legalPlacements, activeIsTarget ? active : null, activeIsTarget ? shownRot : r, dir) : (((r + dir) % 4) + 4) % 4));
     },
-    [pending, s.legalPlacements, active, activeIsTarget, shownRot],
+    [pending, s.legalPlacements, active, activeIsTarget, shownRot, snap],
   );
   /** Rotations the dial marks as legal: at the hovered spot, else anywhere on the board. */
   const legalRots = useMemo(() => {
@@ -227,14 +320,19 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const place = useCallback(
     async (cell: Cell) => {
       if (!canAct || pending) return;
-      const r = snapRotation(s.legalPlacements, cell.x, cell.y, cell === active ? shownRot : rot);
-      if (r === null) return;
+      const want = cell === active ? shownRot : rot;
+      const r = snap ? snapRotation(s.legalPlacements, cell.x, cell.y, want) : fitsHere(cell.x, cell.y, want) ? (want as 0 | 1 | 2 | 3) : null;
+      if (r === null) {
+        if (!snap) lesson?.onMisfit?.();
+        return;
+      }
       setRot(r);
       const options = await client.legalFigures({ x: cell.x, y: cell.y, rot: r });
       setPending({ x: cell.x, y: cell.y, rot: r, options });
       setCursor(cell);
     },
-    [canAct, pending, s.legalPlacements, active, shownRot, rot, client],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canAct, pending, s.legalPlacements, active, shownRot, rot, client, snap, lesson],
   );
 
   const recallTarget = canAct && pending ? client.recallableAbbot() : null;
@@ -244,13 +342,21 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     return 1 + neighbourCount(board, recallTarget.x, recallTarget.y);
   }, [recallTarget, view]);
 
-  const choices: FigureChoice[] = useMemo(
-    () =>
-      pending && view?.currentTile
-        ? figureChoices(pending.options, view.currentTile, catalog, recallTarget ? { points: recallPoints } : null)
-        : [],
-    [pending, view?.currentTile, catalog, recallTarget, recallPoints],
-  );
+  const choices: FigureChoice[] = useMemo(() => {
+    if (!pending || !view?.currentTile) return [];
+    // What each claim would be worth, on the board with the new tile in place.
+    const board = boardFromTiles([...view.board, { x: pending.x, y: pending.y, rot: pending.rot, tile: view.currentTile, figures: [] }]);
+    const a = analyzeBoard(board, catalog);
+    const project = (feature: number): Projection | null => {
+      const ext = a.extentOf(pending.x, pending.y, feature);
+      if (!ext) return null;
+      const n0 = ext.nodes[0]!;
+      const completed = ext.adjacentCities.filter((id) => a.extents[id]?.complete).length;
+      return projectExtent(ext, neighbourCount(board, n0.x, n0.y), completed, view.ruleset.fieldEdition);
+    };
+    const all = figureChoices(pending.options, view.currentTile, catalog, recallTarget ? { points: recallPoints } : null, project);
+    return allowSkip ? all : all.filter((c) => c.option !== null);
+  }, [pending, view, catalog, recallTarget, recallPoints, allowSkip]);
 
   const choose = useCallback(
     (c: FigureChoice) => {
@@ -453,7 +559,32 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const current = view.currentPlayer;
   const currentColor = s.players[current]?.color ?? "red";
   const ended = view.status === "ended";
-  const online = !isLocal;
+  const online = s.connection !== "local";
+  const waitingName = !canAct && !ended ? playerName(s.players, current) : null;
+  const guidePhase = ended ? "ended" : canAct ? (pending ? "claim" : "place") : "waiting";
+  const shownProjection = hoverChoice?.projection ?? projection;
+  const guide = lesson ? (
+    typeof lesson.card === "function" ? lesson.card({ pending: !!pending, canAct }) : lesson.card
+  ) : settings.showTurnGuide && !needsPass ? (
+    <TurnGuide
+      phase={guidePhase}
+      waitingFor={waitingName}
+      thinking={s.thinking}
+      scores={guideScores}
+      lastMove={lastOtherMove}
+      allowSkip={allowSkip}
+      onRules={() => setRulesOpen(true)}
+      onHide={() => {
+        updateSettings({ showTurnGuide: false });
+        toast("Turn guide hidden", { description: "Bring it back any time in Settings.", id: "guide-hidden" });
+      }}
+    />
+  ) : null;
+  const guideSlot = guide ? (
+    <div ref={guideRef} className="carc-guide-slot" data-place={guideTop ? "top" : "column"}>
+      {guide}
+    </div>
+  ) : null;
 
   return (
     <div className="carc-game" data-testid="game-screen"
@@ -504,10 +635,10 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         players={s.players}
         targets={targets}
         ghost={ghost}
-        hotspots={pending?.options}
+        hotspots={pending?.options.map((o) => ({ ...o, label: choices.find((c) => c.option && "feature" in c.option && c.option.feature === o.feature && c.option.type === o.type)?.label }))}
         activePlayer={current}
         recall={recallTarget ? { x: recallTarget.x, y: recallTarget.y } : null}
-        highlight={extent?.nodes ?? null}
+        highlight={extent?.nodes ?? flash ?? null}
         lastPlaced={lastPlaced}
         cursor={canAct && !pending ? cursor : null}
         floaters={floaters}
@@ -569,8 +700,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           <div className="carc-titlebar-text">
             <div className="carc-titlebar-title">{title}</div>
             <div className="carc-turn" aria-live="polite" data-mine={canAct || undefined}>
-              {ended ? (
-                <span className="carc-turn-who">Game over</span>
+              {ended || lesson?.idle ? (
+                <span className="carc-turn-who">{lesson ? "Lesson complete" : "Game over"}</span>
               ) : (
                 <>
                   <span className="carc-turn-dot" style={{ background: PLAYER_COLORS[currentColor].fill }} aria-hidden />
@@ -590,6 +721,9 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         </Panel>
         <div className="carc-actions">
           <Panel className="carc-actions-bar carc-hud-bar">
+            <button type="button" onClick={() => setRulesOpen(true)} className="carc-btn" data-variant="ghost" title="How to play" aria-label="How to play" data-testid="how-to-play-button">
+              <BookOpen /> <span className="carc-btn-label">Rules</span>
+            </button>
             {isLocal ? (
               <button type="button" onClick={() => void doUndo()} disabled={!s.canUndo} className="carc-btn" data-variant="ghost" title="Undo (U)" aria-label="Undo">
                 <Undo2 /> <span className="carc-btn-label">Undo</span>
@@ -628,6 +762,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         </div>
       </div>
 
+      {guideTop && guideSlot ? <div className="carc-hud-guide">{guideSlot}</div> : null}
+
       {/* left column: scores, recent events */}
       <div className="carc-hud-left">
         <ScorePanel
@@ -639,12 +775,18 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           thinking={s.thinking}
           palette={palette}
           footer={subtitle}
+          idle={!!lesson?.idle}
         />
+        {!guideTop ? guideSlot : null}
         {log.length ? (
-          <Panel className="carc-log" aria-label="Recent events">
+          <Panel className="carc-log" aria-label="What happened">
+            <div className="carc-eyebrow">What happened</div>
             <ul>
               {log.map((l) => (
-                <li key={l.key}>{l.text}</li>
+                <li key={l.key} data-score={l.score || undefined}>
+                  <span className="carc-log-dot" style={{ background: l.color ?? "var(--text-2)" }} aria-hidden />
+                  <span>{l.text}</span>
+                </li>
               ))}
             </ul>
           </Panel>
@@ -653,7 +795,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
 
       {/* right column: tile in hand, draw pile */}
       <div className="carc-hud-right">
-        {!ended ? (
+        {!ended && !lesson?.idle ? (
           <TileInHand
             tile={view.currentTile}
             rot={pending ? pending.rot : ghost ? ghost.rot : rot}
@@ -668,7 +810,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             legalRots={legalRots}
             onChoose={choose}
             onBack={() => setPending(null)}
+            onHoverChoice={setHoverChoice}
             waitingFor={!canAct ? playerName(s.players, current) : null}
+            thinking={s.thinking}
+            allowSkip={allowSkip}
+            color={s.players[current]?.color}
             dialSize={dialSize}
           />
         ) : null}
@@ -688,7 +834,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           <BoardHelp is3d={is3d} />
         </div>
         <div className="carc-hud-bottom-center">
-          {projection ? <FeatureInfo p={projection} players={s.players} /> : null}
+          {shownProjection ? <FeatureInfo p={shownProjection} players={s.players} edition={edition} choosing={!!hoverChoice} /> : null}
           <ReactionBar onReact={(e) => client.react(e)} />
         </div>
         <div className="carc-hud-bottom-end">
@@ -698,14 +844,36 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
 
       {needsPass ? <PassDevice player={current} meta={s.players[current]} onReveal={() => setRevealedPly(view.ply)} /> : null}
 
-      {ended && summaryOpen ? (
+      {coach && !lesson && !needsPass ? (
+        <CoachMarks
+          ctx={{
+            myTurn: canAct,
+            pending: !!pending,
+            ply: view.ply,
+            spot: () => {
+              const t0 = targets[0];
+              const p = t0 ? commands.current?.toScreen?.(t0) : null;
+              return p ? new DOMRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size) : null;
+            },
+          }}
+        />
+      ) : null}
+
+      <HowToPlay open={rulesOpen} onClose={closeRules} />
+
+      {ended && summaryOpen && !lesson ? (
         <EndSummary view={view} players={s.players} onClose={() => setSummaryOpen(false)} actions={endActions} />
       ) : null}
 
       {tune ? <TuneMode style={style} palette={palette} /> : null}
       <span className={cn("sr-only")} aria-live="assertive">
-        {canAct ? (pending ? "Choose a figure or press S to skip" : "Your turn: place your tile") : ""}
+        {canAct ? (pending ? "Claim something with a meeple, or press S to skip" : "Your turn: place your tile on a glowing spot") : ""}
       </span>
     </div>
   );
+}
+
+function moverOf(events: EngineEvent[]): number | null {
+  const e = events.find((x) => x.type === "tilePlaced");
+  return e && e.type === "tilePlaced" ? e.player : null;
 }

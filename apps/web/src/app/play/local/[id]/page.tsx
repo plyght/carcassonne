@@ -97,6 +97,7 @@ export default function LocalGamePage() {
       title={rec.mode === "hotseat" ? "Hot-seat game" : rec.mode === "tutorial" ? "Tutorial" : "Game vs AI"}
       subtitle={<span className="font-mono">seed {rec.seed}</span>}
       hotseat={rec.mode === "hotseat"}
+      coach={rec.mode === "ai"}
       exitHref="/"
       endActions={
         <>
