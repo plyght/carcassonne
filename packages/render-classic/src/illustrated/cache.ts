@@ -68,10 +68,22 @@ function evict() {
   }
 }
 
+let quietUntil = 0;
+
+/** Hold off painting while the user pans or zooms (keeps frames smooth); vector/lower-level art shows meanwhile. */
+export function deferTilePainting(ms = 160) {
+  quietUntil = Math.max(quietUntil, performance.now() + ms);
+}
+
 function pump() {
   scheduled = false;
   const start = performance.now();
-  while (queued.size && performance.now() - start < 9) {
+  if (start < quietUntil) {
+    scheduled = true;
+    setTimeout(pump, quietUntil - start + 5);
+    return;
+  }
+  while (queued.size && performance.now() - start < 7) {
     let job: Job | undefined;
     for (const j of queued.values()) {
       if (j.urgent) {
@@ -115,7 +127,12 @@ export function canIllustrate(source: TileArtSource, palette: BoardPalette): boo
  * URL of the painted tile at `size`, or the best other size already painted, or null.
  * Requests the exact size (or queues it) as a side effect.
  */
-export function tileImage(source: TileArtSource, def: TileDef, rot: number, palette: BoardPalette, size: number, urgent = true): string | null {
+/**
+ * `version` (from useTileCacheVersion) is unused here but must be passed by React
+ * callers: it makes the call an input-dependent expression, so memoizing compilers
+ * (React Compiler) re-run it when bitmaps become ready.
+ */
+export function tileImage(source: TileArtSource, def: TileDef, rot: number, palette: BoardPalette, size: number, urgent = true, _version = 0): string | null {
   if (!canIllustrate(source, palette)) return null;
   const key = keyOf(def.id, rot, palette.id, size);
   const hit = ready.get(key);
@@ -158,6 +175,6 @@ export function useTileCacheVersion(): number {
 
 /** Painted art for a single tile (thumbnails). */
 export function useTileImage(source: TileArtSource, def: TileDef | undefined, rot: number, palette: BoardPalette, size: number): string | null {
-  useTileCacheVersion();
-  return def ? tileImage(source, def, rot, palette, size) : null;
+  const version = useTileCacheVersion();
+  return def ? tileImage(source, def, rot, palette, size, true, version) : null;
 }

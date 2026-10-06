@@ -47,8 +47,8 @@ export const STYLE_PACKS: StylePack[] = [
   {
     id: "classic",
     name: "Classic Board",
-    tagline: "Crisp flat tiles, like the printed game",
-    description: "Clean outlines, green fields, walled tan cities with pennant shields and flat meeple tokens. Fastest and clearest.",
+    tagline: "Painted tiles, like the printed game",
+    description: "Hand-painted look: lush fields with trees and sheep, walled towns packed with red-roofed houses, cream roads, a blue river and wooden meeples.",
     dimension: "2d",
     renderer: "classic-svg",
     status: "ready",
@@ -59,7 +59,7 @@ export const STYLE_PACKS: StylePack[] = [
     animation: { intensity: 0.6, easing: "gentle" },
     postFx: [],
     palette: CLASSIC_PALETTE,
-    swatch: ["#93b65a", "#e3c88f", "#f3ead2"],
+    swatch: ["#86bf35", "#ddb067", "#e85d33"],
   },
   {
     id: "blueprint",

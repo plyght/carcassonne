@@ -9,7 +9,7 @@ import { installedFigureArt, installedTileArt } from "./defaults";
 import { FigureToken, proceduralFigures, type FigureArtSource } from "./figures";
 import { PLAYER_COLORS, playerFill, type BoardPalette } from "./palette";
 import { proceduralArt } from "./procedural-art";
-import { canIllustrate, levelFor, tileImage, useTileCacheVersion } from "./illustrated/cache";
+import { canIllustrate, deferTilePainting, levelFor, tileImage, useTileCacheVersion } from "./illustrated/cache";
 import { PaletteDefs, TileHit, TileSvg } from "./tile";
 import { rotatePoint, TILE, type TileArtSource } from "./tile-art";
 
@@ -83,6 +83,8 @@ export interface BoardCommands {
   fit(): void;
   /** Make sure a cell is visible. */
   reveal(cell: Cell): void;
+  /** Centre the view on a cell, optionally at a given scale. */
+  focus(cell: Cell, scale?: number): void;
 }
 
 interface Camera {
@@ -257,6 +259,11 @@ export function ClassicBoard(props: ClassicBoardProps) {
       zoom: zoomCenter,
       pan: (dx, dy) => setCam((c) => ({ ...c, tx: c.tx + dx, ty: c.ty + dy })),
       fit,
+      focus: (cell, scale) =>
+        setCam((c) => {
+          const s = Math.max(MIN_S, Math.min(MAX_S, scale ?? c.s));
+          return { s, tx: size.w / 2 - (cell.x + 0.5) * TILE * s, ty: size.h / 2 - (cell.y + 0.5) * TILE * s };
+        }),
       reveal: (cell) =>
         setCam((c) => {
           const px = (cell.x + 0.5) * TILE * c.s + c.tx;
@@ -278,6 +285,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
     const el = svgRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      deferTilePainting();
       if (propsRef.current.interactive === false) return;
       e.preventDefault();
       const p = propsRef.current;
@@ -330,6 +338,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
         const my = (a.y + b.y) / 2;
         const pin = drag.current.pinch;
         setCam((c) => ({ ...c, tx: c.tx + mx - pin.mx, ty: c.ty + my - pin.my }));
+        deferTilePainting();
         if (pin.d > 0) zoomAt(mx, my, d / pin.d);
         drag.current.pinch = { d, mx, my };
         return;
@@ -343,7 +352,10 @@ export function ClassicBoard(props: ClassicBoardProps) {
           svgRef.current?.setPointerCapture(e.pointerId);
         } catch {}
       }
-      if (drag.current.moved) setCam((c) => ({ ...c, tx: c.tx + dx, ty: c.ty + dy }));
+      if (drag.current.moved) {
+        deferTilePainting();
+        setCam((c) => ({ ...c, tx: c.tx + dx, ty: c.ty + dy }));
+      }
       return;
     }
     if (!interactive) return;
@@ -423,7 +435,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
   // ── painted tiles: bitmap level follows the zoom once it settles ──────────
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  useTileCacheVersion();
+  const tileVersion = useTileCacheVersion();
   const [lodScale, setLodScale] = useState(cam.s);
   useEffect(() => {
     const t = setTimeout(() => setLodScale(cam.s), 180);
@@ -439,7 +451,23 @@ export function ClassicBoard(props: ClassicBoardProps) {
     x1: (size.w - cam.tx) / cam.s / TILE + 1,
     y1: (size.h - cam.ty) / cam.s / TILE + 1,
   };
-  const ghostUrl = painted && ghost && ghostDef ? tileImage(art, ghostDef, ghost.rot, palette, level) : null;
+  const ghostUrl = painted && ghost && ghostDef ? tileImage(art, ghostDef, ghost.rot, palette, level, true, tileVersion) : null;
+  const tileUrls = new Map<string, string>();
+  if (painted) {
+    for (const t of tiles) {
+      const def = catalog.get(t.tile);
+      if (!def) continue;
+      const visible = t.x + 1 >= view0.x0 && t.x <= view0.x1 && t.y + 1 >= view0.y0 && t.y <= view0.y1;
+      const url = tileImage(art, def, t.rot, palette, visible ? level : Math.min(level, 256), visible, tileVersion);
+      if (url) tileUrls.set(`${t.x},${t.y}`, url);
+    }
+  }
+  const [moving, setMoving] = useState(false);
+  useEffect(() => {
+    setMoving(true);
+    const t = setTimeout(() => setMoving(false), 220);
+    return () => clearTimeout(t);
+  }, [cam.tx, cam.ty, cam.s]);
 
   return (
     <div
@@ -447,6 +475,50 @@ export function ClassicBoard(props: ClassicBoardProps) {
       className={className}
       style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: palette.table }}
     >
+      {tileUrls.size ? (
+        // Painted tiles: plain <img>s under one CSS transform, so panning is a compositor
+        // move instead of an SVG repaint. `will-change` only while the camera moves, so the
+        // layer re-rasterises crisply once it settles.
+        <div
+          aria-hidden
+          className={anim ? "cc-anim" : undefined}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            transformOrigin: "0 0",
+            transform: `translate(${cam.tx}px, ${cam.ty}px) scale(${cam.s})`,
+            willChange: moving ? "transform" : undefined,
+            pointerEvents: "none",
+          }}
+        >
+          {tiles.map((t) => {
+            const url = tileUrls.get(`${t.x},${t.y}`);
+            if (!url) return null;
+            const isLast = lastPlaced && lastPlaced.x === t.x && lastPlaced.y === t.y;
+            return (
+              <img
+                key={`${t.x},${t.y}`}
+                src={url}
+                alt=""
+                draggable={false}
+                className={isLast ? "cc-pop" : undefined}
+                style={{
+                  position: "absolute",
+                  left: t.x * TILE - 0.12,
+                  top: t.y * TILE - 0.12,
+                  width: TILE + 0.24,
+                  height: TILE + 0.24,
+                  maxWidth: "none",
+                  boxShadow: "2px 3px 2px rgba(28, 18, 10, 0.32)",
+                }}
+              />
+            );
+          })}
+        </div>
+      ) : null}
       <svg
         ref={svgRef}
         className={`cc-board ${anim ? "cc-anim" : ""} ${panning ? "cc-panning" : ""}`}
@@ -488,9 +560,11 @@ export function ClassicBoard(props: ClassicBoardProps) {
           {/* soft shadow under tiles */}
           {palette.grid ? null : (
             <g pointerEvents="none" opacity={0.28}>
-              {tiles.map((t) => (
-                <rect key={`s${t.x},${t.y}`} x={t.x * TILE + 3} y={t.y * TILE + 4} width={TILE} height={TILE} fill="#1c120a" />
-              ))}
+              {tiles
+                .filter((t) => !tileUrls.has(`${t.x},${t.y}`))
+                .map((t) => (
+                  <rect key={`s${t.x},${t.y}`} x={t.x * TILE + 3} y={t.y * TILE + 4} width={TILE} height={TILE} fill="#1c120a" />
+                ))}
             </g>
           )}
 
@@ -498,19 +572,9 @@ export function ClassicBoard(props: ClassicBoardProps) {
             const def = catalog.get(t.tile);
             if (!def) return null;
             const isLast = lastPlaced && lastPlaced.x === t.x && lastPlaced.y === t.y;
-            const visible = t.x + 1 >= view0.x0 && t.x <= view0.x1 && t.y + 1 >= view0.y0 && t.y <= view0.y1;
-            const url = painted ? tileImage(art, def, t.rot, palette, visible ? level : Math.min(level, 256), visible) : null;
-            if (url)
-              return (
-                <g key={`${t.x},${t.y}`}>
-                  <g transform={`translate(${t.x * TILE} ${t.y * TILE})`} pointerEvents="none">
-                    <g className={isLast ? "cc-pop" : undefined}>
-                      <PaintedImage href={url} />
-                    </g>
-                  </g>
-                  {interactive ? <TileHit def={def} art={art} palette={palette} rot={t.rot} x={t.x} y={t.y} /> : null}
-                </g>
-              );
+            // Painted tiles live in the HTML layer below; here they only keep their hit-test paths.
+            if (tileUrls.has(`${t.x},${t.y}`))
+              return interactive ? <TileHit key={`${t.x},${t.y}`} def={def} art={art} palette={palette} rot={t.rot} x={t.x} y={t.y} /> : null;
             return (
               <TileSvg
                 key={`${t.x},${t.y}`}

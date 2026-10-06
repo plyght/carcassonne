@@ -779,7 +779,7 @@ function drawProp(ctx: Ctx2D, p: RProp, pal: IllustratedPalette, k: number) {
       boxWalls(ctx, pr, hx, hz, h, house, k, { color: pal.house.window, door: p.variant % 2 === 0 });
       const blue = p.variant === 5 && p.tint === 3;
       const colors = blue ? pal.towerRoof : (pal.roofs[p.tint % pal.roofs.length] ?? pal.roofs[0]!);
-      roof(ctx, pr, hx, hz, h, 2.1 * s, colors, house, { hipped: p.variant % 3 === 2, outline: css(parseColor(pal.house.outline), 0.6), k });
+      roof(ctx, pr, hx, hz, h, 2.1 * s, colors, house, { hipped: p.variant % 3 === 2, outline: css(parseColor(pal.house.outline), k < 1.7 ? 0.38 : 0.55), k });
       break;
     }
     case "chapel":

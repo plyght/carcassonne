@@ -26,39 +26,49 @@ function play(seed: string, rules: Ruleset, plies: number): BoardTile[] {
   return view.board;
 }
 
-function biggestCity(board: BoardTile[]): number {
+function biggestCity(board: BoardTile[]): { size: number; center: [number, number] } {
   const a = analyzeBoard(boardFromTiles(board), catalog);
-  let best = 0;
+  let best = { size: 0, center: [0, 0] as [number, number] };
   for (const t of board) {
     const def = catalog.get(t.tile)!;
     def.features.forEach((f, i) => {
-      if (f.kind === "city") best = Math.max(best, a.extentOf(t.x, t.y, i)?.cells.length ?? 0);
+      if (f.kind !== "city") return;
+      const cells = (a.extentOf(t.x, t.y, i)?.cells ?? []) as unknown as ([number, number] | { x: number; y: number })[];
+      if (cells.length <= best.size) return;
+      const xs = cells.map((c) => (Array.isArray(c) ? c[0] : c.x));
+      const ys = cells.map((c) => (Array.isArray(c) ? c[1] : c.y));
+      const avg = (v: number[]) => Math.round(v.reduce((s, n) => s + n, 0) / v.length);
+      best = { size: cells.length, center: [avg(xs), avg(ys)] };
     });
   }
   return best;
 }
 
 const NO_RIVER: Ruleset = { ...DEFAULT_RULESET, river: false };
-type Shot = { name: string; board: BoardTile[]; zoom?: number; focus?: [number, number]; blueprint?: boolean; w?: number; h?: number };
+type Shot = { name: string; board: BoardTile[]; zoom?: number; focus?: [number, number]; scale?: number; blueprint?: boolean; vector?: boolean; w?: number; h?: number };
 const shots: Shot[] = [];
 const want = (n: string) => !only || only.includes(n);
 
 if (want("mid")) shots.push({ name: "classic-illustrated-mid", board: play("illustrated-mid", NO_RIVER, 30) });
-if (want("late") || want("zoom")) {
+if (want("late") || want("zoom") || want("vector-zoom") || want("vector-late")) {
+  // Late game with figures still on the board: the seed with the biggest city.
   let best: BoardTile[] = [];
-  let size = -1;
-  for (const s of ["late-1", "late-2", "late-3", "late-4", "late-5", "late-6"]) {
-    const b = play(s, NO_RIVER, 200);
+  let city = { size: -1, center: [0, 0] as [number, number] };
+  for (const s of ["late-1", "late-2", "late-3", "late-4", "late-5", "late-6", "late-7", "late-8"]) {
+    const b = play(s, NO_RIVER, 64);
     const c = biggestCity(b);
-    if (c > size) {
-      size = c;
+    if (c.size > city.size) {
+      city = c;
       best = b;
     }
   }
-  console.log("late game:", best.length, "tiles; biggest city", size, "tiles");
+  console.log("late game:", best.length, "tiles; biggest city", city.size, "tiles around", city.center);
   if (want("late")) shots.push({ name: "classic-illustrated-late", board: best });
-  if (want("zoom")) shots.push({ name: "classic-illustrated-zoom", board: best, zoom: 3.2 });
+  if (want("zoom")) shots.push({ name: "classic-illustrated-city", board: best, focus: city.center, scale: 1.7 });
+  if (want("vector-zoom")) shots.push({ name: "vector-baseline-zoom", board: best, focus: city.center, scale: 1.7, vector: true });
+  if (want("vector-late")) shots.push({ name: "vector-baseline-late", board: best, vector: true });
 }
+if (want("meeples")) shots.push({ name: "classic-illustrated-meeples", board: play("illustrated-mid", NO_RIVER, 30), zoom: 3.4 });
 if (want("river")) shots.push({ name: "classic-illustrated-river", board: play("illustrated-river", DEFAULT_RULESET, 22) });
 if (want("blueprint")) shots.push({ name: "blueprint-check", board: play("illustrated-mid", NO_RIVER, 30), blueprint: true });
 
@@ -80,7 +90,7 @@ const server = Bun.serve({
     if (url.pathname === "/entry.js") return new Response(js, { headers: { "content-type": "text/javascript" } });
     return new Response(
       `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;overflow:hidden}</style></head><body><div id="root"></div>
-<script>window.HARNESS=${JSON.stringify({ board: current.board, zoom: current.zoom, focus: current.focus, blueprint: current.blueprint })}</script>
+<script>window.HARNESS=${JSON.stringify({ board: current.board, zoom: current.zoom, focus: current.focus, blueprint: current.blueprint, vector: current.vector, scale: current.scale })}</script>
 <script type="module" src="/entry.js"></script></body></html>`,
       { headers: { "content-type": "text/html" } },
     );
@@ -98,7 +108,7 @@ for (const shot of shots) {
   await page.goto(`http://localhost:${server.port}/`);
   // Wait until every tile is a painted bitmap (or vector for Blueprint) and the queue is idle.
   await page
-    .waitForFunction((n) => document.querySelectorAll("svg.cc-board image").length >= n, shot.blueprint ? 0 : shot.board.length, { timeout: 30_000 })
+    .waitForFunction((n) => document.querySelectorAll('img[src^="blob:"]').length >= n, shot.blueprint || shot.vector ? 0 : shot.board.length, { timeout: 30_000 })
     .catch(() => console.log("timeout waiting for painted tiles", logs.join("\n")));
   await page.waitForTimeout(700);
   const stats = await page.evaluate(() => (window as unknown as { STATS: { painted: number; paintMs: number } }).STATS);

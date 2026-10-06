@@ -18,7 +18,11 @@ interface Harness {
   zoom?: number;
   /** Cell to centre after fitting. */
   focus?: [number, number];
+  /** Board scale for `focus`. */
+  scale?: number;
   blueprint?: boolean;
+  /** Classic colours, vector art (baseline for perf comparisons). */
+  vector?: boolean;
 }
 
 const H = (window as unknown as { HARNESS: Harness }).HARNESS;
@@ -36,8 +40,8 @@ function App() {
   const cmd = useRef<BoardCommands | null>(null);
   useEffect(() => {
     const t = setTimeout(() => {
-      if (H.zoom) cmd.current?.zoom(H.zoom);
-      if (H.focus) cmd.current?.reveal({ x: H.focus[0], y: H.focus[1] });
+      if (H.zoom && !H.focus) cmd.current?.zoom(H.zoom);
+      if (H.focus) cmd.current?.focus({ x: H.focus[0], y: H.focus[1] }, H.scale);
     }, 50);
     return () => clearTimeout(t);
   }, []);
@@ -46,7 +50,7 @@ function App() {
       <ClassicBoard
         view={{ board: H.board }}
         catalog={catalog}
-        palette={H.blueprint ? BLUEPRINT_PALETTE : CLASSIC_PALETTE}
+        palette={H.blueprint ? BLUEPRINT_PALETTE : H.vector ? { ...CLASSIC_PALETTE, illustrated: undefined } : CLASSIC_PALETTE}
         players={PLAYERS}
         art={art}
         figures={figures}
