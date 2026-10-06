@@ -23,9 +23,16 @@
 //!    same horizon). Opponents in rollouts pick from `opponent_samples` moves
 //!    (0 = all of them, i.e. they are modelled as Medium players);
 //! 5. backs values up: a decision node is worth its best explored child for
-//!    the player to move, a chance node its weighted mean.
+//!    the player to move, a chance node its weighted mean. Draws not explored
+//!    yet are valued at the move's own heuristic when that sits at the same
+//!    horizon (`prior_fill`), which keeps thinly sampled deep nodes stable.
 //!
-//! The result is deterministic for a given seed and iteration count.
+//! Opponent nodes assume each opponent plays its best reply under the same
+//! evaluation (they are modelled as Medium players). Leaves whose value is
+//! already exact (game-ending moves, depth-capped replies whose heuristic is
+//! at the leaf horizon) are not replayed.
+//!
+//! The result is deterministic for a given seed and iteration/work budget.
 const std = @import("std");
 const engine = @import("../engine/engine.zig");
 const tiles = @import("../engine/tiles.zig");
@@ -40,8 +47,8 @@ const Params = eval.Params;
 const NONE: u32 = 0xffff_ffff;
 
 pub const Config = struct {
-    /// Iterations when the caller gives no budget.
-    default_iterations: u32,
+    /// Think time (ms, through `work_per_ms`) when the caller gives no budget.
+    default_ms: u32,
     /// Deepest decision level the tree grows to (1 = root moves only).
     max_depth: u8,
     /// Extra full rounds simulated from a leaf before evaluating.

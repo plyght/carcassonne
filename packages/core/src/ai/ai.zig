@@ -44,7 +44,7 @@ pub const Tier = enum(u8) {
 pub const SearchConfig = mcts.Config;
 
 pub const hard_config: SearchConfig = .{
-    .default_iterations = 600,
+    .default_ms = 1000,
     .max_depth = 4,
     .rollout_cycles = 0,
     .rollout_samples = 6,
@@ -56,7 +56,7 @@ pub const hard_config: SearchConfig = .{
 };
 
 pub const expert_config: SearchConfig = .{
-    .default_iterations = 1500,
+    .default_ms = 2500,
     .max_depth = 4,
     .rollout_cycles = 0,
     .rollout_samples = 8,
@@ -80,7 +80,7 @@ pub const Options = struct {
     /// Exact MCTS iteration count (Hard/Expert). Overrides `budget_ms`.
     iterations: ?u32 = null,
     /// Think-time cap in ms (Hard/Expert), translated into a work cap via
-    /// `work_per_ms`. Without either, the tier's default iterations run.
+    /// `work_per_ms`. Without either, the tier's `default_ms` applies.
     budget_ms: ?u32 = null,
     params: *const Params = &eval.default_params,
 };
@@ -98,7 +98,7 @@ pub fn budgetFor(opts: Options, cfg: SearchConfig) Budget {
         const work: u64 = @intFromFloat(@as(f32, @floatFromInt(ms)) * work_per_ms);
         return .{ .iterations = std.math.maxInt(u32), .max_work = @max(1, work) };
     }
-    return .{ .iterations = cfg.default_iterations, .max_work = null };
+    return budgetFor(.{ .tier = opts.tier, .budget_ms = cfg.default_ms }, cfg);
 }
 
 /// Scratch memory for one decision (big buffers live here, not on the stack).
