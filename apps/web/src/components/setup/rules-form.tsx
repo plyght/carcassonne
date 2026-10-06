@@ -57,7 +57,7 @@ export function RulesForm({
       <DialField
         hint={
           <>
-            <Recommended is={ruleset.river === rec.river}>{rec.river ? "on" : "off"}</Recommended> The game opens with 12 river tiles laid end to end, from the spring to the lake. It spreads the map out nicely. The river itself is scenery: nobody can claim it.
+            <Recommended is={ruleset.river === rec.river}>{rec.river ? "on" : "off"}</Recommended> The game opens with 12 river tiles laid end to end, from the spring to the lake. It spreads the map out nicely, and the river itself is scenery that nobody can claim.
           </>
         }
       >
@@ -90,11 +90,11 @@ export function RulesForm({
         <div className="carc-advanced" data-open={advanced || undefined}>
           <button type="button" className="carc-disclosure" aria-expanded={advanced} onClick={() => setAdvanced((o) => !o)} data-testid="advanced-toggle">
             <span>Advanced</span>
-            <span className="carc-disclosure-hint">Seed</span>
+            <span className="carc-disclosure-hint">The seed that decides the tile order</span>
             <ChevronDown className="carc-disclosure-chevron" aria-hidden />
           </button>
           {advanced ? (
-            <DialField hint="The seed decides the order of the tiles. Same seed, same game: share it for a rematch, a puzzle or a bug report. Leave it alone for a random game.">
+            <DialField hint="The seed decides the order of the tiles, and a game with the same seed deals the same tiles, so you can share it for a rematch, a puzzle or a bug report. Leave it as it is for a random game.">
               <div className="carc-seed" data-testid="seed-row">
                 <span className="carc-seed-label">Seed</span>
                 <input

@@ -16,10 +16,10 @@ import { DialSelect, type SelectItem } from "./primitives";
 
 /** Bot levels, described for someone who has never played. */
 export const TIER_INFO: { id: AiTier; label: string; hint: string; recommended?: boolean }[] = [
-  { id: "easy", label: "Easy", hint: "Plays fast and makes beginner mistakes. Good for your very first game." },
-  { id: "medium", label: "Medium", hint: "A fair opponent for new players: finishes what it starts.", recommended: true },
-  { id: "hard", label: "Hard", hint: "Plans ahead with the tiles left in the pile. A real challenge." },
-  { id: "expert", label: "Expert", hint: "Plans further ahead and plays to block you. For experienced players." },
+  { id: "easy", label: "Easy", hint: "It plays quickly and makes beginner mistakes, which suits your very first game." },
+  { id: "medium", label: "Medium", hint: "It is a fair opponent for new players because it finishes what it starts.", recommended: true },
+  { id: "hard", label: "Hard", hint: "It plans ahead with the tiles left in the pile, so it is a real challenge." },
+  { id: "expert", label: "Expert", hint: "It plans further ahead and plays to block you, so it suits experienced players." },
 ];
 
 export type SeatController = "human" | `bot:${AiTier}`;

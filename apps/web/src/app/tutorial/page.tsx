@@ -41,7 +41,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
         title: "Place a tile",
         place: (
           <>
-            This is the start of the map. Your tile is a straight road. Click a <strong>glowing spot</strong> beside the start tile: the road on your tile has to line up with the road on the map.
+            This is the start of the map, and your tile is a straight road. Click a <strong>glowing spot</strong> beside the start tile: the road on your tile has to line up with the road on the map.
           </>
         ),
         claim: (
@@ -51,7 +51,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
         ),
       },
     },
-    done: <>Every edge matches: road meets road, grass meets grass. Brother Odo then took his turn. Players take turns, one tile each.</>,
+    done: <>Every edge matches, with road meeting road and grass meeting grass. Brother Odo then took his turn, because players take turns placing one tile each.</>,
   },
   {
     title: "Turn the tile",
@@ -74,7 +74,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
         ),
       },
     },
-    done: <>That’s it. You’ll turn most tiles before you place them. The red edge means “doesn’t fit yet”.</>,
+    done: <>You’ll turn most tiles before you place them, and a red edge around the preview means the tile doesn’t fit that way round yet.</>,
   },
   {
     title: "Thieves on roads",
@@ -90,7 +90,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
       },
       "road-finish": {
         title: "Finish the road",
-        place: <>A road is finished when both ends stop: at a cloister, a city, a village or a crossroads. Close the open end with this crossroads.</>,
+        place: <>A road is finished when both of its ends stop at a cloister, a city, a village or a crossroads, so close the open end with this crossroads.</>,
         claim: (
           <>
             Nothing to claim: choose <strong>Skip</strong>, and watch your road score.
@@ -105,7 +105,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
     steps: {
       city: {
         title: "Claim and finish a city",
-        place: <>Cities are the walled, brown areas. This corner piece joins the two bits of city and closes the walls all the way round. Place it.</>,
+        place: <>Cities are the walled, brown areas. Place this corner piece to join the two bits of city and close the walls all the way round.</>,
         claim: (
           <>
             Put a <strong>knight</strong> in the city. You can claim a city in the same move that finishes it, and score it straight away.
@@ -120,16 +120,16 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
     steps: {
       "cloister-claim": {
         title: "Claim a cloister",
-        place: <>A cloister is a small church in a field. Place it in the middle of the villages.</>,
+        place: <>A cloister is a small church in a field, so place it in the middle of the villages.</>,
         claim: (
           <>
-            Claim it with a <strong>monk</strong>. A cloister is finished when all 8 spaces around it hold tiles.
+            Claim it with a <strong>monk</strong>; a cloister is finished when all 8 spaces around it hold tiles.
           </>
         ),
       },
       "cloister-finish": {
         title: "Fill the last space",
-        place: <>Seven of the eight spaces around your cloister are filled. Fill the last one.</>,
+        place: <>Seven of the eight spaces around your cloister are filled, so fill the last one.</>,
         claim: (
           <>
             Choose <strong>Skip</strong> and your cloister scores.
@@ -144,7 +144,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
     steps: {
       farmer: {
         title: "The last tile",
-        place: <>The draw pile is empty: this is the last tile of the game. Place it at the end of the road.</>,
+        place: <>The draw pile is empty, so this is the last tile of the game. Place it at the end of the road.</>,
         claim: (
           <>
             Put a <strong>farmer</strong> in the field above the road. Farmers lie down and stay until the game ends. Then each field scores 3 points for every finished city it touches.
@@ -152,7 +152,7 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
         ),
       },
     },
-    done: <>The game is over. At the end, unfinished roads, cities and cloisters still score, and farmers score their fields. Most points wins.</>,
+    done: <>The game is over. At the end, unfinished roads, cities and cloisters still score, farmers score their fields, and whoever has the most points wins.</>,
   },
 ];
 

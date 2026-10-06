@@ -454,7 +454,7 @@ export function RemainingTiles({
       </button>
       {open ? (
         <p className="carc-pile-note">
-          {total === 0 ? "This is the last tile: the game ends when it is placed." : "Still to come, with how many of each. The game ends when the last tile is placed."}
+          {total === 0 ? "This is the last tile, and the game ends when it is placed." : "These tiles are still to come, with how many of each are left, and the game ends when the last one is placed."}
         </p>
       ) : null}
       {open && ids.length ? (
@@ -586,6 +586,17 @@ export function TurnClock({ startedAt, deadline }: { startedAt: number; deadline
 
 // ── feature glossary (hover a feature, or a figure choice) ──────────────────
 
+/** What a feature is worth right now, as one sentence. */
+function featureNow(p: Projection): string {
+  const size =
+    p.kind === "cloister" || p.kind === "garden"
+      ? "It"
+      : `It covers ${p.tiles} tile${p.tiles === 1 ? "" : "s"}${p.pennants ? ` and ${p.pennants} shield${p.pennants === 1 ? "" : "s"}`: ""}, and it`;
+  if (p.complete) return p.ifCompleted !== null ? `${size} is finished and scored ${p.ifCompleted} points.` : `${size} is finished.`;
+  if (p.ifCompleted !== null) return `${size} would score ${p.ifCompleted} if finished, or ${p.atEnd} if it is still open at the end.`;
+  return `${size} would score ${p.atEnd} at the end as things stand.`;
+}
+
 export function FeatureInfo({ p, players, edition = 3, choosing }: { p: Projection; players: PlayerMeta[]; edition?: 1 | 2 | 3; choosing?: boolean }) {
   const role = FIGURE_ROLE[p.kind];
   const roleName = role ? role.charAt(0).toUpperCase() + role.slice(1) : null;
@@ -603,14 +614,7 @@ export function FeatureInfo({ p, players, edition = 3, choosing }: { p: Projecti
       <p className="carc-feature-rule">{featureRule(p.kind, edition)}</p>
       <p className="carc-feature-now carc-num">
         <span>
-          {p.kind === "cloister" || p.kind === "garden" ? "" : `${p.tiles} tile${p.tiles === 1 ? "" : "s"}${p.pennants ? `, ${p.pennants} shield${p.pennants === 1 ? "" : "s"}` : ""}. `}
-          {p.complete
-            ? p.ifCompleted !== null
-              ? `Finished: ${p.ifCompleted} points.`
-              : "Finished."
-            : p.ifCompleted !== null
-              ? `Worth ${p.ifCompleted} if finished, ${p.atEnd} if not.`
-              : `Worth ${p.atEnd} at the end, as it stands.`}
+          {featureNow(p)}
         </span>{" "}
         <span className="carc-feature-holder">
           {holders.length

@@ -60,7 +60,7 @@ export function TurnGuide({
         {allowSkip ? " Claiming is optional: you can skip." : ""}
       </>
     );
-  else if (phase === "ended") body = <>Game over. Every unfinished road, city, cloister and field has been scored.</>;
+  else if (phase === "ended") body = <>The game is over, and every unfinished road, city, cloister and field has been scored.</>;
   else body = waitingFor ? <>{thinking ? `${waitingFor} is thinking…` : `${waitingFor}’s turn.`}</> : null;
 
   return (

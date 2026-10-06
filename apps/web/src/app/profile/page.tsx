@@ -125,7 +125,7 @@ export default function ProfilePage() {
               </span>
             </li>
           ))}
-          {games.length === 0 ? <li className="carc-hint">No games yet.</li> : null}
+          {games.length === 0 ? <li className="carc-hint">You haven’t played any games yet.</li> : null}
         </ul>
       </section>
     </div>

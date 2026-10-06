@@ -110,7 +110,7 @@ export function NewGameSetup() {
   return (
     <div className="carc-page">
       <h1 className="carc-page-title">New game</h1>
-      <p className="carc-page-lead">Never played Carcassonne? Use Quick start. The game tells you what to do on every turn.</p>
+      <p className="carc-page-lead">If you have never played Carcassonne, use Quick start, and the game will tell you what to do on every turn.</p>
 
       <section className="carc-sheet carc-quick mt-[var(--sp-6)]" aria-labelledby="quick-h">
         <div className="carc-quick-text">
@@ -118,7 +118,7 @@ export function NewGameSetup() {
             Quick start
           </h2>
           <p className="carc-quick-lead">
-            You against two Medium bots, with the standard rules: the base game, The River and The Abbot. About 30 minutes.
+            You play against two Medium bots with the standard rules, which are the base game plus The River and The Abbot, and a game takes about half an hour.
           </p>
           <div className="carc-quick-actions">
             <DialButton variant="primary" data-size="large" onClick={quickStart} disabled={starting} data-testid="quick-start">
@@ -144,7 +144,7 @@ export function NewGameSetup() {
           data-testid="customize-toggle"
         >
           <span>Customize</span>
-          <span className="carc-disclosure-hint">Players, bot levels, hot-seat, rules</span>
+          <span className="carc-disclosure-hint">Choose the players, bot levels and rules, or play hot-seat with friends.</span>
           <ChevronDown className="carc-disclosure-chevron" aria-hidden />
         </button>
         {custom ? (
@@ -178,14 +178,14 @@ export function NewGameSetup() {
                 </span>
               </div>
               <DialSurface className="carc-dial-stack mt-[var(--sp-4)] gap-[var(--sp-4)]!">
-                <DialField hint={humans === 0 ? "All bots: sit back and watch them play." : "Two to five players. Three is a good first game."}>
+                <DialField hint={humans === 0 ? "With only bots at the table, you can sit back and watch them play." : "You can play with two to five people, and three makes a good first game."}>
                   <Slider label="Players" value={count} min={2} max={5} step={1} onChange={changeCount} />
                 </DialField>
                 <SeatEditor seats={seats} onChange={setSeats} />
               </DialSurface>
               <div className="carc-explain mt-[var(--sp-4)]">
                 <h3 className="carc-explain-title">What’s a bot level?</h3>
-                <p className="carc-explain-text">Bots are computer players. Pick how strong each one plays in its seat’s menu.</p>
+                <p className="carc-explain-text">Bots are computer players, and you can choose how strongly each one plays from its seat’s menu.</p>
                 <dl className="carc-explain-list">
                   {TIER_INFO.map((t) => (
                     <div key={t.id}>
@@ -204,7 +204,7 @@ export function NewGameSetup() {
               <h2 id="rules-h" className="carc-heading">
                 Rules
               </h2>
-              <p className="carc-sub">The recommended settings match the current box. New to the game? Leave them as they are.</p>
+              <p className="carc-sub">The recommended settings match the current box, so if you are new to the game you can leave them as they are.</p>
               <DialSurface className="mt-[var(--sp-4)]">
                 <RulesForm ruleset={ruleset} onRuleset={setRuleset} seed={seed} onSeed={setSeed} />
               </DialSurface>

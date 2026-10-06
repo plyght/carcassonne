@@ -157,7 +157,7 @@ export default function RoomLobby() {
         ) : null}
         {room?.isHost ? (
           <div className="mt-[var(--sp-6)] flex flex-wrap items-center justify-between gap-[var(--sp-3)]">
-            <p className="carc-hint">{room.seats.length < 2 ? "Waiting for at least one more player." : "Everyone seated? Deal the first tile."}</p>
+            <p className="carc-hint">{room.seats.length < 2 ? "Waiting for at least one more player." : "When everyone is seated, deal the first tile."}</p>
             <button
               type="button"
               onClick={start}

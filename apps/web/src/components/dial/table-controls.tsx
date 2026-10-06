@@ -196,7 +196,7 @@ export function PlaySettings() {
           { value: "fast", label: "Fast" },
         ]}
       />
-      <DialField hint="The three steps of a turn over the board: what to do now, and what just scored and why.">
+      <DialField hint="The guide over the board says what to do on each step of your turn and explains what just scored and why.">
         <Toggle label="Turn guide" checked={s.showTurnGuide} onChange={(v) => set({ showTurnGuide: v })} />
       </DialField>
       <DialField hint="Show the first-game tips again in your next game against bots.">
@@ -216,10 +216,10 @@ export function PlaySettings() {
       <DialField hint="Don’t show emoji reactions from other players.">
         <Toggle label="Hide all reactions" checked={s.hideReactions} onChange={(v) => set({ hideReactions: v })} />
       </DialField>
-      <DialField hint="Hot-seat: hide your tile until you’re at the device.">
+      <DialField hint="In hot-seat games, your tile stays hidden until you’re at the device.">
         <Toggle label="Pass-the-device screen" checked={s.hotseatPrivacy} onChange={(v) => set({ hotseatPrivacy: v })} />
       </DialField>
-      <DialField hint="Offline games: show a Hint button (best move by Medium AI).">
+      <DialField hint="In offline games, a Hint button shows the move the Medium bot would make.">
         <Toggle label="Hints" checked={s.showHints} onChange={(v) => set({ showHints: v })} />
       </DialField>
     </div>

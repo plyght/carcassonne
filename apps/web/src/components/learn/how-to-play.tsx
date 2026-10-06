@@ -78,13 +78,13 @@ export function RulesSheet({ compact }: { compact?: boolean }) {
           <h3 className="carc-rule-title">Every turn has three steps</h3>
           <ol className="carc-steps-list">
             <li>
-              <strong>Place your tile.</strong> You draw one tile and add it to the map.
+              <strong>Place your tile.</strong> You draw one tile and add it to the map so that it touches what is already there.
             </li>
             <li>
               <strong>Claim something, if you like.</strong> Put one of your meeples on a road, city, cloister or field of the tile you just placed, as long as nobody has claimed it yet.
             </li>
             <li>
-              <strong>Score.</strong> When a road, city or cloister is finished, whoever has the most meeples on it scores, and those meeples come back.
+              <strong>Score.</strong> When a road, city or cloister is finished, whoever has the most meeples on it scores, and those meeples come back to their owners.
             </li>
           </ol>
         </div>
@@ -97,22 +97,22 @@ export function RulesSheet({ compact }: { compact?: boolean }) {
       <h3 className="carc-rules-sub">The four things you can claim</h3>
 
       <Rule title="Roads: thieves" board={ROAD} label="A road from a junction to a cloister, with a blue thief on it.">
-        <p>A road is finished when both ends stop at a village, a cloister, a city or a crossroads. It scores 1 point per tile. This one is 4 tiles long: 4 points.</p>
+        <p>A road is finished when both ends stop at a village, a cloister, a city or a crossroads, and it scores 1 point per tile, so this one is worth 4 points.</p>
       </Rule>
       <Rule title="Cities: knights" board={CITY} cell={72} label="A three-tile city closed by its walls, with a blue knight in it.">
-        <p>A city is finished when its walls close all the way round. It scores 2 points per tile and 2 per blue shield. This one has 3 tiles and 1 shield: 8 points.</p>
+        <p>A city is finished when its walls close all the way round, and it scores 2 points per tile and 2 per blue shield, so this one with 3 tiles and 1 shield is worth 8 points.</p>
       </Rule>
       <Rule title="Cloisters: monks" board={CLOISTER} label="A cloister with all eight neighbouring spaces filled, with a blue monk." cell={40}>
-        <p>A cloister is finished when all 8 spaces around it hold tiles. It scores 9 points.</p>
+        <p>A cloister is finished when all 8 spaces around it hold tiles, and then it scores 9 points.</p>
       </Rule>
       <Rule title="Fields: farmers" board={FIELD} cell={68} label="A blue farmer lying in the field above the road, next to a finished city.">
-        <p>Farmers lie down and stay until the game ends. Then each field scores 3 points for every finished city it touches, for whoever has the most farmers in it.</p>
+        <p>Farmers lie down and stay until the game ends, and then each field scores 3 points for every finished city it touches, for whoever has the most farmers in it.</p>
       </Rule>
 
       <section className="carc-rule carc-rule-meeples">
         <div className="carc-rule-text">
           <h3 className="carc-rule-title">Meeples</h3>
-          <p>You have 7. Each one you place stays until its road, city or cloister is finished, then comes back to you. Farmers never come back, so place them late. If two features join, the player with more meeples on the joined feature takes all the points; a tie means everyone tied scores.</p>
+          <p>You have seven meeples. Each one you place stays until its road, city or cloister is finished and then comes back to you, but farmers never come back, so it pays to place them late. If two features join, the player with more meeples on the joined feature takes all the points; a tie means everyone tied scores.</p>
         </div>
         <figure className="carc-rule-figure">
           <SupplyChip color="blue" label="7 meeples" />
@@ -121,16 +121,16 @@ export function RulesSheet({ compact }: { compact?: boolean }) {
 
       <h3 className="carc-rules-sub">Optional rules</h3>
       <Rule title="The River" board={RIVER} label="River tiles from the spring to the lake." cell={48}>
-        <p>The game starts with 12 river tiles, laid one after another from the spring to the lake. The river can’t be claimed, but the roads and cities beside it can.</p>
+        <p>The game starts with 12 river tiles, laid one after another from the spring to the lake. Nobody can claim the river, but the roads and cities beside it can be claimed as usual.</p>
       </Rule>
       <Rule title="The Abbot" board={ABBOT} label="An abbot in a garden and another in a cloister.">
-        <p>Each player gets one extra figure, the abbot. It can only go on a cloister or a garden (a small walled orchard). On a later turn, instead of placing a meeple, you can bring the abbot home and score its cloister or garden as it stands.</p>
+        <p>Each player gets one extra figure, the abbot, which can only go on a cloister or a garden (a small walled orchard). On a later turn, instead of placing a meeple, you can bring the abbot home and score its cloister or garden as it stands.</p>
       </Rule>
 
       <section className="carc-rule">
         <div className="carc-rule-text">
           <h3 className="carc-rule-title">The end</h3>
-          <p>The game ends when the last tile is placed. Unfinished roads and cities score 1 point per tile (and per shield), unfinished cloisters score 1 plus 1 per neighbour, and farmers score their fields. Most points wins.</p>
+          <p>The game ends when the last tile is placed. Unfinished roads and cities then score 1 point per tile (and per shield), unfinished cloisters score 1 plus 1 per neighbour, farmers score their fields, and whoever has the most points wins.</p>
         </div>
       </section>
     </div>
@@ -161,7 +161,7 @@ export function HowToPlay({ open, onClose }: { open: boolean; onClose(): void })
             <h2 id="how-to-play-title" className="carc-heading">
               How to play
             </h2>
-            <p className="carc-sub">Carcassonne in three minutes. Build a map of southern France one tile at a time, and score by claiming what you build.</p>
+            <p className="carc-sub">This is the whole game in about three minutes: you build a map of southern France one tile at a time, and you score by claiming what you build.</p>
           </div>
           <button ref={closeRef} type="button" className="carc-icon-btn" onClick={onClose} aria-label="Close" title="Close (Esc)">
             <X />

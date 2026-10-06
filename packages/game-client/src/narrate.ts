@@ -174,7 +174,7 @@ export function narrateBatch(events: EngineEvent[], players: PlayerMeta[], catal
       const t = explainScore(e, players, edition);
       if (t) out.push({ text: t, player: e.winners.length === 1 ? e.winners[0]! : null, score: true });
     }
-    if (e.type === "gameEnded") out.push({ text: "The last tile is down: final scoring is done.", player: null });
+    if (e.type === "gameEnded") out.push({ text: "The last tile is down, so the final scoring is done.", player: null });
   }
   return out;
 }

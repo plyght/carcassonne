@@ -43,7 +43,7 @@ export default function RankedPage() {
   return (
     <div className="carc-page">
       <h1 className="carc-page-title">Ranked</h1>
-      <p className="carc-page-lead">Free-for-all with a fixed ruleset and clock. Ratings use Glicko-2; no bots, no takebacks.</p>
+      <p className="carc-page-lead">Ranked games are a free-for-all with a fixed ruleset and clock, rated with Glicko-2, and they have no bots and no takebacks.</p>
       {!isPending && !session ? (
         <div className="carc-notice mt-[var(--sp-6)] flex flex-wrap items-center justify-between gap-[var(--sp-3)]">
           <span>Ranked play needs an account.</span>
@@ -59,7 +59,7 @@ export default function RankedPage() {
               <Trophy />
             </span>
             <h2 className="carc-heading mt-[var(--sp-4)]">{q === "ffa3" ? "3 players" : "4 players"}</h2>
-            <p className="carc-sub">Seat order picked by the server.</p>
+            <p className="carc-sub">The server picks the seat order.</p>
             <div className="mt-auto pt-[var(--sp-6)]">
               {queue === q ? (
                 <button

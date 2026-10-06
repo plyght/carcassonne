@@ -710,3 +710,13 @@
     font-size: var(--fs-body);
   }
 }
+
+@media (max-width: 519px) {
+  .carc-disclosure-large .carc-disclosure-hint {
+    display: none;
+  }
+
+  .carc-disclosure-large {
+    justify-content: space-between;
+  }
+}

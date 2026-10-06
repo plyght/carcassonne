@@ -23,7 +23,7 @@ export default function SettingsPage() {
   return (
     <div className="carc-page">
       <h1 className="carc-page-title">Settings</h1>
-      <p className="carc-page-lead">Saved on this device. Styles switch live, even mid-game.</p>
+      <p className="carc-page-lead">Your settings are saved on this device, and styles switch live, even in the middle of a game.</p>
 
       <section className="carc-sheet mt-[var(--sp-6)] overflow-hidden p-0!" aria-label="Visual style">
         <StylePreview key={style.id} style={style} live3d className="h-60" />
