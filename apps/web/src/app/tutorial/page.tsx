@@ -204,7 +204,7 @@ export default function TutorialPage() {
   const stepKey = progress ? `${progress.chapter}:${progress.step}:${progress.chapterDone}` : "";
   useEffect(() => setMisfit(0), [stepKey]);
 
-  if (!client || !progress) return <div className="h-full bg-[#a4743f]" aria-busy="true" />;
+  if (!client || !progress) return <div className="h-full bg-[image:var(--game-table)]" aria-busy="true" />;
 
   const lesson = LESSONS[progress.chapter]!;
   const step = client.step;

@@ -26,6 +26,9 @@ import { useTheme } from "next-themes";
 
 import { cn } from "@carcassonne/ui/lib/utils";
 
+import { popMotion } from "@/lib/motion";
+import { useReducedMotion } from "@/lib/settings";
+
 /** DialKit theme matching next-themes ("system" until hydrated). */
 export function useDialTheme(): "light" | "dark" | "system" {
   const { resolvedTheme } = useTheme();
@@ -236,6 +239,7 @@ export function DialSelect({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const pop = popMotion(useReducedMotion());
   const [active, setActive] = useState(0);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; above: boolean } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -393,11 +397,10 @@ export function DialSelect({
                     aria-label={label}
                     aria-activedescendant={`${id}-${active}`}
                     className="carc-select-dropdown"
-                    style={{ left: pos.left, top: pos.top, width: pos.width, outline: "none" }}
-                    initial={{ opacity: 0, y: pos.above ? 6 : -6, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: pos.above ? 6 : -6, scale: 0.97 }}
-                    transition={{ type: "spring", visualDuration: 0.16, bounce: 0 }}
+                    style={{ left: pos.left, top: pos.top, width: pos.width, outline: "none", transformOrigin: pos.above ? "50% 100%" : "50% 0%" }}
+                    initial={pop.initial}
+                    animate={pop.animate}
+                    exit={pop.exit}
                     onKeyDown={onListKey}
                   >
                     {items.map((it, i) => (

@@ -221,10 +221,21 @@
   transition: background-color var(--dur-base) ease;
 }
 
-/* whoever is playing: a warm gold card with a solid bar, unmistakable at a glance */
+/* whoever is playing: the row becomes a raised card tinted with their colour, with a
+   solid chip in that colour ("Your turn" / "Thinking…"); no edge lines */
 .carc-score-row[data-active] {
-  background: var(--fill-gold-strong);
-  box-shadow: inset var(--bar-current) 0 0 var(--gold);
+  background: color-mix(in oklch, var(--seat) 15%, var(--sheet));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 1px 2px rgba(40, 24, 8, 0.12),
+    0 6px 14px -8px color-mix(in oklch, var(--seat) 55%, transparent);
+}
+
+.dark .carc-score-row[data-active] {
+  background: color-mix(in oklch, var(--seat) 18%, var(--sheet));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 6px 16px -8px rgba(0, 0, 0, 0.8);
 }
 
 /* the player's colour: a solid swatch with their meeple on it */
@@ -327,15 +338,11 @@
 .carc-score-status {
   padding: 0 var(--sp-2);
   border-radius: var(--r-inner);
-  background: var(--text-1);
-  color: var(--sheet);
-  font: var(--fw-strong) var(--fs-small) / 22px var(--font-ui);
+  background: var(--seat, var(--text-1));
+  color: var(--seat-ink, var(--sheet));
+  font: var(--fw-medium) var(--fs-small) / 22px var(--font-ui);
   white-space: nowrap;
-}
-
-.carc-score-status[data-tone="you"] {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  box-shadow: var(--swatch-lift);
 }
 
 .carc-score-status[data-thinking] {
@@ -377,8 +384,12 @@
 }
 
 .carc-score-chip[data-active] {
-  background: var(--fill-gold-strong);
-  box-shadow: inset 0 calc(-1 * var(--bar-current)) 0 var(--gold);
+  background: color-mix(in oklch, var(--seat) 18%, var(--sheet));
+  box-shadow: 0 4px 10px -6px color-mix(in oklch, var(--seat) 60%, transparent);
+}
+
+.dark .carc-score-chip[data-active] {
+  background: color-mix(in oklch, var(--seat) 26%, var(--sheet));
 }
 
 .carc-score-chip-name {
@@ -999,4 +1010,138 @@
 /* dark page: the black player's solid swatch and chips lift a step so they still read */
 .dark :is(.carc-swatch, .carc-supply:not([data-away]))[data-color="black"] {
   background: #6b655c;
+}
+
+/* ── reaction bubbles: launched out of the emoji bar (ReactionBubbles) ─── */
+
+.carc-reaction-wrap {
+  position: relative;
+}
+
+.carc-bubbles {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 12px);
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* outer: the sideways drift and the final fade (2.4 s); its end removes the bubble */
+.carc-bubble {
+  position: absolute;
+  left: var(--x);
+  bottom: 0;
+  animation: carc-bubble-x 2400ms cubic-bezier(0.45, 0, 0.55, 1) both;
+}
+
+/* middle: the rise, with a pop as it leaves the bar */
+.carc-bubble-rise {
+  display: block;
+  animation: carc-bubble-rise 2400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* inner: a gentle wobble */
+.carc-bubble-wobble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  translate: -50% 0;
+  animation: carc-bubble-wobble 900ms ease-in-out var(--wobble) infinite alternate;
+}
+
+.carc-bubble-emoji {
+  font-size: 44px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+}
+
+.carc-bubble-name {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--seat);
+  color: var(--seat-ink);
+  font: var(--fw-medium) var(--fs-small) / 18px var(--font-ui);
+  white-space: nowrap;
+  box-shadow: var(--swatch-lift);
+}
+
+@keyframes carc-bubble-x {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  8% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(var(--dx));
+  }
+}
+
+@keyframes carc-bubble-rise {
+  0% {
+    transform: translateY(16px) scale(0.5);
+  }
+  12% {
+    transform: translateY(-26px) scale(1.14);
+  }
+  22% {
+    transform: translateY(-48px) scale(1);
+  }
+  100% {
+    transform: translateY(-230px) scale(0.92);
+  }
+}
+
+@keyframes carc-bubble-wobble {
+  from {
+    rotate: -7deg;
+  }
+  to {
+    rotate: 7deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carc-bubble {
+    animation-name: carc-bubble-fade;
+  }
+  .carc-bubble-rise {
+    animation: none;
+    transform: translateY(-56px);
+  }
+  .carc-bubble-wobble {
+    animation: none;
+  }
+}
+
+html[data-reduced-motion="true"] .carc-bubble {
+  animation: carc-bubble-fade 2400ms ease both !important;
+}
+
+html[data-reduced-motion="true"] .carc-bubble-rise {
+  animation: none !important;
+  transform: translateY(-56px);
+}
+
+html[data-reduced-motion="true"] .carc-bubble-wobble {
+  animation: none !important;
+}
+
+@keyframes carc-bubble-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  10%,
+  75% {
+    opacity: 1;
+  }
 }

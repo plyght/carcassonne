@@ -78,7 +78,7 @@ export default function LocalGamePage() {
       </div>
     );
   }
-  if (!rec || !client) return <div className="h-full bg-[#a4743f]" aria-busy="true" />;
+  if (!rec || !client) return <div className="h-full bg-[image:var(--game-table)]" aria-busy="true" />;
 
   const again = (sameSeed: boolean) => {
     const n = createLocalGame({

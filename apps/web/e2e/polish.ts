@@ -35,7 +35,26 @@ async function scrollTo(p: Page, selector: string, offset = 72) {
   await p.waitForTimeout(900);
 }
 
-const wants = (prefix: string) => !only || prefix.startsWith(only) || only.startsWith(prefix);
+async function waitMyTurn(p: Page) {
+  await p.waitForFunction(() => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-my-turn") === "1", undefined, { timeout: 60_000 });
+}
+
+/** Place on the first glowing spot and claim the first figure offered (or skip). */
+async function playTurn(p: Page) {
+  await waitMyTurn(p);
+  const t = p.locator(".cc-target").first();
+  await t.waitFor({ timeout: 20_000 });
+  const b = (await t.boundingBox())!;
+  await p.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await p.waitForFunction(() => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-pending") !== "", undefined, { timeout: 20_000 });
+  const before = Number(await p.getAttribute("[data-testid=game-screen]", "data-ply"));
+  const figures = p.locator(".carc-figures .carc-figure");
+  if ((await figures.count()) > 1) await figures.first().click();
+  else await p.locator(".carc-figures .carc-figure[data-skip]").click();
+  await p.waitForFunction((b0) => Number(document.querySelector("[data-testid=game-screen]")?.getAttribute("data-ply")) > b0, before, { timeout: 30_000 });
+}
+
+const wants =(prefix: string) => !only || prefix.startsWith(only) || only.startsWith(prefix);
 
 for (const scheme of ["light", "dark"] as const) {
   for (const [device, viewport] of [
@@ -84,15 +103,35 @@ for (const scheme of ["light", "dark"] as const) {
       await p.getByTestId("quick-start").click();
       await p.waitForSelector("[data-testid=game-screen]", { timeout: 60_000 });
       await p.waitForTimeout(2500);
-      await shot(p, `game-${tag}`);
-      const coach = p.getByTestId("coach-mark").getByRole("button", { name: "Got it" });
-      for (let i = 0; i < 4 && (await coach.count()); i++) await coach.click().catch(() => {});
-      const rules = p.getByRole("button", { name: /rules/i }).first();
-      if (await rules.count()) {
-        await rules.click().catch(() => {});
-        await shot(p, `rules-${tag}`);
+      await shot(p, `game-start-${tag}`);
+      const skip = p.getByRole("button", { name: "Skip tips" });
+      if (await skip.count()) await skip.click().catch(() => {});
+      // a few turns so the board, the scores and the log have something in them
+      for (let i = 0; i < 4; i++) await playTurn(p);
+      await waitMyTurn(p);
+      await shot(p, `game-${tag}`, 1500);
+      // the rules sheet
+      await p.getByTestId("how-to-play-button").click();
+      await p.getByTestId("how-to-play").waitFor();
+      await shot(p, `game-rules-${tag}`);
+      await p.getByTestId("how-to-play").evaluate((el) => el.scrollTo(0, 620));
+      await shot(p, `game-rules-features-${tag}`, 500);
+      await p.keyboard.press("Escape");
+      await p.waitForTimeout(300);
+      // the table popover, mid-open and open
+      if (!phone) {
+        await p.getByTestId("style-button").click();
+        await p.waitForTimeout(70);
+        await shot(p, `game-table-opening-${tag}`, 0);
+        await shot(p, `game-table-${tag}`, 500);
         await p.keyboard.press("Escape");
+        await p.waitForTimeout(300);
       }
+      // a reaction, caught mid-flight
+      await p.getByRole("button", { name: "React 👍" }).click();
+      await p.waitForTimeout(150);
+      await p.getByRole("button", { name: "React 👏" }).click().catch(() => {});
+      await shot(p, `game-reaction-${tag}`, 550);
     }
     if (wants("tutorial")) {
       await p.goto(`${BASE}/tutorial`);

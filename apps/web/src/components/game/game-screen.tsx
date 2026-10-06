@@ -40,6 +40,7 @@ import { playTick, useAudioLevels } from "@/lib/audio";
 import { useCore } from "@/lib/core";
 import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
 import { updateSettings, useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
+import { withAppTable } from "@/lib/table";
 import { useTunedPalette, useTuneMode } from "@/lib/tuning";
 
 import { Board3D } from "../board3d/board-3d";
@@ -107,7 +108,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const settings = useSettings();
   const reducedMotion = useReducedMotion();
   const style = renderableStyle(settings.style);
-  const palette = useTunedPalette(hudPalette(style));
+  const palette = useTunedPalette(withAppTable(hudPalette(style)));
   const tune = useTuneMode();
   const debug = useDebugFlag();
   const core = useCore();
@@ -835,7 +836,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         </div>
         <div className="carc-hud-bottom-center">
           {shownProjection ? <FeatureInfo p={shownProjection} players={s.players} edition={edition} choosing={!!hoverChoice} /> : null}
-          <ReactionBar onReact={(e) => client.react(e)} />
+          <ReactionBar onReact={(e) => client.react(e)} reactions={s.reactions} players={s.players} hideBubbles={settings.hideReactions} />
         </div>
         <div className="carc-hud-bottom-end">
           <BoardToolbar commands={commands} fitLabel={is3d ? "Reframe the board" : "Fit board"} />

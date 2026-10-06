@@ -53,6 +53,6 @@ export default function OnlineGamePage() {
   }, [gameId]);
 
   if (error) return <div className="grid h-full place-items-center p-6 text-center text-destructive">{error}</div>;
-  if (!client) return <div className="h-full bg-[#a4743f]" />;
+  if (!client) return <div className="h-full bg-[image:var(--game-table)]" />;
   return <GameScreen client={client} title="Online game" subtitle={<span className="font-mono">{gameId.slice(0, 8)}</span>} exitHref="/online" />;
 }

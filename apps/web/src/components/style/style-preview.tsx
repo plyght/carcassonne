@@ -7,6 +7,7 @@ import { legalPlacementsOn, type TileCatalog } from "@carcassonne/game-client";
 import { ClassicBoard, is3DStyle, type StylePack } from "@carcassonne/render-classic";
 
 import { useCore } from "@/lib/core";
+import { withAppTable } from "@/lib/table";
 
 import { Board3D } from "../board3d/board-3d";
 
@@ -43,7 +44,7 @@ export function StylePreview({ style, className, live3d = false }: { style: Styl
   const core = useCore();
   const view = useMemo(() => (core ? ({ board: (SAMPLE ??= buildSample(core.catalog)) } as Pick<GameView, "board">) : null), [core]);
   if (style.status === "ready" && style.palette) {
-    if (!core || !view) return <div className={className} style={{ background: style.palette.table }} />;
+    if (!core || !view) return <div className={className} style={{ background: withAppTable(style.palette).table }} />;
     return (
       <div className={className}>
         <ClassicBoard
@@ -51,7 +52,7 @@ export function StylePreview({ style, className, live3d = false }: { style: Styl
           catalog={core.catalog}
           art={core.art}
           figures={core.figures}
-          palette={style.palette}
+          palette={withAppTable(style.palette)}
           players={SAMPLE_PLAYERS}
           interactive={false}
           reducedMotion

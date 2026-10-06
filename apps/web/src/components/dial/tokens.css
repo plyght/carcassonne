@@ -335,3 +335,19 @@ html[data-reduced-motion="true"] [data-reveal-item] {
   opacity: 1 !important;
   filter: none !important;
 }
+
+/* ── the game table (under the 2D board; lib/table.ts) ──────────────────── */
+/*
+ * A calm blue-grey slate in light mode (it sets off the green tiles and the cream
+ * placement spots, where felt fought the grass and paper swallowed the spots) and a
+ * warm near-black in dark, each with a soft vignette so the edges recede.
+ */
+:root {
+  --table-slate: radial-gradient(120% 95% at 50% 42%, transparent 50%, rgba(10, 16, 20, 0.34) 100%), radial-gradient(ellipse at 50% 40%, #66747a 0%, #55636a 55%, #46535a 100%);
+  --table-night: radial-gradient(120% 95% at 50% 42%, transparent 45%, rgba(0, 0, 0, 0.45) 100%), radial-gradient(ellipse at 50% 40%, #2a2826 0%, #1d1b19 60%, #151412 100%);
+  --game-table: var(--table-slate);
+}
+
+.dark {
+  --game-table: var(--table-night);
+}

@@ -16,6 +16,7 @@ import { CameraIconSwitch } from "@/components/dial/table-controls";
 import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { getGame, type LocalGameRecord } from "@/lib/local-games";
+import { withAppTable } from "@/lib/table";
 import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
 import { useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
 
@@ -40,7 +41,7 @@ export default function ReplayViewer() {
   const settings = useSettings();
   const reduced = useReducedMotion();
   const style = renderableStyle(settings.style);
-  const palette = hudPalette(style);
+  const palette = withAppTable(hudPalette(style));
   const debug = useDebugFlag();
   const core = useCore();
   const { camera, choose: chooseCamera, report: setCamera } = useBoardCamera(style);

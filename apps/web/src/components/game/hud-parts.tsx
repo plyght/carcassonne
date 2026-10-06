@@ -136,7 +136,13 @@ export function ScorePanel({
           const color = players[i]?.color ?? "red";
           const active = playing && view.currentPlayer === i;
           return (
-            <div key={i} className="carc-score-chip" data-active={active || undefined} aria-current={active ? "true" : undefined}>
+            <div
+              key={i}
+              className="carc-score-chip"
+              data-active={active || undefined}
+              aria-current={active ? "true" : undefined}
+              style={{ ["--seat" as string]: PLAYER_COLORS[color].fill }}
+            >
               <SeatSwatch color={color} size={24} />
               <span className="carc-score-chip-name">{playerName(players, i)}</span>
               <span className="carc-score-chip-score carc-num" data-leader={p.score === leader && leader > 0 ? "true" : undefined}>
@@ -168,7 +174,14 @@ export function ScorePanel({
             const you = local && single && name !== "You";
             const status = active ? (local ? (single ? "Your turn" : "Playing") : thinking ? "Thinking…" : "Playing") : null;
             return (
-              <li key={i} className="carc-score-row" data-active={active || undefined} data-local={local || undefined} aria-current={active ? "true" : undefined}>
+              <li
+                key={i}
+                className="carc-score-row"
+                data-active={active || undefined}
+                data-local={local || undefined}
+                aria-current={active ? "true" : undefined}
+                style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }}
+              >
                 <SeatSwatch color={color} title={`${app.label} player`} />
                 <div className="carc-score-who">
                   <div className="carc-score-name-line">
@@ -189,7 +202,7 @@ export function ScorePanel({
                       />
                     ) : null}
                     {status ? (
-                      <span className="carc-score-status" data-tone={local ? "you" : "other"} data-thinking={status === "Thinking…" || undefined}>
+                      <span className="carc-score-status" data-thinking={status === "Thinking…" || undefined}>
                         {status}
                       </span>
                     ) : null}
@@ -477,38 +490,121 @@ export function RemainingTiles({
 
 // ── reactions ───────────────────────────────────────────────────────────────
 
-export function ReactionBar({ onReact, disabled }: { onReact(e: string): void; disabled?: boolean }) {
+/** Spam guard for the emoji bar: at most one every 250 ms and five in any three seconds. */
+function useReactionLimit() {
+  const [sent] = useState<number[]>(() => []);
+  return () => {
+    const now = performance.now();
+    while (sent.length && now - sent[0]! > 3000) sent.shift();
+    if (sent.length >= 5 || (sent.length && now - sent[sent.length - 1]! < 250)) return false;
+    sent.push(now);
+    return true;
+  };
+}
+
+export function ReactionBar({ onReact, disabled, reactions, players, hideBubbles }: { onReact(e: string): void; disabled?: boolean; reactions?: Reaction[]; players?: PlayerMeta[]; hideBubbles?: boolean }) {
   const [open, setOpen] = useState(false);
+  const allow = useReactionLimit();
   const quick = REACTIONS.slice(0, 6);
   const shown = open ? REACTIONS : quick;
   return (
-    <Panel className="carc-reactions" data-open={open || undefined} aria-label="Emoji reactions">
-      <div className="carc-reaction-grid">
-        {shown.map((e, i) => (
-          <button
-            key={e}
-            type="button"
-            disabled={disabled}
-            onClick={() => onReact(e)}
-            className="carc-emoji"
-            data-extra={i >= 4 && !open ? "true" : undefined}
-            aria-label={`React ${e}`}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="carc-icon-btn carc-reaction-more"
-        aria-expanded={open}
-        aria-label={open ? "Fewer reactions" : `${REACTIONS.length - quick.length} more reactions`}
-        title={open ? "Fewer reactions" : "More reactions"}
-      >
-        {open ? <ChevronDown /> : <FaceSmile />}
-      </button>
-    </Panel>
+    <div className="carc-reaction-wrap">
+      {reactions && players && !hideBubbles ? <ReactionBubbles reactions={reactions} players={players} /> : null}
+      <Panel className="carc-reactions" data-open={open || undefined} aria-label="Emoji reactions">
+        <div className="carc-reaction-grid">
+          {shown.map((e, i) => (
+            <button
+              key={e}
+              type="button"
+              disabled={disabled}
+              onClick={() => allow() && onReact(e)}
+              className="carc-emoji"
+              data-extra={i >= 4 && !open ? "true" : undefined}
+              aria-label={`React ${e}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="carc-icon-btn carc-reaction-more"
+          aria-expanded={open}
+          aria-label={open ? "Fewer reactions" : `${REACTIONS.length - quick.length} more reactions`}
+          title={open ? "Fewer reactions" : "More reactions"}
+        >
+          {open ? <ChevronDown /> : <FaceSmile />}
+        </button>
+      </Panel>
+    </div>
+  );
+}
+
+const MAX_BUBBLES = 6;
+
+interface Bubble {
+  id: number;
+  emoji: string;
+  name: string;
+  fill: string;
+  ink: string;
+  /** Launch offset from the bar's centre, its sideways drift, and its wobble phase. */
+  x: number;
+  dx: number;
+  wobble: number;
+}
+
+/**
+ * Reactions launch out of the emoji bar like Kahoot: a big emoji with a name pill in
+ * the player's colour, rising on a slightly random curve with a small wobble and a
+ * scale pop, then fading after about 2.4 s (carc-bubble in hud.css). Transform and opacity only; at most six at
+ * once (the oldest goes first); reduced motion gets a plain fade in place.
+ */
+export function ReactionBubbles({ reactions, players }: { reactions: Reaction[]; players: PlayerMeta[] }) {
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [seen] = useState(() => new Set<number>());
+  useEffect(() => {
+    const fresh = reactions.filter((r) => !seen.has(r.id));
+    if (!fresh.length) return;
+    for (const r of fresh) seen.add(r.id);
+    setBubbles((cur) => {
+      const add = fresh.map((r, k): Bubble => {
+        const meta = r.player === null ? null : players[r.player];
+        const app = PLAYER_COLORS[meta?.color ?? "red"];
+        const side = (cur.length + k) % 2 === 0 ? 1 : -1;
+        return {
+          id: r.id,
+          emoji: r.emoji,
+          name: r.player === null ? "Someone" : playerName(players, r.player),
+          fill: app.fill,
+          ink: app.ink,
+          x: side * (20 + Math.random() * 110),
+          dx: (Math.random() - 0.5) * 90,
+          wobble: Math.random() * -600,
+        };
+      });
+      return [...cur, ...add].slice(-MAX_BUBBLES);
+    });
+  }, [reactions, players, seen]);
+  return (
+    <div className="carc-bubbles" aria-hidden>
+      {bubbles.map((b) => (
+        <span
+          key={b.id}
+          className="carc-bubble"
+          onAnimationEnd={(e) => e.target === e.currentTarget && setBubbles((cur) => cur.filter((x) => x.id !== b.id))}
+          style={{ ["--x" as string]: `${b.x}px`, ["--dx" as string]: `${b.dx}px`, ["--wobble" as string]: `${b.wobble}ms`, ["--seat" as string]: b.fill, ["--seat-ink" as string]: b.ink }}
+        >
+          <span className="carc-bubble-rise">
+            <span className="carc-bubble-wobble">
+              <span className="carc-bubble-emoji">{b.emoji}</span>
+              <span className="carc-bubble-name">{b.name}</span>
+            </span>
+          </span>
+        </span>
+      ))}
+    </div>
   );
 }
 

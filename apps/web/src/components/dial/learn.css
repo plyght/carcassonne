@@ -288,82 +288,194 @@
   }
 }
 
-.carc-rules-dialog {
-  width: min(780px, 100%);
-  max-height: calc(100svh - 2 * var(--sp-4));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  box-shadow: var(--elev-3);
-  padding: var(--sp-8);
+/* ── the rules sheet (learn/how-to-play.tsx) ─────────────────────────── */
+/*
+ * Editorial and calm: a heading, a one-line lead, a quiet section index on the left and
+ * one scrolling column of short sections. Illustrations are real tiles on a piece of
+ * the game table (--game-table). It blurs in and out without moving.
+ */
+
+.carc-rs-modal {
+  animation: carc-fade var(--dur-base) ease;
 }
 
-.carc-rules-head {
+.carc-rs-modal[data-state="closing"] {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.carc-rs {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  height: min(780px, calc(100svh - 2 * var(--sp-4)));
+  overflow: hidden;
+  border-radius: var(--r-sheet);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain), var(--sheet-shading);
+  box-shadow: var(--elev-3);
+  color: var(--text-1);
+  animation: carc-rs-in 260ms var(--ease-reveal) both;
+}
+
+.carc-rs-modal[data-state="closing"] .carc-rs {
+  animation: carc-rs-out 140ms ease both;
+}
+
+@keyframes carc-rs-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(0.985);
+  }
+}
+
+@keyframes carc-rs-out {
+  to {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+.carc-rs-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--sp-4);
+  gap: var(--sp-6);
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--text-1) 8%, transparent);
 }
 
-.carc-rules-head .carc-sub {
-  max-width: 52ch;
-  font-size: var(--fs-lead);
+.carc-rs-h {
+  font: var(--fw-heading) 30px / 1.1 var(--font-heading);
+  letter-spacing: -0.03em;
 }
 
-.carc-rules {
-  margin-top: var(--sp-4);
-}
-
-.carc-rules-sub {
-  margin-top: var(--sp-8);
-  font: var(--fw-strong) var(--fs-small) / var(--lh-snug) var(--font-ui);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-  color: var(--text-2);
-}
-
-.carc-rule {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-8);
-  padding: var(--sp-5) 0;
-}
-
-.carc-rule-title {
-  font: var(--fw-heading) var(--fs-title) / var(--lh-tight) var(--font-heading);
-  letter-spacing: var(--ls-display);
-  color: var(--text-1);
-}
-
-.carc-rule-text p,
-.carc-steps-list {
+.carc-rs-lead {
+  max-width: 46ch;
   margin-top: var(--sp-2);
-  max-width: 52ch;
-  font: var(--fw-regular) 15px / 1.55 var(--font-ui);
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.carc-rs-main {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.carc-rs-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-6) var(--sp-3) var(--sp-6) var(--sp-5);
+}
+
+.carc-rs-toc-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-height: 36px;
+  padding: var(--sp-2) var(--sp-3);
+  border: none;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-2);
+  font: var(--fw-medium) var(--fs-body) / 1.3 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.carc-rs-toc-link .carc-num {
+  font-size: var(--fs-small);
+  color: var(--text-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .carc-rs-toc-link:hover {
+    background: var(--fill);
+    color: var(--text-1);
+  }
+}
+
+.carc-rs-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-6) var(--sp-8) var(--sp-8) var(--sp-4);
+  outline: none;
+}
+
+.carc-rs-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.carc-rs-section {
+  scroll-margin-top: var(--sp-6);
+}
+
+.carc-rs-n {
+  font-size: var(--fs-small);
+  color: var(--text-accent);
+}
+
+.carc-rs-title {
+  margin-top: var(--sp-1);
+  margin-bottom: var(--sp-4);
+  font: var(--fw-heading) 22px / 1.2 var(--font-heading);
+  letter-spacing: -0.022em;
+}
+
+.carc-rs-text,
+.carc-rs-steps {
+  max-width: 54ch;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--text-1);
   text-wrap: pretty;
 }
 
-.carc-steps-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
+.carc-rs-hint {
+  margin-top: var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.carc-rs-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.carc-rs-steps {
+  display: grid;
+  gap: var(--sp-3);
   padding: 0;
   list-style: none;
   counter-reset: step;
 }
 
-.carc-steps-list li {
+.carc-rs-steps li {
   position: relative;
   padding-left: 36px;
   counter-increment: step;
 }
 
-.carc-steps-list li::before {
+.carc-rs-steps li::before {
   content: counter(step);
   position: absolute;
   left: 0;
-  top: 0;
+  top: 1px;
   display: grid;
   place-items: center;
   width: 24px;
@@ -371,41 +483,135 @@
   border-radius: 50%;
   background: var(--primary);
   color: var(--primary-foreground);
-  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-num);
 }
 
-.carc-steps-list strong {
-  font-weight: var(--fw-strong);
-}
-
-.carc-rule-figure {
+/* a piece of the game table holding a few real tiles */
+.carc-plate {
   display: grid;
   place-items: center;
+  min-width: 168px;
+  min-height: 132px;
   margin: 0;
+  padding: var(--sp-5);
+  border-radius: var(--r-control);
+  background: var(--game-table);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
 }
 
-.carc-rules-foot {
+.carc-plate[data-wide] {
+  min-height: 112px;
+}
+
+.carc-rs-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-8) var(--sp-6);
+  padding: 0;
+  list-style: none;
+}
+
+.carc-rs-features .carc-plate {
+  height: 168px;
+}
+
+.carc-rs-feature-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0 var(--sp-1);
+}
+
+.carc-rs-feature-name {
+  font: var(--fw-medium) var(--fs-lead) / 1.3 var(--font-heading);
+  letter-spacing: -0.01em;
+}
+
+.carc-rs-pair .carc-rs-feature-name {
+  margin: var(--sp-4) 0 var(--sp-1);
+}
+
+.carc-rs-feature-who {
+  color: var(--text-2);
+  font-weight: var(--fw-regular);
+}
+
+.carc-rs-worth {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: var(--r-inner);
+  background: var(--fill-gold);
+  color: var(--text-1);
+  font-size: var(--fs-small);
+}
+
+.carc-rs-chip {
+  padding: var(--sp-4);
+}
+
+.carc-rs-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-6);
+}
+
+.carc-rs-pair .carc-plate {
+  height: 140px;
+}
+
+.carc-rs-foot {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--sp-2);
-  margin-top: var(--sp-6);
+  margin-top: var(--sp-12);
 }
 
-@media (max-width: 639px) {
-  .carc-rules-dialog {
-    padding: var(--sp-5);
+@media (max-width: 767px) {
+  .carc-rs-modal {
+    padding: 0;
+    place-items: stretch;
   }
-
-  .carc-rule {
+  .carc-rs {
+    width: 100%;
+    height: 100svh;
+    border-radius: 0;
+  }
+  .carc-rs-head {
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
+  }
+  .carc-rs-h {
+    font-size: 26px;
+  }
+  .carc-rs-main {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-3);
   }
+  .carc-rs-toc {
+    display: none;
+  }
+  .carc-rs-scroll {
+    padding: var(--sp-5) var(--sp-4) var(--sp-8);
+  }
+  .carc-rs-split,
+  .carc-rs-features,
+  .carc-rs-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .carc-rs-split .carc-plate {
+    justify-self: start;
+  }
+}
 
-  .carc-rule-figure {
-    justify-items: start;
-    place-items: start;
+@media (prefers-reduced-motion: reduce) {
+  .carc-rs,
+  .carc-rs-modal[data-state="closing"] .carc-rs {
+    animation: none;
   }
+}
+
+html[data-reduced-motion="true"] .carc-rs {
+  animation: none;
 }
 
 /* ── mini boards (real tiles as illustrations) ───────────────────────── */

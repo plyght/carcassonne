@@ -4,13 +4,16 @@
 // nudging, 3D quality, motion and sound. Sections are DialKit Folders (collapsible);
 // the panel springs open from the HUD button and closes on Escape or a click outside.
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 import { Folder } from "dialkit";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { X } from "reicon-react";
 
 import type { BoardCommands, CameraMode } from "@carcassonne/render-classic";
+
+import { popMotion } from "@/lib/motion";
+import { useReducedMotion } from "@/lib/settings";
 
 import { CameraNudgePad } from "./camera-pad";
 import { DialIconButton, DialSurface } from "./primitives";
@@ -35,7 +38,17 @@ export function TablePanel({
   anchorRef: RefObject<HTMLElement | null>;
 }) {
   const reduced = useReducedMotion();
+  const pop = popMotion(reduced);
   const panel = useRef<HTMLDivElement>(null);
+  // grow from the button: the origin is the anchor's centre, in the panel's own box
+  const [origin, setOrigin] = useState("calc(100% - 48px) top");
+  useLayoutEffect(() => {
+    if (!open) return;
+    const a = anchorRef.current?.getBoundingClientRect();
+    const box = panel.current?.offsetParent?.getBoundingClientRect();
+    if (!a || !box) return;
+    setOrigin(`calc(100% - ${Math.round(box.right - (a.left + a.width / 2))}px) top`);
+  }, [open, anchorRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,10 +84,10 @@ export function TablePanel({
           role="dialog"
           aria-label="Table settings"
           data-testid="table-panel"
-          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: -6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -4, transition: { duration: 0.12 } }}
-          transition={{ type: "spring", visualDuration: 0.26, bounce: 0.18 }}
+          style={{ transformOrigin: origin }}
+          initial={pop.initial}
+          animate={pop.animate}
+          exit={pop.exit}
         >
           <DialSurface>
             <div className="carc-dial-panel">
