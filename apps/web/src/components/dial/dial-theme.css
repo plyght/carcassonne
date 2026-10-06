@@ -1,0 +1,953 @@
+/*
+ * DialKit, dressed for the table.
+ *
+ * DialKit ships a dark glass theme (dialkit/styles.css). This sheet re-points its CSS
+ * variables at the app tokens (tokens.css: spacing, radii, heights, type, colours) and
+ * the warm parchment / walnut / terracotta palette, so every DialKit surface — game
+ * controls, the HUD panel, the ?tune panels and the timeline dock — follows light and
+ * dark mode (next-themes toggles `.dark` on <html>). Selectors carry `html` +
+ * `[data-theme]` to outrank DialKit's `.dialkit-root[data-theme=…]` blocks.
+ *
+ * House rules: controls are filled rows (DialKit's language), never bordered boxes;
+ * containers are cardstock sheets (tokens.css `.carc-sheet`), never nested; text is
+ * ≥ 13 px; rows are 40 px, inner controls 32 px; radii are --r-control and --r-sheet;
+ * every row's text starts at the same 12 px inset, inner controls sit 4 px from the
+ * right edge.
+ */
+
+html .dialkit-root[data-theme] {
+  --dial-surface: var(--fill);
+  --dial-surface-hover: var(--fill-hover);
+  --dial-surface-active: var(--fill-active);
+  --dial-surface-subtle: color-mix(in oklch, var(--wood) 14%, transparent);
+
+  --dial-text-root: var(--text-1);
+  --dial-text-section: var(--text-2);
+  --dial-text-label: var(--text-1);
+  --dial-text-focus: var(--text-1);
+  --dial-text-primary: var(--text-1);
+  --dial-text-secondary: var(--text-2);
+  --dial-text-tertiary: var(--text-2);
+
+  --dial-border: color-mix(in oklch, var(--wood) 22%, transparent);
+  --dial-border-hover: color-mix(in oklch, var(--primary) 35%, transparent);
+  --dial-focus-ring: var(--ring);
+  --dial-timeline-clip-overlay: color-mix(in oklch, var(--primary) 34%, transparent);
+
+  --dial-glass-bg: var(--sheet);
+  --dial-dropdown-bg: var(--sheet);
+  --dial-backdrop-blur: 0px;
+  --dial-radius: var(--r-control);
+  --dial-row-height: var(--h-control);
+  --dial-row-gap: var(--sp-2);
+  --dial-shadow: var(--sheet-lift);
+  --dial-shadow-collapsed: var(--sheet-lift);
+  --dial-shadow-dropdown: 0 18px 40px -16px rgba(70, 44, 16, 0.5), 0 2px 6px -3px rgba(70, 44, 16, 0.25);
+
+  --row-inset: var(--sp-3);
+  --row-inset-control: var(--sp-1);
+
+  /* app fonts (next/font variables live on <body>; Tailwind's @theme inline doesn't emit --font-*) */
+  --carc-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --carc-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --carc-display: var(--font-display-serif), ui-serif, Georgia, serif;
+
+  font-family: var(--carc-sans);
+  color: var(--text-1);
+}
+
+html.dark .dialkit-root[data-theme] {
+  --dial-surface-subtle: color-mix(in oklch, var(--foreground) 10%, transparent);
+  --dial-border: color-mix(in oklch, var(--foreground) 14%, transparent);
+  --dial-timeline-clip-overlay: color-mix(in oklch, var(--primary) 28%, rgba(0, 0, 0, 0.25));
+  --dial-shadow-dropdown: 0 18px 40px -14px rgba(0, 0, 0, 0.75);
+}
+
+/* ── type: 14 px labels and values, 13 px secondary ───────────────────── */
+
+html .dialkit-root :is(.dialkit-slider-label, .dialkit-slider-value, .dialkit-slider-input, .dialkit-labeled-control-label, .dialkit-segmented-button, .dialkit-select-trigger, .dialkit-select-label, .dialkit-select-value, .dialkit-select-option, .dialkit-text-label, .dialkit-text-input, .dialkit-color-label, .dialkit-pad-label, .dialkit-pad-axis, .dialkit-pad-value, .dialkit-button, .dialkit-action-button) {
+  font-size: var(--fs-body);
+}
+
+html .dialkit-root :is(.dialkit-slider-value, .dialkit-slider-input, .dialkit-pad-value, .dialkit-color-value, .dialkit-color-css-input, .dialkit-timeline-time, .dialkit-timeline-tick-label, .dialkit-timeline-clip-duration, .dialkit-timeline-playhead-flag) {
+  font-family: var(--carc-mono);
+}
+
+html .dialkit-root :is(.dialkit-timeline-tick-label, .dialkit-timeline-clip-duration, .dialkit-timeline-playhead-flag, .dialkit-color-value) {
+  font-size: var(--fs-small);
+}
+
+html .dialkit-root .dialkit-folder-title-root {
+  font-family: var(--carc-display);
+  font-size: var(--fs-title);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* section folders: a 13 px caps label, grouped by spacing (no rules) */
+html .dialkit-root .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header .dialkit-folder-title {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+html .dialkit-root .dialkit-panel[data-multiple="true"] .dialkit-folder-root > .dialkit-folder-content > .dialkit-folder-inner > .dialkit-folder > .dialkit-folder-header .dialkit-folder-title {
+  font-family: var(--carc-display);
+  font-size: var(--fs-lead);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-1);
+}
+
+html .dialkit-root .dialkit-folder:not(.dialkit-folder-root) {
+  border-top: none;
+  border-bottom: none;
+  margin-top: var(--sp-2);
+  margin-bottom: 0;
+}
+
+html .dialkit-root .dialkit-folder:not(.dialkit-folder-root) + .dialkit-folder:not(.dialkit-folder-root) {
+  margin-top: var(--sp-1);
+}
+
+html .dialkit-root .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header > .dialkit-folder-header-top {
+  padding-left: var(--row-inset);
+  padding-right: var(--sp-2);
+}
+
+html .dialkit-root .dialkit-panel-header {
+  border-bottom: none;
+}
+
+html .dialkit-root .dialkit-folder-inner {
+  padding-bottom: var(--sp-2);
+}
+
+/* ── panel surfaces: cardstock ────────────────────────────────────────── */
+
+html .dialkit-root .dialkit-panel-inner {
+  border: none;
+  border-radius: var(--r-sheet);
+  background-image: var(--paper-grain);
+}
+
+html .dialkit-root .dialkit-panel-inner[data-collapsed="true"] {
+  border-radius: 50%;
+  color: var(--primary);
+}
+
+/* ── rows: one inset for text, one for inner controls ─────────────────── */
+
+html .dialkit-root .dialkit-slider-label {
+  left: var(--row-inset);
+}
+
+html .dialkit-root :is(.dialkit-slider-value, .dialkit-slider-input) {
+  right: var(--row-inset);
+}
+
+html .dialkit-root .dialkit-labeled-control {
+  padding: 0 var(--row-inset-control) 0 var(--row-inset);
+}
+
+html .dialkit-root .dialkit-labeled-control .dialkit-segmented {
+  margin-right: 0;
+}
+
+html .dialkit-root :is(.dialkit-select-trigger, .dialkit-text-control, .dialkit-color-control, .dialkit-pad-caption) {
+  padding-left: var(--row-inset);
+  padding-right: var(--row-inset);
+}
+
+/* ── sliders: terracotta fill and handle ──────────────────────────────── */
+
+html .dialkit-root .dialkit-slider-fill {
+  background: color-mix(in oklch, var(--primary) 16%, transparent);
+}
+
+html .dialkit-root .dialkit-slider-active .dialkit-slider-fill {
+  background: color-mix(in oklch, var(--primary) 24%, transparent);
+}
+
+html .dialkit-root .dialkit-slider-handle {
+  background: var(--primary);
+}
+
+html .dialkit-root .dialkit-slider:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ── segmented / toggles: a tinted inset, not a raised pill ───────────── */
+
+html .dialkit-root .dialkit-segmented {
+  padding: 0;
+  gap: 2px;
+  align-items: center;
+}
+
+html .dialkit-root .dialkit-segmented-pill {
+  top: 0;
+  bottom: 0;
+  border-radius: calc(var(--r-control) - 2px);
+  background: var(--fill-active);
+  box-shadow: none;
+}
+
+html .dialkit-root .dialkit-segmented-button {
+  height: var(--h-compact);
+  padding: 0 var(--sp-3);
+  border-radius: calc(var(--r-control) - 2px);
+  font-weight: 500;
+}
+
+html .dialkit-root .dialkit-segmented-button[data-active="false"] {
+  color: var(--text-2);
+}
+
+html .dialkit-root .dialkit-segmented-button[data-active="true"] {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+html .dialkit-root .dialkit-segmented-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+html .dialkit-root .dialkit-segmented-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Toggle (DialKit's Off/On segmented): "On" fills terracotta */
+html .dialkit-root .dialkit-labeled-control:has(.dialkit-segmented-button:last-child[data-active="true"]):not(.carc-seg-row) .dialkit-segmented-pill {
+  background: var(--primary);
+}
+
+html .dialkit-root .dialkit-labeled-control:has(.dialkit-segmented-button:last-child[data-active="true"]):not(.carc-seg-row) .dialkit-segmented-button[data-active="true"] {
+  color: var(--primary-foreground);
+}
+
+/* ── selects, text, buttons ───────────────────────────────────────────── */
+
+html .dialkit-root .dialkit-select-dropdown {
+  border: none;
+  border-radius: var(--r-control);
+  background-image: var(--paper-grain);
+}
+
+html .dialkit-root .dialkit-select-option {
+  min-height: var(--h-compact);
+  border-radius: calc(var(--r-control) - 2px);
+}
+
+html .dialkit-root .dialkit-select-option[data-selected="true"] {
+  color: var(--text-accent);
+  background: var(--fill-active);
+}
+
+html .dialkit-root .dialkit-text-input {
+  color: var(--text-1);
+}
+
+html .dialkit-root :is(.dialkit-button, .dialkit-action-button) {
+  min-height: var(--h-control);
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+html .dialkit-root .dialkit-actions-stack,
+html .dialkit-root .dialkit-action-button {
+  width: 100%;
+}
+
+html .dialkit-root .dialkit-pad-point {
+  background: var(--primary);
+}
+
+html .dialkit-root .dialkit-spring-viz path {
+  stroke: var(--primary);
+}
+
+html .dialkit-root .dialkit-toolbar-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+html .dialkit-root .dialkit-toolbar-primary:hover {
+  background: color-mix(in oklch, var(--primary) 86%, black);
+}
+
+/* ── timeline dock (?tune) ────────────────────────────────────────────── */
+
+html .dialkit-root .dialkit-timeline-dock {
+  border: none;
+  border-radius: var(--r-sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--sheet-lift), 0 20px 40px -24px rgba(40, 24, 8, 0.5);
+  /* DialKit's default dock (400 px) would bury the board; drag the top edge to grow it */
+  max-height: min(296px, 42vh) !important;
+}
+
+html .dialkit-root :is(.dialkit-timeline-playhead-stem, .dialkit-timeline-playhead-flag) {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: transparent;
+}
+
+/* ?tune: the floating panel stops above the timeline dock */
+html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inner:not([data-collapsed="true"]) {
+  max-height: calc(100svh - min(296px, 42vh) - 48px) !important;
+}
+
+/* ══ Game controls built on DialKit ═══════════════════════════════════ */
+
+.carc-dial {
+  position: relative;
+}
+
+.carc-dial-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* A DialKit panel on cardstock (HUD popover). */
+.carc-dial-panel {
+  box-sizing: border-box;
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--sheet-lift), 0 24px 48px -24px rgba(40, 24, 8, 0.5);
+  padding: var(--sp-2) var(--sp-4) var(--sp-4);
+}
+
+.carc-dial-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-2) var(--row-inset);
+}
+
+.carc-dial-title {
+  font-family: var(--carc-display);
+  font-size: var(--fs-title);
+  font-weight: 500;
+  line-height: var(--lh-tight);
+  color: var(--text-1);
+}
+
+.carc-dial-sub {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-small);
+  line-height: var(--lh-text);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+/* one-line explanation under a control: same 12 px inset as the row text */
+.carc-dial-hint {
+  margin: 0;
+  padding: 0 var(--row-inset);
+  font-size: var(--fs-small);
+  line-height: var(--lh-text);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.carc-dial-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.carc-dial-section-label {
+  margin: var(--sp-4) 0 0;
+  padding: 0 var(--row-inset);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.carc-icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--h-compact);
+  height: var(--h-compact);
+  border: none;
+  border-radius: calc(var(--r-control) - 2px);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.carc-icon-button svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.carc-icon-button:hover {
+  background: var(--fill-hover);
+  color: var(--text-1);
+}
+
+.carc-icon-button:active {
+  transform: scale(0.94);
+}
+
+:is(.carc-icon-button, .carc-dial-button, .carc-select-trigger, .carc-meeple, .carc-seat-name, .carc-seed-input):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.carc-dial-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--h-control);
+  padding: 0 var(--sp-4);
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font: 500 var(--fs-body) var(--carc-sans);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.carc-dial-button svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.carc-dial-button:hover {
+  background: var(--fill-hover);
+}
+
+.carc-dial-button:active {
+  transform: scale(0.97);
+}
+
+.carc-dial-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.carc-dial-button[data-variant="primary"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  box-shadow: 0 10px 22px -12px color-mix(in oklch, var(--primary) 80%, black);
+}
+
+.carc-dial-button[data-variant="primary"]:hover {
+  background: color-mix(in oklch, var(--primary) 88%, black);
+}
+
+.carc-dial-button[data-variant="ghost"] {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.carc-dial-button[data-variant="ghost"]:hover {
+  background: var(--fill);
+  color: var(--text-1);
+}
+
+.carc-dial-button[data-size="large"] {
+  height: var(--sp-12);
+  padding: 0 var(--sp-6);
+  font-size: var(--fs-lead);
+}
+
+/* Segmented row with icons; stacked = label above, options full width. */
+.carc-seg-row[data-stacked="true"] {
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: var(--sp-1) var(--row-inset-control) var(--row-inset-control) var(--row-inset);
+}
+
+.carc-seg-row[data-stacked="true"] .dialkit-labeled-control-label {
+  line-height: var(--h-compact);
+}
+
+.carc-seg-row[data-stacked="true"] .dialkit-segmented {
+  margin-left: calc(var(--row-inset-control) - var(--row-inset));
+}
+
+.carc-seg-row[data-stacked="true"] .dialkit-segmented-button {
+  flex: 1 1 0;
+}
+
+.carc-seg .dialkit-segmented-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-width: var(--h-compact);
+  font-variant-numeric: tabular-nums;
+}
+
+.carc-seg .dialkit-segmented-button svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+/* Page-level tabs (vs AI / Hot-seat): a 40 px filled row like any other control. */
+.carc-seg-tabs {
+  height: var(--h-control);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-control);
+  background: var(--fill);
+}
+
+.carc-seg-tabs .dialkit-segmented-pill {
+  top: var(--sp-1);
+  bottom: var(--sp-1);
+}
+
+.carc-seg-tabs .dialkit-segmented-button {
+  padding: 0 var(--sp-4);
+}
+
+.carc-seg-compact {
+  height: var(--h-compact);
+  padding: 0;
+  background: transparent;
+}
+
+.carc-seg-compact .dialkit-segmented-pill {
+  top: 0;
+  bottom: 0;
+}
+
+.carc-seg-compact .dialkit-segmented-button {
+  padding: 0 var(--sp-2);
+}
+
+/* ── listbox select with swatches / icons ─────────────────────────────── */
+
+.carc-select-trigger .carc-select-swatch {
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: 4px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.carc-select-trigger .dialkit-select-value {
+  color: var(--text-1);
+}
+
+.carc-select-trigger svg:not(.dialkit-select-chevron) {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.carc-select-dropdown {
+  position: fixed;
+  z-index: 10000;
+  box-sizing: border-box;
+  max-height: min(400px, 70vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-1);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  border-radius: var(--r-control);
+  box-shadow: var(--dial-shadow-dropdown);
+}
+
+.carc-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--h-control);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2);
+  box-sizing: border-box;
+  border: none;
+  border-radius: calc(var(--r-control) - 2px);
+  background: transparent;
+  color: var(--text-1);
+  font: 500 var(--fs-body) / var(--lh-tight) var(--carc-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.carc-select-option[data-active="true"] {
+  background: var(--fill-hover);
+}
+
+.carc-select-option[aria-selected="true"] {
+  background: var(--fill-active);
+}
+
+.carc-select-option[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.carc-select-option[aria-disabled="true"] :is(.carc-select-option-label, .carc-select-swatch) {
+  opacity: 0.55;
+}
+
+.carc-select-option .carc-select-swatch {
+  width: var(--h-compact);
+  height: var(--h-compact);
+  border-radius: calc(var(--r-control) - 2px);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.carc-select-option .carc-select-icon {
+  display: grid;
+  place-items: center;
+  width: var(--h-compact);
+  height: var(--h-compact);
+  flex-shrink: 0;
+  border-radius: calc(var(--r-control) - 2px);
+  background: var(--fill);
+  color: var(--text-2);
+}
+
+.carc-select-option .carc-select-icon svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+
+.carc-select-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.carc-select-option-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.carc-select-option-hint {
+  font-size: var(--fs-small);
+  font-weight: 400;
+  line-height: var(--lh-text);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carc-select-check {
+  width: var(--icon);
+  height: var(--icon);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.carc-badge {
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* ── seed row: one 40 px row with the text field and re-roll inside ───── */
+
+.carc-seed {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--h-control);
+  padding: 0 var(--row-inset-control) 0 var(--row-inset);
+  border-radius: var(--r-control);
+  background: var(--fill);
+}
+
+.carc-seed-label {
+  flex-shrink: 0;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-1);
+}
+
+.carc-seed-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-compact);
+  padding: 0 var(--sp-2);
+  border: none;
+  border-radius: calc(var(--r-control) - 2px);
+  background: transparent;
+  color: var(--text-1);
+  font: 500 var(--fs-body) var(--carc-mono);
+  text-align: right;
+}
+
+.carc-seed-input:hover,
+.carc-seed-input:focus {
+  background: var(--fill);
+}
+
+/* ── meeple colour picker ─────────────────────────────────────────────── */
+
+.carc-meeples {
+  display: flex;
+  align-items: center;
+}
+
+.carc-meeple {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--h-compact);
+  height: var(--h-control);
+  padding: 0;
+  border: none;
+  border-radius: calc(var(--r-control) - 2px);
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.carc-meeple::after {
+  /* the felt spot the chosen meeple stands on */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 22px;
+  height: 5px;
+  border-radius: 50%;
+  transform: translateX(-50%) scale(0.4);
+  background: color-mix(in oklch, var(--text-1) 28%, transparent);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.carc-meeple[aria-checked="true"]::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.carc-meeple:hover {
+  background: var(--fill);
+}
+
+.carc-meeple[data-taken="true"] svg {
+  opacity: 0.5;
+}
+
+/* ── player seat rows: flat (no box), aligned columns, grouped by spacing ── */
+
+.carc-seats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.carc-seat {
+  display: grid;
+  grid-template-columns: var(--h-control) minmax(0, 1fr) auto 176px;
+  grid-template-areas: "avatar name color who";
+  align-items: center;
+  column-gap: var(--sp-2);
+}
+
+.carc-seat-avatar {
+  grid-area: avatar;
+  display: grid;
+  place-items: center;
+  width: var(--h-control);
+  height: var(--h-control);
+  border-radius: var(--r-control);
+}
+
+.carc-seat-name {
+  grid-area: name;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--h-control);
+  padding: 0 var(--row-inset);
+  border: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--text-1);
+  font: 500 var(--fs-body) var(--carc-sans);
+  transition: background 0.15s;
+}
+
+.carc-seat-name:hover,
+.carc-seat-name:focus {
+  background: var(--fill-hover);
+}
+
+.carc-seat-color {
+  grid-area: color;
+}
+
+.carc-seat-who {
+  grid-area: who;
+  min-width: 0;
+}
+
+@media (max-width: 719px) {
+  .carc-seat {
+    grid-template-columns: var(--h-control) minmax(0, 1fr) 168px;
+    grid-template-areas:
+      "avatar name who"
+      ". color color";
+    row-gap: var(--sp-1);
+  }
+
+  .carc-seats {
+    gap: var(--sp-4);
+  }
+}
+
+@media (max-width: 519px) {
+  .carc-seat {
+    grid-template-columns: var(--h-control) minmax(0, 1fr);
+    grid-template-areas:
+      "avatar name"
+      ". who"
+      ". color";
+    row-gap: var(--sp-2);
+  }
+}
+
+/* ── tile rotation dial ───────────────────────────────────────────────── */
+
+.carc-rot {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 50%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  outline: none;
+}
+
+.carc-rot[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+.carc-rot[aria-disabled="true"] {
+  cursor: default;
+}
+
+.carc-rot:focus-visible .carc-rot-ring {
+  stroke: var(--ring);
+  stroke-width: 2.5;
+}
+
+.carc-rot-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.carc-rot-ring {
+  fill: var(--fill);
+  stroke: transparent;
+  stroke-width: 1;
+  transition: fill 0.15s;
+}
+
+.carc-rot:hover .carc-rot-ring {
+  fill: var(--fill-hover);
+}
+
+.carc-rot-tick {
+  stroke: color-mix(in oklch, var(--text-2) 55%, transparent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.carc-rot-tick[data-legal="true"] {
+  stroke: var(--primary);
+  stroke-width: 3;
+}
+
+.carc-rot-knob {
+  fill: var(--primary);
+  stroke: var(--sheet);
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 1.5px rgba(60, 35, 10, 0.35));
+}
+
+.carc-rot-tile {
+  position: absolute;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 6px 14px -6px rgba(40, 25, 10, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.carc-rot-label {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 60%);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-control);
+  background-color: var(--sheet);
+  box-shadow: var(--sheet-lift);
+  color: var(--text-2);
+  font: 500 var(--fs-small) / 20px var(--carc-mono);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* ── HUD popover ──────────────────────────────────────────────────────── */
+
+.carc-hud-popover {
+  width: min(336px, calc(100vw - 24px));
+  max-height: calc(100svh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  transform-origin: top right;
+  border-radius: var(--r-sheet);
+}
+
+/* ── tune mode preview chip ───────────────────────────────────────────── */
+
+.carc-tune-stage {
+  position: relative;
+  width: 168px;
+  height: 120px;
+  border-radius: var(--r-sheet);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--sheet-lift), 0 18px 36px -20px rgba(40, 24, 8, 0.5);
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carc-meeple::after {
+    transition: none;
+  }
+}
+
+/* the view-nudge pad: a wide field, not a square, inside the HUD panel */
+.carc-hud-popover .dialkit-pad-surface {
+  aspect-ratio: 16 / 9;
+}

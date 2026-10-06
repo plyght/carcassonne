@@ -202,9 +202,17 @@ async function signUp(ctx: BrowserContext, name: string) {
 
 async function createRoom(host: Page, opts: { seats: number; bots: number; river?: boolean }) {
   await host.goto(`${WEB}/online`);
-  await host.getByRole("button", { name: String(opts.seats), exact: true }).first().click();
-  await host.locator("section", { hasText: "Host a room" }).getByRole("button", { name: String(opts.bots), exact: true }).last().click();
-  if (opts.river === false) await host.getByRole("switch", { name: "The River" }).click();
+  // DialKit sliders: Home/End then step with the arrow keys
+  const setSlider = async (name: string, value: number, min: number) => {
+    const sl = host.getByRole("slider", { name, exact: true });
+    await sl.focus();
+    await host.keyboard.press("Home");
+    for (let v = min; v < value; v++) await host.keyboard.press("ArrowRight");
+    await host.waitForFunction(([n, v]) => document.querySelector(`[role=slider][aria-label="${n}"]`)?.getAttribute("aria-valuenow") === String(v), [name, value] as const);
+  };
+  await setSlider("Seats", opts.seats, 2);
+  await setSlider("Bots", opts.bots, 0);
+  if (opts.river === false) await host.getByRole("radiogroup", { name: "The River" }).getByRole("radio", { name: "Off" }).click();
   await host.getByTestId("create-room").click();
   await host.waitForURL(/\/r\/[A-Z0-9]+$/, { timeout: T });
   const code = host.url().split("/r/")[1]!;
@@ -293,9 +301,9 @@ try {
   await step("guest switches live to 3D Tabletop; turns stay in sync with a 2D client", async () => {
     const before = await ply(bob);
     await bob.getByTestId("style-button").click();
-    const dialog = bob.getByRole("dialog", { name: "Board style" });
-    await dialog.getByRole("option", { name: /tabletop/i }).click();
-    await dialog.getByRole("button", { name: /use this style/i }).click();
+    const panel = bob.getByRole("dialog", { name: "Table settings" });
+    await panel.getByTestId("style-select").click();
+    await bob.getByRole("option", { name: /tabletop/i }).click();
     await bob.keyboard.press("Escape");
     await bob.waitForSelector("[data-testid=board-3d][data-ready='1']", { timeout: 90_000 });
     assert((await ply(bob)) >= before, "style switch lost the game state");

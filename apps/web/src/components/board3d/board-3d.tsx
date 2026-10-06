@@ -13,7 +13,10 @@ import type { NodeRef } from "@carcassonne/game-client";
 import type { EngineEvent, FigureOption, GameView, Placement, TileId } from "@carcassonne/protocol";
 import type { BoardCommands, CameraMode, Cell, StyleId } from "@carcassonne/render-classic";
 import type { PickResult, RendererEvent, RendererStats } from "@carcassonne/render-three";
+import { withAnimTuning } from "@carcassonne/render-three/tuning";
 import { cn } from "@carcassonne/ui/lib/utils";
+
+import { tuneStore, useTunedPack } from "@/lib/tuning";
 
 import { detectTier, probeGpu, type Tier3D } from "./capabilities";
 import type { BoardRenderer } from "./runtime";
@@ -107,7 +110,8 @@ export function Board3D(props: Board3DProps) {
       canvas.dataset.testid = "board-3d-canvas";
       host.appendChild(canvas);
       try {
-        r = await mod.createBoard(canvas, p.geo, {
+        // the geo provider's anim timelines pass through ?tune clip edits (a no-op otherwise)
+        r = await mod.createBoard(canvas, withAnimTuning(p.geo, tuneStore.anim), {
           style: p.styleId,
           camera: toThree(p.camera),
           tier: p.tier === "auto" ? detectTier(probe) : p.tier,
@@ -230,9 +234,14 @@ export function Board3D(props: Board3DProps) {
   // ── prop sync ─────────────────────────────────────────────────────────────
   const { styleId, camera, tier, reducedMotion, view, batches, playerSlots, hints, ghost, pending } = props;
 
+  // style switches apply at once; ?tune edits (a new pack object per change) coalesce per frame
+  const tunedPack = useTunedPack(styleId);
   useEffect(() => {
-    if (ready) rRef.current!.setStyle(styleId);
-  }, [ready, styleId]);
+    if (!ready) return;
+    if (!tunedPack) return rRef.current!.setStyle(styleId);
+    const id = requestAnimationFrame(() => rRef.current?.setStyle(tunedPack));
+    return () => cancelAnimationFrame(id);
+  }, [ready, styleId, tunedPack]);
 
   useEffect(() => {
     const r = rRef.current;

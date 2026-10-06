@@ -18,6 +18,7 @@ export { TileGeometryCache, buildTileGeometry, rotXZ, type TileGeometry, type Ge
 export { featureAt, featureAtGrid, featureExtent, rayPlaneY, cellAt, toCanonical, rotatePorts, opposingPort } from "./picking";
 export { PropKit, VARIANTS as PROP_VARIANTS, type PropSource } from "./props";
 export * from "./styles";
+export * from "./tuning";
 
 export interface ThreeStyleEntry {
   id: BuiltinStyleId;

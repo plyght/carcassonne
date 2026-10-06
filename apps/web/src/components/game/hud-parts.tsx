@@ -16,13 +16,15 @@ import {
   type TileArtSource,
 } from "@carcassonne/render-classic";
 
+import { DialSurface } from "../dial/primitives";
+import { RotationDial } from "../dial/rotation-dial";
 import { FEATURE_LABEL, FIGURE_ROLE, formatClock, playerName, type Projection } from "./helpers";
 
 export function Panel({ className, children, ...rest }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "pointer-events-auto rounded-2xl border border-border/70 bg-card/92 text-card-foreground shadow-[0_10px_30px_-12px_rgba(40,25,10,0.45)] backdrop-blur-md",
+        "carc-hud-sheet pointer-events-auto text-card-foreground",
         className,
       )}
       {...rest}
@@ -34,7 +36,7 @@ export function Panel({ className, children, ...rest }: { className?: string; ch
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-5 items-center justify-center rounded-md border border-border bg-muted px-1 font-mono text-[10px] font-semibold text-muted-foreground">
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-[6px] bg-[var(--sheet)] px-1 font-mono text-[13px] font-medium text-[var(--text-1)] shadow-[inset_0_-1px_0_rgba(92,62,28,0.18)]">
       {children}
     </kbd>
   );
@@ -233,6 +235,8 @@ export function TileInHand({
   onBack,
   waitingFor,
   discardsNote,
+  legalRots,
+  dialSize = 116,
 }: {
   tile: TileId | null;
   rot: number;
@@ -248,47 +252,42 @@ export function TileInHand({
   onBack(): void;
   waitingFor: string | null;
   discardsNote?: string | null;
+  /** Rotations legal at the hovered spot (marked on the dial). */
+  legalRots?: number[];
+  dialSize?: number;
 }) {
   const def = tile ? catalog.get(tile) : undefined;
+  const interactive = canAct && !pending && !hidden && !!def;
   return (
     <Panel className="w-full p-3" aria-label="Tile in hand">
-      <div className="flex items-start gap-3">
-        <div
-          className="relative grid size-[104px] shrink-0 place-items-center rounded-xl p-1 shadow-inner"
-          style={{ background: palette.table }}
-        >
-          {def && !hidden ? (
-            // Rotation is painted into the art (not CSS-rotated), so the cloister, houses and lighting stay upright.
-            <TileThumb def={def} art={art} palette={palette} rot={rot} size={92} title={`Tile ${def.id}, rotated ${rot * 90}°`} className="rounded-md shadow-md" />
-          ) : (
-            <div className="grid size-[92px] place-items-center rounded-md bg-black/20 font-display text-3xl text-white/80">?</div>
-          )}
-        </div>
+      <div className="flex items-center gap-3">
+        <DialSurface className="shrink-0">
+          <RotationDial
+            rot={rot}
+            onRotate={onRotate}
+            legal={interactive ? legalRots : undefined}
+            disabled={!interactive}
+            size={dialSize}
+            tileSize={Math.round(dialSize * 0.6)}
+            label="Rotate the tile in hand"
+          >
+            {def && !hidden ? (
+              // Rotation is painted into the art (not CSS-rotated), so the cloister, houses and lighting stay upright.
+              <TileThumb def={def} art={art} palette={palette} rot={rot} size={Math.round(dialSize * 0.6)} title={`Tile ${def.id}, rotated ${rot * 90}°`} />
+            ) : (
+              <div className="grid size-full place-items-center font-display text-3xl text-white/85" style={{ background: palette.table }}>
+                ?
+              </div>
+            )}
+          </RotationDial>
+        </DialSurface>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tile in hand</div>
+          <div className="text-[13px] font-semibold tracking-[0.06em] text-[var(--text-2)] uppercase">Tile in hand</div>
           {canAct && !pending ? (
             <>
-              <p className="mt-1 text-sm leading-snug">Click a glowing spot to place it.</p>
-              <div className="mt-2 flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRotate(-1)}
-                  className="rounded-lg border bg-background px-2 py-1 text-sm hover:bg-muted"
-                  aria-label="Rotate counter-clockwise"
-                >
-                  ↺
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRotate(1)}
-                  className="rounded-lg border bg-background px-2 py-1 text-sm hover:bg-muted"
-                  aria-label="Rotate clockwise"
-                >
-                  ↻
-                </button>
-              </div>
-              <p className="mt-2 hidden text-[11px] md:block leading-relaxed text-muted-foreground">
-                <Kbd>R</Kbd> / scroll rotate · <Kbd>←↑→↓</Kbd> pick spot · <Kbd>Enter</Kbd> place
+              <p className="mt-1 text-sm leading-snug text-pretty">Click a glowing spot to place it.</p>
+              <p className="mt-2 text-[13px] leading-normal text-pretty text-[var(--text-2)]">
+                Turn the dial, scroll, or press <Kbd>R</Kbd>
               </p>
             </>
           ) : null}

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { effectiveCamera, getStyle, renderableStyle, type CameraMode, type StyleId, type StylePack } from "@carcassonne/render-classic";
 
-import { getSettings, updateSettings, useSettings, type Settings } from "./settings";
+import { getSettings, updateSettings, useSettings, type Settings, type VolumeBus } from "./settings";
 
 /** Switch the board style live (keeps the camera if the new style supports it). */
 export function selectStyle(id: StyleId): void {
@@ -30,6 +30,12 @@ export function selectTier(tier: Settings["tier"]): void {
 
 export function selectMotion(motion: Settings["motion"]): void {
   updateSettings({ motion });
+}
+
+/** Set one volume bus (0–100). The audio mixer reads the levels from settings. */
+export function setVolume(bus: VolumeBus, level: number): void {
+  const v = Math.max(0, Math.min(100, Math.round(level)));
+  updateSettings({ volume: { ...getSettings().volume, [bus]: v } });
 }
 
 /** 3D could not start on this device: fall back to the guaranteed Classic style. */

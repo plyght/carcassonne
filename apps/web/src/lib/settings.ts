@@ -20,7 +20,12 @@ export interface Settings {
   uiScale: 1 | 1.1 | 1.25;
   /** 3D performance tier; "auto" detects from the GPU and device. */
   tier: "auto" | "low" | "medium" | "high";
+  /** Volume buses, 0–100 (PRD §6.4). */
+  volume: VolumeLevels;
 }
+
+export type VolumeBus = "master" | "music" | "sfx" | "ambience";
+export type VolumeLevels = Record<VolumeBus, number>;
 
 export const DEFAULT_SETTINGS: Settings = {
   style: DEFAULT_STYLE,
@@ -33,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   botSpeed: "normal",
   uiScale: 1,
   tier: "auto",
+  volume: { master: 80, music: 60, sfx: 80, ambience: 50 },
 };
 
 const KEY = "carc.settings.v1";
@@ -40,7 +46,10 @@ const listeners = new Set<() => void>();
 let cache: Settings | null = null;
 
 function load(): Settings {
-  if (!cache) cache = { ...DEFAULT_SETTINGS, ...readJSON<Partial<Settings>>(KEY, {}) };
+  if (!cache) {
+    const saved = readJSON<Partial<Settings>>(KEY, {});
+    cache = { ...DEFAULT_SETTINGS, ...saved, volume: { ...DEFAULT_SETTINGS.volume, ...saved.volume } };
+  }
   return cache;
 }
 

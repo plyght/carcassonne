@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import Link from "next/link";
-import { ArrowLeft, Lightbulb, Palette, Undo2, Wifi, WifiOff, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Lightbulb, SlidersHorizontal, Undo2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import type { EngineEvent, FigureOption, Move } from "@carcassonne/protocol";
@@ -34,12 +34,15 @@ import {
 import type { PickResult } from "@carcassonne/render-three";
 import { cn } from "@carcassonne/ui/lib/utils";
 
+import { playTick, useAudioLevels } from "@/lib/audio";
 import { useCore } from "@/lib/core";
 import { fallbackToClassic, useBoardCamera } from "@/lib/board-controls";
 import { useDebugFlag, useReducedMotion, useSettings } from "@/lib/settings";
+import { useTunedPalette, useTuneMode } from "@/lib/tuning";
 
 import { Board3D } from "../board3d/board-3d";
-import { CameraSwitcher, StyleCarousel } from "../style/style-settings";
+import { TablePanel } from "../dial/table-panel";
+import { TuneMode } from "../tune/tune-mode";
 import { EndSummary } from "./end-summary";
 import { describeEvent, playerName, projectExtent, useClientState } from "./helpers";
 import {
@@ -78,7 +81,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const settings = useSettings();
   const reducedMotion = useReducedMotion();
   const style = renderableStyle(settings.style);
-  const palette = hudPalette(style);
+  const palette = useTunedPalette(hudPalette(style));
+  const tune = useTuneMode();
   const debug = useDebugFlag();
   const core = useCore();
   const art = core?.art ?? proceduralArt;
@@ -93,6 +97,9 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [styleOpen, setStyleOpen] = useState(false);
+  const tableButton = useRef<HTMLButtonElement>(null);
+  const closeTable = useCallback(() => setStyleOpen(false), []);
+  useAudioLevels();
   const [revealedPly, setRevealedPly] = useState<number>(-1);
   const [hintMove, setHintMove] = useState<Move | null>(null);
   const [fitSignal] = useState(0);
@@ -202,10 +209,16 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const rotate = useCallback(
     (dir: 1 | -1) => {
       if (pending) return;
+      playTick(dir > 0 ? 1 : 0.9);
       setRot((r) => nextRotation(s.legalPlacements, activeIsTarget ? active : null, activeIsTarget ? shownRot : r, dir));
     },
     [pending, s.legalPlacements, active, activeIsTarget, shownRot],
   );
+  /** Rotations the dial marks as legal: at the hovered spot, else anywhere on the board. */
+  const legalRots = useMemo(() => {
+    const at = activeIsTarget && active ? s.legalPlacements.filter((p) => p.x === active.x && p.y === active.y) : s.legalPlacements;
+    return [...new Set(at.map((p) => p.rot))];
+  }, [s.legalPlacements, active, activeIsTarget]);
 
   const place = useCallback(
     async (cell: Cell) => {
@@ -570,6 +583,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             </span>
           ) : null}
         </Panel>
+        <div className="relative shrink-0">
         <Panel className="flex shrink-0 items-center gap-1 p-1.5">
           {isLocal ? (
             <button
@@ -593,17 +607,30 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
               <Lightbulb className="size-4" /> <span className="hidden sm:inline">Hint</span>
             </button>
           ) : null}
-          {is3d ? <CameraSwitcher value={camera} onChange={chooseCamera} className="hidden sm:flex" /> : null}
           <button
+            ref={tableButton}
             type="button"
-            onClick={() => setStyleOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted"
-            title="Board style"
+            onClick={() => setStyleOpen((o) => !o)}
+            className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted", styleOpen && "bg-muted")}
+            title="Table: style, camera, quality, sound"
+            aria-expanded={styleOpen}
+            aria-haspopup="dialog"
             data-testid="style-button"
           >
-            <Palette className="size-4" /> <span className="hidden sm:inline">{style.name}</span>
+            <SlidersHorizontal className="size-4" /> <span className="hidden sm:inline">{style.name}</span>
+            <ChevronDown className={cn("hidden size-3.5 opacity-60 transition-transform sm:block", styleOpen && "rotate-180")} />
           </button>
         </Panel>
+        <TablePanel
+          open={styleOpen}
+          onClose={closeTable}
+          camera={camera}
+          onCamera={chooseCamera}
+          is3d={is3d}
+          commands={commands}
+          anchorRef={tableButton}
+        />
+        </div>
       </div>
 
       {/* left: scores */}
@@ -642,6 +669,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             pending={!!pending}
             choices={choices}
             onRotate={rotate}
+            legalRots={legalRots}
             onChoose={choose}
             onBack={() => setPending(null)}
             waitingFor={!canAct ? playerName(s.players, current) : null}
@@ -683,31 +711,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         <EndSummary view={view} players={s.players} onClose={() => setSummaryOpen(false)} actions={endActions} />
       ) : null}
 
-      {styleOpen ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-[2px]" onClick={() => setStyleOpen(false)}>
-          <div
-            className="h-full w-[min(440px,100vw)] overflow-y-auto border-l border-border bg-card p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Board style"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-2xl">Board style</h2>
-              <button type="button" onClick={() => setStyleOpen(false)} className="rounded-lg p-1.5 hover:bg-muted" aria-label="Close">
-                <X className="size-5" />
-              </button>
-            </div>
-            <p className="mb-4 text-sm text-muted-foreground">Switches instantly, mid-game. Only you see your style.</p>
-            <StyleCarousel compact />
-            {is3d ? (
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Camera</span>
-                <CameraSwitcher value={camera} onChange={chooseCamera} />
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {tune ? <TuneMode style={style} palette={palette} /> : null}
       <span className={cn("sr-only")} aria-live="assertive">
         {canAct ? (pending ? "Choose a figure or press S to skip" : "Your turn: place your tile") : ""}
       </span>

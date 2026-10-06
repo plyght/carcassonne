@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 
 import type { Route } from "next";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Slider } from "dialkit";
 import { Bot, Copy, Play, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { DEFAULT_RULESET, type Ruleset } from "@carcassonne/protocol";
 import { randomSeedString, type PlayerMeta } from "@carcassonne/game-client";
 import { PLAYER_COLOR_ORDER } from "@carcassonne/render-classic";
-import { cn } from "@carcassonne/ui/lib/utils";
 
+import { DialButton, DialField, DialSurface, Segmented } from "@/components/dial/primitives";
 import { RulesForm } from "@/components/setup/rules-form";
 import { botName, SeatEditor } from "@/components/setup/seat-editor";
 import { createLocalGame } from "@/lib/local-games";
@@ -26,11 +27,27 @@ function defaultSeats(mode: Mode, n: number): PlayerMeta[] {
   });
 }
 
+/** Seats for a new count: keep the existing ones, add defaults with unused colours. */
+function resize(prev: PlayerMeta[], mode: Mode, n: number): PlayerMeta[] {
+  const base = defaultSeats(mode, n);
+  const out = base.map((b, i) => prev[i] ?? b);
+  const used = new Set<string>();
+  return out.map((s) => {
+    if (!used.has(s.color)) {
+      used.add(s.color);
+      return s;
+    }
+    const free = PLAYER_COLOR_ORDER.find((c) => !used.has(c) && !out.some((o) => o !== s && o.color === c))!;
+    used.add(free);
+    return { ...s, color: free };
+  });
+}
+
 export function NewGameSetup() {
   const params = useSearchParams();
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(params.get("mode") === "hotseat" ? "hotseat" : "ai");
-  const [count, setCount] = useState(Number(params.get("players")) || (mode === "ai" ? 3 : 2));
+  const [count, setCount] = useState(() => Math.min(5, Math.max(2, Number(params.get("players")) || (mode === "ai" ? 3 : 2))));
   const [seats, setSeats] = useState<PlayerMeta[]>(() => defaultSeats(mode, count));
   const [ruleset, setRuleset] = useState<Ruleset>({ ...DEFAULT_RULESET });
   const [seed, setSeed] = useState<string>(() => params.get("seed") ?? "");
@@ -46,11 +63,10 @@ export function NewGameSetup() {
     setSeats(defaultSeats(m, count));
   };
   const changeCount = (n: number) => {
-    setCount(n);
-    setSeats((prev) => {
-      const base = defaultSeats(mode, n);
-      return base.map((b, i) => prev[i] ?? b);
-    });
+    const k = Math.min(5, Math.max(2, Math.round(n)));
+    if (k === count) return;
+    setCount(k);
+    setSeats((prev) => resize(prev, mode, k));
   };
 
   const shareUrl = () => {
@@ -72,66 +88,53 @@ export function NewGameSetup() {
   };
 
   const humans = seats.filter((s) => s.kind === "human").length;
+  const bots = seats.length - humans;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="font-display text-4xl tracking-tight">New game</h1>
-      <p className="mt-1 text-muted-foreground">Set the table: who’s playing, and which rules.</p>
+    <div className="carc-page">
+      <h1 className="carc-page-title">New game</h1>
+      <p className="carc-page-lead">Set the table: who’s playing, and which rules.</p>
 
-      <div className="mt-6 inline-flex rounded-2xl bg-muted p-1" role="tablist" aria-label="Mode">
-        {(
-          [
-            { id: "ai", label: "vs AI", icon: Bot },
-            { id: "hotseat", label: "Hot-seat", icon: Users },
-          ] as const
-        ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={mode === id}
-            type="button"
-            onClick={() => changeMode(id)}
-            className={cn(
-              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors",
-              mode === id ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="size-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <DialSurface className="mt-[var(--sp-6)] flex">
+        <Segmented
+          label="Mode"
+          value={mode}
+          onChange={changeMode}
+          className="carc-seg-tabs"
+          options={[
+            { value: "ai", label: "vs AI", icon: <Bot />, showLabel: true },
+            { value: "hotseat", label: "Hot-seat", icon: <Users />, showLabel: true },
+          ]}
+        />
+      </DialSurface>
 
-      <section className="mt-6 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-2xl">Players</h2>
-          <div className="inline-flex rounded-xl bg-muted p-0.5" role="radiogroup" aria-label="Number of players">
-            {[2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={count === n}
-                onClick={() => changeCount(n)}
-                className={cn("rounded-lg px-3.5 py-1 text-sm font-semibold", count === n ? "bg-card shadow-sm" : "text-muted-foreground")}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+      <section className="carc-sheet mt-[var(--sp-6)]" aria-labelledby="players-h">
+        <div className="flex flex-wrap items-baseline justify-between gap-[var(--sp-2)]">
+          <h2 id="players-h" className="carc-heading">Players</h2>
+          <span className="text-[length:var(--fs-body)] text-[var(--text-2)]" data-testid="seat-summary">
+            {humans} {humans === 1 ? "human" : "humans"}
+            {bots ? ` · ${bots} ${bots === 1 ? "bot" : "bots"}` : ""}
+          </span>
         </div>
-        <SeatEditor seats={seats} onChange={setSeats} />
-        {humans === 0 ? <p className="mt-2 text-xs text-muted-foreground">All bots: sit back and watch them play.</p> : null}
+        <DialSurface className="carc-dial-stack mt-[var(--sp-4)] gap-[var(--sp-4)]!">
+          <DialField hint={humans === 0 ? "All bots: sit back and watch them play." : "Up to five at the table. Drag, scroll or use the arrow keys."}>
+            <Slider label="Players" value={count} min={2} max={5} step={1} onChange={changeCount} />
+          </DialField>
+          <SeatEditor seats={seats} onChange={setSeats} />
+        </DialSurface>
       </section>
 
-      <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="font-display text-2xl">House rules</h2>
-        <p className="mb-2 text-sm text-muted-foreground">Defaults match the current box (3rd edition with The River and The Abbot).</p>
-        <RulesForm ruleset={ruleset} onRuleset={setRuleset} seed={seed} onSeed={setSeed} />
+      <section className="carc-sheet mt-[var(--sp-6)]" aria-labelledby="rules-h">
+        <h2 id="rules-h" className="carc-heading">House rules</h2>
+        <p className="carc-sub">Defaults match the current box: 3rd edition with The River and The Abbot.</p>
+        <DialSurface className="mt-[var(--sp-4)]">
+          <RulesForm ruleset={ruleset} onRuleset={setRuleset} seed={seed} onSeed={setSeed} />
+        </DialSurface>
       </section>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
+      <DialSurface className="mt-[var(--sp-6)] flex flex-wrap-reverse items-center justify-between gap-[var(--sp-3)]">
+        <DialButton
+          variant="ghost"
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(shareUrl());
@@ -140,20 +143,13 @@ export function NewGameSetup() {
               toast.error("Couldn’t copy the link");
             }
           }}
-          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          <Copy className="size-4" /> Copy shareable setup (seed {seed || "…"})
-        </button>
-        <button
-          type="button"
-          onClick={start}
-          disabled={starting}
-          data-testid="start-game"
-          className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:-translate-y-0.5 disabled:opacity-60"
-        >
-          <Play className="size-4 fill-current" /> Start game
-        </button>
-      </div>
+          <Copy /> Copy setup link
+        </DialButton>
+        <DialButton variant="primary" data-size="large" onClick={start} disabled={starting} data-testid="start-game">
+          <Play className="fill-current" /> Start game
+        </DialButton>
+      </DialSurface>
     </div>
   );
 }

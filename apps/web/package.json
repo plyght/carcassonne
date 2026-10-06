@@ -9,7 +9,8 @@
     "start": "next start",
     "env:generate": "varlock codegen",
     "e2e": "bun e2e/online.e2e.ts",
-    "e2e:local": "bun e2e/local-smoke.ts"
+    "e2e:local": "bun e2e/local-smoke.ts",
+    "e2e:dialkit": "bun e2e/dialkit.e2e.ts"
   },
   "dependencies": {
     "@carcassonne/api": "workspace:*",
@@ -29,7 +30,9 @@
     "@varlock/nextjs-integration": "1.2.2",
     "babel-plugin-react-compiler": "^1.0.0",
     "better-auth": "catalog:",
+    "dialkit": "^2.0.2",
     "lucide-react": "catalog:",
+    "motion": "^14.0.0",
     "next": "^16.3.4",
     "next-themes": "catalog:",
     "react": "catalog:",

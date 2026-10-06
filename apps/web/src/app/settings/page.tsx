@@ -1,34 +1,59 @@
 "use client";
 
-import { CameraPicker, GeneralSettings, StyleCarousel } from "@/components/style/style-settings";
+import { getStyle } from "@carcassonne/render-classic";
+
+import { DialSurface } from "@/components/dial/primitives";
+import { CameraControl, PlaySettings, QualityControl, SoundControls, StyleSelect } from "@/components/dial/table-controls";
+import { StylePreview } from "@/components/style/style-preview";
+import { useSettings } from "@/lib/settings";
+
+function Card({ title, sub, children, label }: { title: string; sub?: string; children: React.ReactNode; label?: string }) {
+  return (
+    <section className="carc-sheet mt-[var(--sp-6)]" aria-label={label}>
+      <h2 className="carc-heading">{title}</h2>
+      {sub ? <p className="carc-sub">{sub}</p> : null}
+      <DialSurface className="mt-[var(--sp-4)]">{children}</DialSurface>
+    </section>
+  );
+}
 
 export default function SettingsPage() {
+  const settings = useSettings();
+  const style = getStyle(settings.style);
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="font-display text-4xl tracking-tight">Settings</h1>
-      <p className="mt-1 text-muted-foreground">Saved on this device. Styles switch live, even mid-game.</p>
+    <div className="carc-page">
+      <h1 className="carc-page-title">Settings</h1>
+      <p className="carc-page-lead">Saved on this device. Styles switch live, even mid-game.</p>
 
-      <section className="mt-6 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="mb-3 font-display text-2xl">Board style</h2>
-        <StyleCarousel />
+      <section className="carc-sheet mt-[var(--sp-6)] overflow-hidden p-0!" aria-label="Visual style">
+        <StylePreview key={style.id} style={style} live3d className="h-60" />
+        <div className="p-[var(--sp-6)] max-[519px]:p-[var(--sp-4)]">
+          <h2 className="carc-heading">
+            {style.name} <span className="align-middle font-sans text-[length:var(--fs-small)] font-medium text-[var(--text-2)]">{style.dimension.toUpperCase()}</span>
+          </h2>
+          <p className="carc-sub">{style.description}</p>
+          <DialSurface className="carc-dial-stack mt-[var(--sp-4)] gap-[var(--sp-3)]!">
+            <StyleSelect />
+            <CameraControl stacked />
+            <QualityControl />
+          </DialSurface>
+        </div>
       </section>
 
-      <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="mb-3 font-display text-2xl">Camera</h2>
-        <CameraPicker />
-      </section>
+      <Card title="Sound" sub="Volume buses for the soundscape, music and effects.">
+        <SoundControls />
+      </Card>
 
-      <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 shadow-sm">
-        <h2 className="mb-1 font-display text-2xl">Play & accessibility</h2>
-        <GeneralSettings />
-      </section>
+      <Card title="Play & accessibility">
+        <PlaySettings />
+      </Card>
 
-      <section className="mt-5 rounded-3xl border border-border/80 bg-card/80 p-5 text-sm shadow-sm">
-        <h2 className="mb-2 font-display text-2xl">Keyboard</h2>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5">
+      <section className="carc-sheet mt-[var(--sp-6)]">
+        <h2 className="carc-heading">Keyboard</h2>
+        <dl className="mt-[var(--sp-4)] grid grid-cols-[auto_1fr] gap-x-[var(--sp-6)] gap-y-[var(--sp-2)] text-[length:var(--fs-body)]">
           {[
             ["← ↑ → ↓", "Move between legal spots"],
-            ["R / E · Shift+R / Q", "Rotate clockwise · counter-clockwise (scroll also rotates over a spot)"],
+            ["R / E · Shift+R / Q", "Rotate clockwise · counter-clockwise (scroll or the dial also rotate)"],
             ["Enter / Space", "Place the tile, then confirm with no figure"],
             ["1–9", "Place a figure on the listed feature"],
             ["S", "Skip the figure"],
@@ -40,8 +65,8 @@ export default function SettingsPage() {
             ["H", "Hint (when enabled)"],
           ].map(([k, v]) => (
             <div key={k} className="contents">
-              <dt className="font-mono text-xs font-semibold">{k}</dt>
-              <dd className="text-muted-foreground">{v}</dd>
+              <dt className="font-mono font-medium text-[var(--text-1)]">{k}</dt>
+              <dd className="text-pretty text-[var(--text-2)]">{v}</dd>
             </div>
           ))}
         </dl>

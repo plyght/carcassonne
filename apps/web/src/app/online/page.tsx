@@ -6,9 +6,13 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { Loader2, Swords } from "lucide-react";
 
-import { DEFAULT_RULESET, type Ruleset } from "@carcassonne/protocol";
-import { cn } from "@carcassonne/ui/lib/utils";
+import { SelectControl, Slider } from "dialkit";
 
+import { DEFAULT_RULESET, type AiTier, type Ruleset } from "@carcassonne/protocol";
+
+import { ClockSettings, type RoomClock } from "@/components/dial/clock-settings";
+import { DialField, DialSurface } from "@/components/dial/primitives";
+import { TIER_INFO } from "@/components/dial/seat-row";
 import { RulesForm } from "@/components/setup/rules-form";
 import { authClient } from "@/lib/auth-client";
 import { roomApi } from "@/lib/rooms-api";
@@ -19,7 +23,9 @@ export default function OnlinePage() {
   const [code, setCode] = useState("");
   const [seats, setSeats] = useState(4);
   const [bots, setBots] = useState(0);
+  const [botTier, setBotTier] = useState<AiTier>("medium");
   const [ruleset, setRuleset] = useState<Ruleset>({ ...DEFAULT_RULESET });
+  const [clock, setClock] = useState<RoomClock>({ type: "none" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +36,8 @@ export default function OnlinePage() {
       const room = await roomApi.create({
         ruleset,
         maxPlayers: seats,
-        bots: Array.from({ length: bots }, () => "medium" as const),
+        bots: Array.from({ length: bots }, () => botTier),
+        clock,
       });
       router.push(`/r/${room.code}` as Route);
     } catch (e) {
@@ -41,12 +48,12 @@ export default function OnlinePage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 px-4 py-8 md:grid-cols-[1fr_1.3fr]">
-      <section className="rounded-3xl border border-border/80 bg-card/80 p-6 shadow-sm">
-        <h1 className="font-display text-3xl">Join a room</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Got an invite code? Guests can join with a nickname.</p>
+    <div className="mx-auto grid max-w-5xl items-start gap-[var(--sp-6)] px-[var(--sp-4)] py-[var(--sp-8)] md:grid-cols-[1fr_1.3fr]">
+      <section className="carc-sheet">
+        <h1 className="carc-heading">Join a room</h1>
+        <p className="carc-sub">Got an invite code? Guests can join with a nickname.</p>
         <form
-          className="mt-5 flex gap-2"
+          className="mt-[var(--sp-4)] flex gap-[var(--sp-2)]"
           onSubmit={(e) => {
             e.preventDefault();
             const c = code.trim().toUpperCase();
@@ -57,63 +64,51 @@ export default function OnlinePage() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="e.g. ABBEY7"
-            className="h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-4 font-mono text-lg tracking-widest uppercase"
+            className="h-10 min-w-0 flex-1 rounded-[var(--r-control)] bg-[var(--fill)] px-[var(--sp-3)] font-mono text-base tracking-widest uppercase placeholder:text-[var(--text-2)] focus-visible:outline-2 focus-visible:outline-[var(--ring)]"
             aria-label="Room code"
           />
-          <button type="submit" className="rounded-xl bg-primary px-5 font-semibold text-primary-foreground">
+          <button type="submit" className="h-10 rounded-[var(--r-control)] bg-primary px-[var(--sp-4)] font-semibold text-primary-foreground">
             Join
           </button>
         </form>
       </section>
 
-      <section className="rounded-3xl border border-border/80 bg-card/80 p-6 shadow-sm">
-        <h2 className="font-display text-3xl">Host a room</h2>
-        <p className="mt-1 text-sm text-muted-foreground">You set the rules and bots, then share the link.</p>
-        <div className="mt-4 flex flex-wrap gap-6">
-          <div>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seats</div>
-            <div className="inline-flex rounded-xl bg-muted p-0.5">
-              {[2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => {
-                    setSeats(n);
-                    setBots((b) => Math.min(b, n - 1));
-                  }}
-                  className={cn("rounded-lg px-3 py-1 text-sm font-semibold", seats === n ? "bg-card shadow-sm" : "text-muted-foreground")}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bots</div>
-            <div className="inline-flex rounded-xl bg-muted p-0.5">
-              {Array.from({ length: seats }, (_, n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setBots(n)}
-                  className={cn("rounded-lg px-3 py-1 text-sm font-semibold", bots === n ? "bg-card shadow-sm" : "text-muted-foreground")}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3">
+      <section className="carc-sheet">
+        <h2 className="carc-heading">Host a room</h2>
+        <p className="carc-sub">You set the rules and bots, then share the link.</p>
+        <DialSurface className="carc-dial-stack mt-[var(--sp-4)] gap-[var(--sp-3)]!">
+          <DialField hint="Open seats are filled by people with the invite link; bots take the rest.">
+            <Slider
+              label="Seats"
+              value={seats}
+              min={2}
+              max={5}
+              step={1}
+              onChange={(v) => {
+                const n = Math.round(v);
+                setSeats(n);
+                setBots((b) => Math.min(b, n - 1));
+              }}
+            />
+          </DialField>
+          <Slider label="Bots" value={bots} min={0} max={seats - 1} step={1} onChange={(v) => setBots(Math.round(v))} />
+          {bots > 0 ? (
+            <DialField hint={TIER_INFO.find((t) => t.id === botTier)?.hint}>
+              <SelectControl label="Bot level" value={botTier} options={TIER_INFO.map((t) => ({ value: t.id, label: t.label }))} onChange={(v) => setBotTier(v as AiTier)} />
+            </DialField>
+          ) : null}
+          <div className="carc-dial-section-label">House rules</div>
           <RulesForm ruleset={ruleset} onRuleset={setRuleset} />
-        </div>
+          <div className="carc-dial-section-label">Clock</div>
+          <ClockSettings value={clock} onChange={setClock} />
+        </DialSurface>
         {error ? (
-          <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          <p className="mt-[var(--sp-4)] rounded-[var(--r-control)] bg-destructive/10 px-[var(--sp-3)] py-[var(--sp-2)] text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}
         {!isPending && !session ? (
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-[var(--sp-4)] text-sm text-pretty text-[var(--text-2)]">
             Hosting needs an account.{" "}
             <a href="/login" className="font-semibold text-primary underline">
               Sign in or sign up
@@ -126,7 +121,7 @@ export default function OnlinePage() {
           onClick={create}
           disabled={busy || !session}
           data-testid="create-room"
-          className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:opacity-60"
+          className="mt-[var(--sp-4)] inline-flex h-12 items-center gap-[var(--sp-2)] rounded-[var(--r-control)] bg-primary px-[var(--sp-6)] font-semibold text-primary-foreground shadow-[0_10px_22px_-12px_var(--primary)] disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Swords className="size-4" />} Create room
         </button>

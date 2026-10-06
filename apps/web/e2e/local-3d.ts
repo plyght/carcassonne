@@ -200,9 +200,9 @@ async function humanTurn(p: Page, opts: { shots?: boolean } = {}) {
 
 async function switchStyle(p: Page, name: RegExp, id: string) {
   await p.getByTestId("style-button").click();
-  const dialog = p.getByRole("dialog", { name: "Board style" });
-  await dialog.getByRole("option", { name: name }).click();
-  await dialog.getByRole("button", { name: /use this style/i }).click();
+  const panel = p.getByRole("dialog", { name: "Table settings" });
+  await panel.getByTestId("style-select").click();
+  await p.getByRole("option", { name: name }).click();
   await p.keyboard.press("Escape");
   await p.waitForFunction((id) => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-style") === id, id);
 }
@@ -252,11 +252,13 @@ while ((await attr(page, "data-status")) !== "ended" && turns < MAX_TURNS) {
   }
   if (turns === 3) {
     // cameras
+    await page.getByTestId("style-button").click();
     for (const cam of ["top-down", "orbit", "cinematic", "tabletop"]) {
       await page.locator(`[data-testid=camera-switcher] [data-camera=${cam}]`).click();
       await page.waitForTimeout(900);
       if (cam !== "tabletop") await shot(page, `camera-${cam}`);
     }
+    await page.keyboard.press("Escape");
   }
   if (turns === 5 && phase === "tabletop") {
     await waitMyTurn(page, 90_000); // bots done: the state is quiet while we switch

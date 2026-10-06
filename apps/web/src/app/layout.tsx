@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 
 import "../index.css";
+import "dialkit/styles.css";
+import "@/components/dial/tokens.css";
+import "@/components/dial/dial-theme.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
 

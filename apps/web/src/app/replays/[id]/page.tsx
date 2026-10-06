@@ -12,7 +12,7 @@ import { ClassicBoard, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyl
 import { Board3D, type Board3DBatch } from "@/components/board3d/board-3d";
 import { describeEvent, playerName } from "@/components/game/helpers";
 import { Panel, ScorePanel } from "@/components/game/hud-parts";
-import { CameraSwitcher } from "@/components/style/style-settings";
+import { CameraIconSwitch } from "@/components/dial/table-controls";
 import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
 import { getGame, type LocalGameRecord } from "@/lib/local-games";
@@ -154,7 +154,7 @@ export default function ReplayViewer() {
           </div>
           {is3DStyle(style) && core ? (
             <div className="ml-auto">
-              <CameraSwitcher value={camera} onChange={chooseCamera} />
+              <CameraIconSwitch value={camera} onChange={chooseCamera} />
             </div>
           ) : null}
         </Panel>
