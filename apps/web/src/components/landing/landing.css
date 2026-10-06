@@ -1,0 +1,1361 @@
+/*
+ * Landing page. Built on the design tokens (tokens.css / globals.css): parchment page,
+ * walnut ink, terracotta primary, gold accent, Fraunces display + Geist UI.
+ *
+ * One grid: the header's 1280 px container with 16 px gutters; inside it a 12-column
+ * grid with 24 px gaps. One bold moment: the hero is a walnut table with the live
+ * board on it. Everything else is quiet paper.
+ */
+
+.lp {
+  --lp-max: 1280px;
+  --lp-gutter: 16px;
+  --lp-gap: 24px;
+  --lp-section: 136px;
+  --lp-radius: 28px;
+  --lp-radius-sm: 20px;
+
+  /* the hero table: the colour the posters were rendered on (see hero-board.tsx) */
+  --lp-table: #37240f;
+  --lp-table-ink: #f8eedc;
+  --lp-table-ink-2: #e2d0b2;
+  --lp-table-gold: #f0c66e;
+
+  max-width: var(--lp-max);
+  margin: 0 auto;
+  padding: var(--sp-4) var(--lp-gutter) 0;
+  color: var(--text-1);
+}
+
+@media (max-width: 767px) {
+  .lp {
+    --lp-section: 88px;
+    --lp-radius: 22px;
+    --lp-radius-sm: 18px;
+    padding-top: var(--sp-2);
+  }
+}
+
+/* ── shared type ─────────────────────────────────────────────────────── */
+
+.lp-h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(40px, 4.4vw, 64px);
+  font-weight: var(--fw-regular);
+  line-height: 1.04;
+  letter-spacing: -0.022em;
+  font-variation-settings: "opsz" 144, "SOFT" 30;
+  text-wrap: balance;
+}
+
+.lp-h1 em,
+.lp-h2 em {
+  font-style: italic;
+}
+
+.lp-h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 3.3vw, 46px);
+  font-weight: var(--fw-regular);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-variation-settings: "opsz" 120, "SOFT" 30;
+  color: var(--text-1);
+  text-wrap: balance;
+}
+
+.lp-section {
+  padding-top: var(--lp-section);
+}
+
+.lp-section-head {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--lp-gap);
+  row-gap: var(--sp-4);
+  align-items: end;
+}
+
+.lp-section-head .lp-h2 {
+  grid-column: 1 / span 6;
+}
+
+.lp-section-lead {
+  grid-column: 8 / span 5;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+@media (max-width: 899px) {
+  .lp-section-head .lp-h2,
+  .lp-section-lead {
+    grid-column: 1 / -1;
+  }
+  .lp-section-lead {
+    font-size: var(--fs-lead);
+    max-width: 36em;
+  }
+}
+
+.lp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-1);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+  text-decoration-color: color-mix(in oklch, var(--primary) 55%, transparent);
+  transition: text-decoration-color var(--dur-fast) ease;
+}
+
+.lp-link svg {
+  width: var(--icon);
+  height: var(--icon);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-link:hover {
+    text-decoration-color: var(--primary);
+  }
+  .lp-link:hover svg {
+    transform: translateX(3px);
+  }
+}
+
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-inner);
+  background: var(--fill);
+  color: var(--text-1);
+  font: var(--fw-medium) 13px / 1 var(--font-num);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.lp-chip[data-tone="gold"] {
+  background: var(--fill-gold);
+  color: var(--text-1);
+}
+
+.lp-chip-dim {
+  color: var(--text-2);
+}
+
+/* ── hero: the walnut table ──────────────────────────────────────────── */
+
+.lp-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  height: clamp(580px, calc(100svh - 56px - 32px), 820px);
+  overflow: hidden;
+  border-radius: var(--lp-radius);
+  background: var(--lp-table);
+  color: var(--lp-table-ink);
+  box-shadow: var(--elev-2);
+}
+
+.lp-stage {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.lp-poster,
+.lp-poster img,
+.lp-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lp-poster img {
+  object-fit: cover;
+  object-position: 100% 45%;
+}
+
+.lp-canvas {
+  display: block;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.lp-stage[data-phase="live"] .lp-canvas {
+  opacity: 1;
+}
+
+.lp-stage[data-phase="fading"] .lp-canvas {
+  transition-duration: 600ms;
+}
+
+/* a pool of lamp light on the table, and shade behind the words */
+.lp-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(28, 16, 4, 0.5) 0%, rgba(28, 16, 4, 0.22) 30%, transparent 52%),
+    radial-gradient(130% 110% at 72% 42%, transparent 55%, rgba(20, 11, 2, 0.4) 100%);
+}
+
+.lp-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-6);
+  width: min(100%, 600px);
+  padding: var(--sp-12) var(--sp-12) var(--sp-12) 56px;
+}
+
+.lp-hero-copy .lp-h1 {
+  color: var(--lp-table-ink);
+  text-shadow: 0 1px 24px rgba(20, 10, 0, 0.35);
+}
+
+.lp-hero-copy .lp-h1 em {
+  color: var(--lp-table-gold);
+}
+
+.lp-hero-lead {
+  max-width: 30em;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--lp-table-ink-2);
+  text-wrap: pretty;
+}
+
+.lp-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+/* on the dark table: a cream primary (the brightest thing on the panel) */
+.lp-hero .lp-play[data-variant="primary"] {
+  height: 52px;
+  padding: 0 28px;
+  background: var(--lp-table-ink);
+  color: #2a1a0a;
+  font-size: 17px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 -2px 0 rgba(90, 56, 20, 0.18) inset,
+    0 14px 30px -14px rgba(0, 0, 0, 0.7);
+}
+
+.lp-hero .lp-play[data-variant="primary"] svg {
+  color: oklch(0.55 0.15 40);
+}
+
+.lp-hero .lp-play[data-variant="primary"]:hover {
+  background: #fff6e6;
+}
+
+.lp-hero .lp-play[data-variant="primary"]:active {
+  background: #efe1c8;
+}
+
+.lp-btn-ghost {
+  height: 52px;
+  padding: 0 24px;
+  background: rgba(255, 236, 205, 0.15);
+  color: var(--lp-table-ink);
+  font-size: 17px;
+  box-shadow: 0 1px 0 rgba(255, 240, 215, 0.12) inset;
+}
+
+.lp-btn-ghost:hover {
+  background: rgba(255, 236, 205, 0.2);
+}
+
+.lp-btn-ghost:active:not(:disabled) {
+  background: rgba(255, 236, 205, 0.26);
+}
+
+.lp-hero-meta {
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--lp-table-ink-2);
+}
+
+.lp-link-light {
+  color: var(--lp-table-ink);
+  text-decoration-color: color-mix(in oklch, var(--lp-table-gold) 70%, transparent);
+}
+
+/* entrance: the words settle onto the table */
+.lp-hero-copy > * {
+  animation: lp-rise 640ms var(--ease-out) both;
+}
+.lp-hero-copy > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.lp-hero-copy > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.lp-hero-copy > :nth-child(4) {
+  animation-delay: 180ms;
+}
+
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* "Four bots, live": appears once the real board takes over */
+.lp-live {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 40px;
+  padding: 0 var(--sp-2) 0 var(--sp-4);
+  border-radius: 999px;
+  background: rgba(24, 14, 4, 0.62);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  color: var(--lp-table-ink);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 400ms ease,
+    transform 500ms var(--ease-out);
+  pointer-events: none;
+}
+
+.lp-live[data-on] {
+  opacity: 1;
+  transform: none;
+}
+
+.lp-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6fd66f;
+  box-shadow: 0 0 0 3px rgba(111, 214, 111, 0.25);
+}
+
+.lp-live-sep {
+  color: var(--lp-table-ink-2);
+}
+
+.lp-live-scores {
+  display: flex;
+  gap: 2px;
+  padding-left: var(--sp-1);
+}
+
+.lp-live-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 236, 205, 0.1);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023px) {
+  .lp-live {
+    display: none;
+  }
+}
+
+/* phones: words on top, the board poster below, one panel */
+@media (max-width: 767px) {
+  .lp-hero {
+    flex-direction: column;
+    height: auto;
+  }
+  .lp-stage {
+    position: relative;
+    inset: auto;
+    z-index: 0;
+    aspect-ratio: 1074 / 960;
+  }
+  .lp-stage::after {
+    background: linear-gradient(180deg, var(--lp-table) 0%, transparent 22%);
+  }
+  .lp-poster img {
+    object-position: 50% 50%;
+  }
+  .lp-hero-copy {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    gap: var(--sp-5);
+    padding: var(--sp-8) var(--sp-5) 0;
+  }
+  .lp-hero-lead {
+    font-size: var(--fs-lead);
+  }
+  .lp-hero-actions {
+    flex-direction: column;
+  }
+  .lp-hero-actions > * {
+    width: 100%;
+  }
+}
+
+/* ── how to play ─────────────────────────────────────────────────────── */
+
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--lp-gap);
+  margin-top: var(--sp-12);
+  list-style: none;
+  padding: 0;
+}
+
+@media (max-width: 899px) {
+  .lp-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-10);
+  }
+}
+
+.lp-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.lp-mini {
+  --cell: clamp(72px, 6.4vw, 92px);
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8) var(--sp-6) calc(var(--sp-8) + 44px);
+  border-radius: var(--lp-radius-sm);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain), var(--sheet-shading);
+  box-shadow: var(--elev-1);
+}
+
+.lp-mini-board {
+  position: relative;
+  width: calc(3 * var(--cell));
+  height: calc(2 * var(--cell));
+}
+
+.lp-tile {
+  position: absolute;
+  left: calc(var(--x, 0) * var(--cell));
+  top: calc(var(--y, 0) * var(--cell));
+  width: var(--cell);
+  height: var(--cell);
+  transform: rotate(var(--rot, 0deg));
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 1px 2px rgba(50, 30, 8, 0.35);
+}
+
+.lp-meeple {
+  position: absolute;
+  left: calc(var(--x) * var(--cell) - 15px);
+  top: calc(var(--y) * var(--cell) - 17px);
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 2px 1.5px rgba(30, 14, 0, 0.45));
+}
+
+.lp-meeple svg {
+  display: block;
+}
+
+/* captions printed under each little board */
+.lp-fit-chip,
+.lp-claim-chips,
+.lp-score {
+  position: absolute;
+  top: calc(100% + 18px);
+  left: 0;
+}
+
+.lp-claim-chips {
+  width: 100%;
+  height: 26px;
+}
+
+.lp-claim-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* step 1: the drawn tile turns until it fits, then drops in */
+.lp-slot {
+  position: absolute;
+  left: calc(var(--x) * var(--cell) + 4px);
+  top: calc(var(--y) * var(--cell) + 4px);
+  width: calc(var(--cell) - 8px);
+  height: calc(var(--cell) - 8px);
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--gold) 26%, transparent);
+  box-shadow: 0 0 0 2.5px color-mix(in oklch, var(--gold) 80%, transparent) inset;
+}
+
+.lp-seam {
+  position: absolute;
+  left: calc(var(--x) * var(--cell) + var(--cell) * 0.14);
+  top: calc(var(--y) * var(--cell) - 3px);
+  width: calc(var(--cell) * 0.72);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gold);
+  box-shadow: 0 0 12px 2px color-mix(in oklch, var(--gold) 70%, transparent);
+  opacity: 0;
+  z-index: 2;
+}
+
+.lp-drawn {
+  z-index: 1;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 12px 20px -8px rgba(40, 22, 4, 0.55);
+  opacity: 0;
+}
+
+.lp-fit-chip {
+  opacity: 0;
+}
+
+/* step 3: the city closes and pays */
+.lp-city-glow {
+  position: absolute;
+  left: calc(var(--cell) * 1.1);
+  top: calc(var(--cell) * 0.7);
+  width: calc(var(--cell) * 0.8);
+  height: calc(var(--cell) * 0.6);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--gold) 85%, white) 0%, color-mix(in oklch, var(--gold) 50%, transparent) 55%, transparent 100%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+.lp-plus {
+  position: absolute;
+  left: calc(var(--cell) * 1.5);
+  top: calc(var(--cell) * 0.32);
+  translate: -50% -50%;
+  font: var(--fw-strong) 30px / 1 var(--font-serif);
+  color: #fff6df;
+  text-shadow:
+    0 0 1px #6b4410,
+    0 1px 2px rgba(60, 36, 6, 0.8),
+    0 0 14px rgba(240, 190, 80, 0.9);
+  opacity: 0;
+}
+
+.lp-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+.lp-score-num {
+  position: relative;
+  display: inline-grid;
+  min-width: 32px;
+  height: 24px;
+  place-items: center;
+  border-radius: var(--r-inner);
+  background: var(--sheet);
+  font: var(--fw-strong) 15px / 1 var(--font-num);
+}
+
+.lp-score-num > span {
+  grid-area: 1 / 1;
+}
+
+.lp-score-b {
+  opacity: 0;
+}
+
+.lp-step-text {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  row-gap: var(--sp-2);
+  padding: 0 var(--sp-2);
+}
+
+.lp-step-n {
+  grid-row: 1 / span 2;
+  font: var(--fw-regular) 30px / 1 var(--font-serif);
+  color: var(--text-accent);
+  font-variant-numeric: lining-nums;
+}
+
+.lp-step-title {
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: var(--fw-medium);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+  text-wrap: balance;
+}
+
+.lp-step-body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.lp-how-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-10);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-lead);
+}
+
+/* the loops run only while the steps are on screen */
+.lp-steps .lp-drawn,
+.lp-steps .lp-slot,
+.lp-steps .lp-seam,
+.lp-steps .lp-fit-chip,
+.lp-steps .lp-claim,
+.lp-steps .lp-claim-chip,
+.lp-steps .lp-city-glow,
+.lp-steps .lp-plus,
+.lp-steps .lp-scorer,
+.lp-steps .lp-score-a,
+.lp-steps .lp-score-b {
+  animation-play-state: paused;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+.lp-steps[data-play] :is(.lp-drawn, .lp-slot, .lp-seam, .lp-fit-chip, .lp-claim, .lp-claim-chip, .lp-city-glow, .lp-plus, .lp-scorer, .lp-score-a, .lp-score-b) {
+  animation-play-state: running;
+}
+
+.lp-drawn {
+  animation-name: lp-draw;
+  animation-duration: 7s;
+}
+.lp-slot {
+  animation-name: lp-slot;
+  animation-duration: 7s;
+}
+.lp-seam {
+  animation-name: lp-seam;
+  animation-duration: 7s;
+}
+.lp-fit-chip {
+  animation-name: lp-fit;
+  animation-duration: 7s;
+}
+
+@keyframes lp-draw {
+  0% {
+    opacity: 0;
+    transform: translate(-6px, -10px) rotate(90deg) scale(1.08);
+    animation-timing-function: var(--ease-out);
+  }
+  8% {
+    opacity: 1;
+    transform: translate(0, -6px) rotate(90deg) scale(1.08);
+  }
+  16% {
+    transform: translate(0, -6px) rotate(90deg) scale(1.08);
+    animation-timing-function: var(--ease-in-out);
+  }
+  30% {
+    transform: translate(0, -6px) rotate(180deg) scale(1.08);
+  }
+  38% {
+    transform: translate(0, -6px) rotate(180deg) scale(1.08);
+    animation-timing-function: var(--ease-in-out);
+  }
+  52% {
+    transform: translate(var(--cell), -4px) rotate(180deg) scale(1.06);
+    animation-timing-function: var(--ease-out);
+  }
+  58% {
+    opacity: 1;
+    transform: translate(var(--cell), 0) rotate(180deg) scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(var(--cell), 0) rotate(180deg) scale(1);
+  }
+  96%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--cell), 0) rotate(180deg) scale(1);
+  }
+}
+
+@keyframes lp-slot {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  58%,
+  92% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes lp-seam {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  62%,
+  80% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lp-fit {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  64%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* step 2: the meeple tries each feature in turn (8 s, four 2 s windows) */
+.lp-claim,
+.lp-claim-chip {
+  opacity: 0;
+  animation-duration: 8s;
+  animation-delay: calc(var(--i) * 2s);
+}
+.lp-claim {
+  animation-name: lp-claim;
+}
+.lp-claim-chip {
+  animation-name: lp-claim-chip;
+}
+
+@keyframes lp-claim {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.05);
+    animation-timing-function: var(--ease-out);
+  }
+  5% {
+    opacity: 1;
+    transform: none;
+  }
+  20% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: ease-in;
+  }
+  24%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes lp-claim-chip {
+  0% {
+    opacity: 0;
+  }
+  4%,
+  21% {
+    opacity: 1;
+  }
+  24%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* step 3 (6 s) */
+.lp-city-glow,
+.lp-plus,
+.lp-scorer,
+.lp-score-a,
+.lp-score-b {
+  animation-duration: 6s;
+}
+.lp-city-glow {
+  animation-name: lp-glow;
+}
+.lp-plus {
+  animation-name: lp-plus;
+}
+.lp-scorer {
+  animation-name: lp-home;
+}
+.lp-score-a {
+  animation-name: lp-score-a;
+}
+.lp-score-b {
+  animation-name: lp-score-b;
+}
+
+@keyframes lp-glow {
+  0%,
+  12% {
+    opacity: 0;
+  }
+  22%,
+  62% {
+    opacity: 1;
+  }
+  76%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lp-plus {
+  0%,
+  22% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+    animation-timing-function: var(--ease-out);
+  }
+  30% {
+    opacity: 1;
+    transform: none;
+  }
+  56% {
+    opacity: 1;
+    transform: translateY(-10px);
+  }
+  66%,
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes lp-home {
+  0%,
+  30% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: var(--ease-out);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-14px);
+  }
+  48%,
+  88% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  96%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lp-score-a {
+  0%,
+  34% {
+    opacity: 1;
+    filter: none;
+  }
+  40%,
+  92% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  98%,
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+@keyframes lp-score-b {
+  0%,
+  34% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  40%,
+  90% {
+    opacity: 1;
+    filter: none;
+  }
+  96%,
+  100% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+/* ── styles showcase ─────────────────────────────────────────────────── */
+
+.lp-showcase {
+  position: relative;
+  margin-top: var(--sp-12);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--lp-radius);
+  background: #e7e3dc;
+  box-shadow: var(--elev-1);
+}
+
+.lp-showcase-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(6px);
+  transform: scale(1.015);
+  transition:
+    opacity 600ms ease,
+    filter 600ms ease,
+    transform 900ms var(--ease-out);
+}
+
+.lp-showcase-img[data-on] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.lp-showcase-bar {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  pointer-events: none;
+}
+
+.lp-showcase-bar > * {
+  pointer-events: auto;
+}
+
+.lp-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--elev-2);
+}
+
+.lp-seg-btn {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-seg-btn:hover {
+    background: var(--fill);
+    color: var(--text-1);
+  }
+}
+
+.lp-seg-btn:active {
+  transform: scale(var(--press-scale));
+}
+
+.lp-seg-btn[aria-checked="true"] {
+  background: var(--text-1);
+  color: var(--sheet);
+}
+
+.lp-showcase-caption {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 440px;
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-2);
+  border-radius: 14px;
+  background-color: var(--sheet);
+  background-image: var(--paper-grain);
+  box-shadow: var(--elev-2);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  color: var(--text-1);
+}
+
+@media (max-width: 767px) {
+  .lp-showcase {
+    aspect-ratio: auto;
+    overflow: visible;
+    background: none;
+    box-shadow: none;
+  }
+  .lp-showcase::before {
+    content: "";
+    display: block;
+    aspect-ratio: 4 / 3;
+  }
+  .lp-showcase-img {
+    height: auto;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--lp-radius);
+  }
+  .lp-showcase-bar {
+    position: static;
+    margin-top: var(--sp-3);
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lp-seg {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lp-seg-btn {
+    padding: 0 6px;
+  }
+  .lp-showcase-caption {
+    max-width: none;
+  }
+}
+
+/* ── ways to play ────────────────────────────────────────────────────── */
+
+.lp-ways-list {
+  margin-top: var(--sp-12);
+  padding: var(--sp-2) var(--sp-8);
+  list-style: none;
+  border-radius: var(--lp-radius);
+  background-color: var(--sheet);
+  background-image: var(--paper-grain), var(--sheet-shading);
+  box-shadow: var(--elev-1);
+}
+
+.lp-way {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--lp-gap);
+  row-gap: var(--sp-3);
+  align-items: center;
+  padding: var(--sp-6) 0;
+}
+
+.lp-way + .lp-way {
+  box-shadow: 0 -2px 0 color-mix(in oklch, var(--wood) 12%, transparent);
+}
+
+.lp-way-title {
+  grid-column: 1 / span 4;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: var(--fw-regular);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--text-1);
+}
+
+.lp-way-body {
+  grid-column: 5 / span 5;
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.lp-way-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--sp-3);
+}
+
+.lp-way-action {
+  grid-column: 10 / span 3;
+  justify-self: end;
+}
+
+.lp-way-btn svg {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-way-btn:hover svg:last-child {
+    transform: translateX(3px);
+  }
+}
+
+@media (max-width: 899px) {
+  .lp-ways-list {
+    padding: var(--sp-1) var(--sp-5);
+  }
+  .lp-way {
+    padding: var(--sp-5) 0;
+  }
+  .lp-way-title,
+  .lp-way-body,
+  .lp-way-action {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .lp-way-title {
+    font-size: 24px;
+  }
+}
+
+.lp-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3) var(--sp-4);
+  margin-top: var(--sp-6);
+  padding: 0 var(--sp-8);
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.lp-desktop strong {
+  color: var(--text-1);
+  font-weight: var(--fw-medium);
+}
+
+@media (max-width: 899px) {
+  .lp-desktop {
+    padding: 0 var(--sp-2);
+  }
+}
+
+/* ── footer ──────────────────────────────────────────────────────────── */
+
+.lp-footer {
+  margin-top: var(--lp-section);
+  padding-top: var(--sp-12);
+}
+
+.lp-footer-top {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-10);
+}
+
+/* the signature: a 1-bit dithered tile + meeple, in ink */
+.lp-signature {
+  display: block;
+  width: 460px;
+  max-width: 100%;
+  aspect-ratio: 460 / 299;
+  background: color-mix(in oklch, var(--text-1) 82%, transparent);
+  -webkit-mask: url("/landing/signature.png") center / contain no-repeat;
+  mask: url("/landing/signature.png") center / contain no-repeat;
+  image-rendering: pixelated;
+}
+
+/* on a dark page the object is lit instead of inked */
+.dark .lp-signature {
+  background: color-mix(in oklch, var(--text-1) 80%, transparent);
+  -webkit-mask-image: url("/landing/signature-dark.png");
+  mask-image: url("/landing/signature-dark.png");
+}
+
+.lp-footer-cols {
+  display: flex;
+  gap: var(--sp-16);
+  padding-right: var(--sp-2);
+}
+
+.lp-footer-h {
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-strong);
+  color: var(--text-1);
+}
+
+.lp-footer-col ul {
+  display: grid;
+  gap: var(--sp-2);
+  list-style: none;
+  padding: 0;
+}
+
+.lp-footer-link {
+  font-size: 15px;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: color var(--dur-fast) ease;
+}
+
+.lp-footer-link:hover {
+  color: var(--text-1);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.lp-wordmark {
+  margin-top: var(--sp-12);
+  font-family: var(--font-serif);
+  font-size: clamp(64px, 16.4vw, 236px);
+  font-weight: 500;
+  line-height: 0.86;
+  letter-spacing: -0.04em;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+  color: color-mix(in oklch, var(--wood) 62%, var(--background));
+  white-space: nowrap;
+  user-select: none;
+}
+
+.dark .lp-wordmark {
+  color: color-mix(in oklch, var(--text-2) 42%, var(--background));
+}
+
+.lp-credit {
+  padding: var(--sp-6) 0 var(--sp-8);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+@media (max-width: 767px) {
+  .lp-footer-cols {
+    gap: var(--sp-12);
+  }
+  .lp-signature {
+    width: 320px;
+  }
+}
+
+/* ── scroll reveal ───────────────────────────────────────────────────── */
+
+.lp-reveal[data-reveal="waiting"] > * {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+.lp-reveal[data-reveal="in"] > * {
+  transition:
+    opacity 700ms ease,
+    transform 800ms var(--ease-out);
+}
+
+/* ── reduced motion: the stills tell the same story ──────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero-copy > * {
+    animation: none;
+  }
+  .lp-reveal[data-reveal="waiting"] > * {
+    transform: none;
+  }
+  .lp-steps :is(.lp-drawn, .lp-slot, .lp-seam, .lp-fit-chip, .lp-claim, .lp-claim-chip, .lp-city-glow, .lp-plus, .lp-scorer, .lp-score-a, .lp-score-b) {
+    animation: none;
+  }
+  .lp-steps .lp-drawn {
+    opacity: 1;
+    transform: translate(var(--cell), 0) rotate(180deg);
+  }
+  .lp-steps .lp-slot {
+    opacity: 0;
+  }
+  .lp-steps :is(.lp-seam, .lp-fit-chip, .lp-city-glow, .lp-plus, .lp-score-b) {
+    opacity: 1;
+  }
+  .lp-steps .lp-score-a,
+  .lp-steps .lp-scorer {
+    opacity: 0;
+  }
+  .lp-steps :is(.lp-claim, .lp-claim-chip):first-of-type {
+    opacity: 1;
+  }
+  .lp-showcase-img {
+    filter: none;
+    transform: none;
+  }
+}
+
+html[data-reduced-motion="true"] .lp-hero-copy > * {
+  animation: none;
+}
+html[data-reduced-motion="true"] .lp-reveal[data-reveal="waiting"] > * {
+  opacity: 1;
+  transform: none;
+}
+html[data-reduced-motion="true"] .lp-steps :is(.lp-drawn, .lp-slot, .lp-seam, .lp-fit-chip, .lp-claim, .lp-claim-chip, .lp-city-glow, .lp-plus, .lp-scorer, .lp-score-a, .lp-score-b) {
+  animation: none;
+}
+html[data-reduced-motion="true"] .lp-steps .lp-drawn {
+  opacity: 1;
+  transform: translate(var(--cell), 0) rotate(180deg);
+}
+html[data-reduced-motion="true"] .lp-steps .lp-slot {
+  opacity: 0;
+}
+html[data-reduced-motion="true"] .lp-steps :is(.lp-seam, .lp-fit-chip, .lp-city-glow, .lp-plus, .lp-score-b) {
+  opacity: 1;
+}
+html[data-reduced-motion="true"] .lp-steps :is(.lp-score-a, .lp-scorer) {
+  opacity: 0;
+}
+html[data-reduced-motion="true"] .lp-steps :is(.lp-claim, .lp-claim-chip):first-of-type {
+  opacity: 1;
+}
