@@ -75,7 +75,7 @@
 }
 
 .carc-brand-name {
-  font: var(--fw-regular) 24px / 1 var(--font-serif);
+  font: var(--fw-heading) 24px / 1 var(--font-heading);
   letter-spacing: -0.02em;
 }
 
@@ -243,7 +243,7 @@
   align-items: center;
   min-height: 52px;
   color: var(--text-1);
-  font: var(--fw-regular) 24px / 1.2 var(--font-serif);
+  font: var(--fw-heading) 24px / 1.2 var(--font-heading);
   letter-spacing: -0.01em;
   text-decoration: none;
 }
@@ -317,9 +317,9 @@
 
 .carc-hero-title {
   margin-top: var(--sp-3);
-  font-family: var(--font-serif);
+  font-family: var(--font-heading);
   font-size: var(--fs-hero);
-  font-weight: var(--fw-regular);
+  font-weight: var(--fw-heading);
   line-height: 1.04;
   letter-spacing: -0.02em;
   color: var(--text-1);
@@ -358,7 +358,7 @@
 
 .carc-mode-title {
   display: block;
-  font: var(--fw-medium) var(--fs-lead) / var(--lh-snug) var(--font-serif);
+  font: var(--fw-medium) var(--fs-lead) / var(--lh-snug) var(--font-heading);
   font-size: 18px;
   color: var(--text-1);
 }
@@ -409,7 +409,7 @@
 
 .carc-stat-value {
   margin-top: var(--sp-1);
-  font: var(--fw-regular) var(--fs-heading) / 1 var(--font-serif);
+  font: var(--fw-heading) var(--fs-heading) / 1 var(--font-heading);
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--text-1);
 }
@@ -602,7 +602,7 @@ html[data-reduced-motion="true"] .carc-dialog {
 }
 
 .carc-lesson-title {
-  font: var(--fw-medium) 18px / var(--lh-snug) var(--font-serif);
+  font: var(--fw-medium) 18px / var(--lh-snug) var(--font-heading);
   color: var(--text-1);
 }
 

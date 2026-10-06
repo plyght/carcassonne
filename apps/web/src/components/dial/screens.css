@@ -75,7 +75,7 @@
 
 .carc-end-title {
   margin-top: var(--sp-1);
-  font: var(--fw-regular) var(--fs-display) / var(--lh-tight) var(--font-serif);
+  font: var(--fw-heading) var(--fs-display) / var(--lh-tight) var(--font-heading);
   letter-spacing: var(--ls-display);
   text-wrap: balance;
 }
@@ -152,7 +152,7 @@
 .carc-end-rank {
   width: 32px;
   padding-left: var(--sp-3) !important;
-  font: var(--fw-regular) var(--fs-title) / 1 var(--font-serif);
+  font: var(--fw-heading) var(--fs-title) / 1 var(--font-heading);
   color: var(--text-2);
 }
 
@@ -165,7 +165,7 @@
 
 .carc-end-total {
   padding-right: var(--sp-3) !important;
-  font: var(--fw-regular) var(--fs-score) / 1 var(--font-serif);
+  font: var(--fw-heading) var(--fs-score) / 1 var(--font-heading);
 }
 
 .carc-end-actions {
@@ -348,7 +348,7 @@
 
 .carc-room-code {
   margin-top: var(--sp-1);
-  font: var(--fw-regular) var(--fs-hero) / 1 var(--font-serif);
+  font: var(--fw-heading) var(--fs-hero) / 1 var(--font-heading);
   letter-spacing: 0.12em;
   color: var(--text-1);
 }

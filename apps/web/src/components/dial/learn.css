@@ -241,7 +241,7 @@
 
 .carc-coach-title {
   margin-top: var(--sp-1);
-  font: var(--fw-regular) var(--fs-title) / var(--lh-tight) var(--font-serif);
+  font: var(--fw-heading) var(--fs-title) / var(--lh-tight) var(--font-heading);
   letter-spacing: var(--ls-display);
 }
 
@@ -330,7 +330,7 @@
 }
 
 .carc-rule-title {
-  font: var(--fw-regular) var(--fs-title) / var(--lh-tight) var(--font-serif);
+  font: var(--fw-heading) var(--fs-title) / var(--lh-tight) var(--font-heading);
   letter-spacing: var(--ls-display);
   color: var(--text-1);
 }
@@ -662,7 +662,7 @@
 
 .carc-lesson-title {
   margin-top: var(--sp-2);
-  font: var(--fw-regular) var(--fs-heading) / var(--lh-tight) var(--font-serif);
+  font: var(--fw-heading) var(--fs-heading) / var(--lh-tight) var(--font-heading);
   letter-spacing: var(--ls-display);
   color: var(--text-1);
 }

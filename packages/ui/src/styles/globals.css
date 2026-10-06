@@ -46,47 +46,49 @@
   --gold: oklch(0.78 0.13 85);
 }
 
+/* Dark: a warm near-black (not brown), neutral surfaces stepping up in lightness,
+   a warm off-white ink, and the same terracotta and gold accents, brightened to pop. */
 .dark {
-  --background: oklch(0.2 0.018 55);
-  --foreground: oklch(0.93 0.025 82);
-  --card: oklch(0.245 0.02 55);
-  --card-foreground: oklch(0.93 0.025 82);
-  --popover: oklch(0.25 0.02 55);
-  --popover-foreground: oklch(0.93 0.025 82);
-  --primary: oklch(0.74 0.13 65);
-  --primary-foreground: oklch(0.2 0.03 50);
-  --secondary: oklch(0.3 0.022 55);
-  --secondary-foreground: oklch(0.92 0.025 82);
-  --muted: oklch(0.29 0.02 55);
-  --muted-foreground: oklch(0.79 0.03 76);
-  --accent: oklch(0.34 0.03 60);
-  --accent-foreground: oklch(0.94 0.025 82);
-  --destructive: oklch(0.68 0.18 25);
-  --border: oklch(0.37 0.025 60);
-  --input: oklch(0.37 0.025 60);
-  --ring: oklch(0.74 0.13 65);
+  --background: oklch(0.175 0.005 65);
+  --foreground: oklch(0.95 0.008 80);
+  --card: oklch(0.225 0.006 65);
+  --card-foreground: oklch(0.95 0.008 80);
+  --popover: oklch(0.245 0.006 65);
+  --popover-foreground: oklch(0.95 0.008 80);
+  --primary: oklch(0.6 0.155 38);
+  --primary-foreground: oklch(0.99 0.004 80);
+  --secondary: oklch(0.265 0.006 65);
+  --secondary-foreground: oklch(0.94 0.008 80);
+  --muted: oklch(0.255 0.006 65);
+  --muted-foreground: oklch(0.77 0.012 75);
+  --accent: oklch(0.29 0.008 65);
+  --accent-foreground: oklch(0.95 0.008 80);
+  --destructive: oklch(0.66 0.19 25);
+  --border: oklch(0.32 0.006 65);
+  --input: oklch(0.32 0.006 65);
+  --ring: oklch(0.74 0.13 50);
   --chart-1: oklch(0.7 0.13 140);
   --chart-2: oklch(0.78 0.11 80);
   --chart-3: oklch(0.68 0.13 45);
   --chart-4: oklch(0.68 0.1 250);
   --chart-5: oklch(0.72 0.12 300);
-  --sidebar: oklch(0.23 0.02 55);
-  --sidebar-foreground: oklch(0.93 0.025 82);
-  --sidebar-primary: oklch(0.74 0.13 65);
-  --sidebar-primary-foreground: oklch(0.2 0.03 50);
-  --sidebar-accent: oklch(0.3 0.022 55);
-  --sidebar-accent-foreground: oklch(0.94 0.025 82);
-  --sidebar-border: oklch(0.37 0.025 60);
-  --sidebar-ring: oklch(0.62 0.1 65);
+  --sidebar: oklch(0.2 0.005 65);
+  --sidebar-foreground: oklch(0.95 0.008 80);
+  --sidebar-primary: oklch(0.6 0.155 38);
+  --sidebar-primary-foreground: oklch(0.99 0.004 80);
+  --sidebar-accent: oklch(0.265 0.006 65);
+  --sidebar-accent-foreground: oklch(0.95 0.008 80);
+  --sidebar-border: oklch(0.32 0.006 65);
+  --sidebar-ring: oklch(0.74 0.13 50);
   --felt: oklch(0.36 0.06 150);
-  --wood: oklch(0.36 0.05 55);
+  --wood: oklch(0.42 0.02 60);
   --gold: oklch(0.8 0.13 85);
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display-serif), ui-serif, Georgia, serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-diatype), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-diatype), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-diatype-mono), ui-monospace, monospace;
   --color-felt: var(--felt);
   --color-wood: var(--wood);
   --color-gold: var(--gold);
@@ -142,12 +144,9 @@
   }
 }
 
-/* Subtle paper grain for the page background. */
+/* The page: one flat colour, so boards and images can fade straight into it. */
 .bg-parchment {
   background-color: var(--background);
-  background-image:
-    radial-gradient(ellipse at 15% 0%, color-mix(in oklch, var(--gold) 14%, transparent), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, color-mix(in oklch, var(--primary) 9%, transparent), transparent 50%);
 }
 
 /* App-level reduced motion override (settings → Motion). */

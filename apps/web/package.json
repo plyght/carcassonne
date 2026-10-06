@@ -37,6 +37,7 @@
     "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "reicon-react": "^1.2.6",
     "sonner": "catalog:",
     "varlock": "catalog:",
     "zod": "catalog:"

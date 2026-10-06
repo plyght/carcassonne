@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
 import "../index.css";
 import "dialkit/styles.css";
@@ -13,20 +13,35 @@ import "@/components/dial/dial-theme.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// ABC Diatype (UI, headings), Diatype Mono (numbers, codes) and ABC Otto (a rare
+// display accent): the same faces and roles as the ditch site.
+const diatype = localFont({
+  variable: "--font-diatype",
+  src: [
+    { path: "../fonts/ABCDiatype-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/ABCDiatype-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../fonts/ABCDiatype-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  fallback: ["ui-sans-serif", "system-ui", "Arial", "sans-serif"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const diatypeMono = localFont({
+  variable: "--font-diatype-mono",
+  src: [
+    { path: "../fonts/ABCDiatypeMono-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/ABCDiatypeMono-Medium.woff2", weight: "500", style: "normal" },
+  ],
+  display: "swap",
+  fallback: ["ui-monospace", "Menlo", "monospace"],
 });
 
-const display = Fraunces({
-  variable: "--font-display-serif",
-  subsets: ["latin"],
-  axes: ["SOFT", "opsz"],
+const otto = localFont({
+  variable: "--font-otto",
+  src: [{ path: "../fonts/ABCOtto-Regular.woff2", weight: "400", style: "normal" }],
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -37,7 +52,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f4ead8" },
-    { media: "(prefers-color-scheme: dark)", color: "#221a13" },
+    { media: "(prefers-color-scheme: dark)", color: "#161412" },
   ],
 };
 
@@ -47,7 +62,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${display.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${diatype.variable} ${diatypeMono.variable} ${otto.variable}`} suppressHydrationWarning>
       <body className="antialiased">
         <Providers>
           <div className="bg-parchment relative flex h-svh flex-col">

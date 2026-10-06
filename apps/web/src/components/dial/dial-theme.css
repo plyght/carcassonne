@@ -50,7 +50,7 @@ html .dialkit-root[data-theme] {
   /* app fonts (next/font variables live on <body>; Tailwind's @theme inline doesn't emit --font-*) */
   --carc-sans: var(--font-ui);
   --carc-mono: var(--font-num);
-  --carc-display: var(--font-serif);
+  --carc-display: var(--font-heading);
 
   font-family: var(--carc-sans);
   color: var(--text-1);
@@ -86,7 +86,7 @@ html .dialkit-root .dialkit-folder-title-root {
 /* section folders: a 13 px caps label, grouped by spacing (no rules) */
 html .dialkit-root .dialkit-folder:not(.dialkit-folder-root) > .dialkit-folder-header .dialkit-folder-title {
   font-size: var(--fs-small);
-  font-weight: 600;
+  font-weight: var(--fw-medium);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-2);
@@ -209,7 +209,7 @@ html .dialkit-root .dialkit-segmented-button[data-active="false"] {
 
 html .dialkit-root .dialkit-segmented-button[data-active="true"] {
   color: var(--text-accent);
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 
 html .dialkit-root .dialkit-segmented-button:focus-visible {
@@ -369,7 +369,7 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   margin: var(--sp-4) 0 0;
   padding: 0 var(--row-inset);
   font-size: var(--fs-small);
-  font-weight: 600;
+  font-weight: var(--fw-medium);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-2);
