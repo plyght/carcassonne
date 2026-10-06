@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Armchair, ChevronLeft, ChevronRight, Clapperboard, Map as MapIcon, Rotate3d, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -17,6 +17,8 @@ import { StylePreview } from "./style-preview";
 export function StyleCarousel({ compact = false }: { compact?: boolean }) {
   const settings = useSettings();
   const [focus, setFocus] = useState<StyleId>(settings.style);
+  // follow the saved style (it is only known after hydration, or changes from elsewhere)
+  useEffect(() => setFocus(settings.style), [settings.style]);
   const idx = STYLE_PACKS.findIndex((s) => s.id === focus);
   const style = STYLE_PACKS[idx] ?? STYLE_PACKS[0]!;
   const go = (d: number) => setFocus(STYLE_PACKS[(idx + d + STYLE_PACKS.length) % STYLE_PACKS.length]!.id);
@@ -111,9 +113,9 @@ const CAMERA_ICONS: Record<CameraMode, LucideIcon> = {
 };
 
 /** Compact HUD camera switcher for 3D styles. */
-export function CameraSwitcher({ value, onChange }: { value: CameraMode; onChange(c: CameraMode): void }) {
+export function CameraSwitcher({ value, onChange, className }: { value: CameraMode; onChange(c: CameraMode): void; className?: string }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-muted/70 p-0.5" role="radiogroup" aria-label="Camera" data-testid="camera-switcher">
+    <div className={cn("flex items-center gap-0.5 rounded-lg bg-muted/70 p-0.5", className)} role="radiogroup" aria-label="Camera" data-testid="camera-switcher">
       {CAMERA_MODES.map((c) => {
         const Icon = CAMERA_ICONS[c.id];
         return (

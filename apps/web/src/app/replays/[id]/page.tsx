@@ -148,9 +148,9 @@ export default function ReplayViewer() {
           <Link href="/replays" className="grid size-8 place-items-center rounded-lg hover:bg-muted" aria-label="Back to replays">
             <ArrowLeft className="size-4" />
           </Link>
-          <div>
+          <div className="min-w-0">
             <div className="font-display">Replay</div>
-            <div className="font-mono text-[11px] text-muted-foreground">seed {rec.seed}</div>
+            <div className="truncate font-mono text-[11px] text-muted-foreground">seed {rec.seed}</div>
           </div>
           {is3DStyle(style) && core ? (
             <div className="ml-auto">

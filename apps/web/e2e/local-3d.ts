@@ -147,9 +147,30 @@ async function humanTurn(p: Page, opts: { shots?: boolean } = {}) {
     await p.mouse.wheel(0, 120); // scroll over a legal spot rotates
     await frames(p, 2);
     if (opts.shots) await shot(p, "ghost-hover");
-    await p.mouse.click(pt.x, pt.y);
+    // the camera may still ease (tiles landing): re-project + verify the pick before each click
+    for (let i = 0; i < 8 && (await attr(p, "data-pending")) === ""; i++) {
+      const hit = await p.evaluate(([x, y]) => {
+        const q = window.__carc3d!.project(x + 0.5, y + 0.5);
+        const cc = window.__carc3d!.renderer.pick(q.x, q.y)?.cell;
+        return cc && cc.x === x && cc.y === y ? q : null;
+      }, [c.x, c.y] as const);
+      if (hit) {
+        await p.evaluate((pt) => ((window as unknown as { __lastPt?: unknown }).__lastPt = pt), hit);
+        await p.mouse.click(hit.x, hit.y);
+      }
+      await p.waitForFunction(() => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-pending") !== "", undefined, { timeout: 4_000 }).catch(() => {});
+    }
   }
-  await p.waitForFunction(() => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-pending") !== "", undefined, { timeout: 10_000 });
+  try {
+    await p.waitForFunction(() => document.querySelector("[data-testid=game-screen]")?.getAttribute("data-pending") !== "", undefined, { timeout: 45_000 });
+  } catch {
+    const diag = await p.evaluate(() => {
+      const el = document.querySelector("[data-testid=game-screen]")!;
+      return { myTurn: el.getAttribute("data-my-turn"), targets: el.getAttribute("data-targets"), hints: document.querySelector("[data-testid=board-3d]")?.getAttribute("data-hints"), ply: el.getAttribute("data-ply") };
+    });
+    const at = keyboard ? null : await p.evaluate(() => { const m = (window as unknown as { __lastPt?: { x: number; y: number } }).__lastPt; return m ? (document.elementFromPoint(m.x, m.y) as HTMLElement | null)?.outerHTML.slice(0, 120) : null; });
+    await fail(`tile not placed (keyboard=${keyboard}) ${JSON.stringify(diag)} at=${at}`);
+  }
   const pending = (await attr(p, "data-pending")).split(",").map(Number);
   const cell = { x: pending[0]!, y: pending[1]! };
   // figure: click a hotspot on every other pointer turn, else skip with S
@@ -223,7 +244,7 @@ while ((await attr(page, "data-status")) !== "ended" && turns < MAX_TURNS) {
     const tab = await ctx.newPage();
     await tab.goto(`${WEB}/settings`);
     await tab.getByRole("radiogroup", { name: "Motion" }).getByRole("radio", { name: "Reduced" }).click();
-    await tab.evaluate(() => window.scrollTo(0, 0));
+    await tab.locator("section[aria-label=\"Visual style\"]").scrollIntoViewIfNeeded();
     await tab.waitForSelector("[data-testid=board-3d][data-ready=\"1\"]", { timeout: 90_000 }).catch(() => {});
     await tab.waitForTimeout(3000);
     await tab.screenshot({ path: `${OUT}/web-3d-settings.png` });
@@ -283,5 +304,36 @@ if (ended) {
   await page.waitForTimeout(1200);
   await shot(page, "replay");
 }
+// ── phone: touch tap places a tile ──
+await page.close(); // free the desktop board (SwiftShader shares the CPU)
+{
+  const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+  const m = await mctx.newPage();
+  m.on("pageerror", (e) => logs.push(`[pageerror] mobile: ${e.message}`));
+  await m.goto(`${WEB}/`);
+  await m.evaluate(() => localStorage.setItem("carc.settings.v1", JSON.stringify({ style: "cartoon", camera: "tabletop", botSpeed: "fast", motion: "reduced" })));
+  await m.goto(`${WEB}/play/new`);
+  await m.getByTestId("start-game").click();
+  await m.waitForSelector(`[data-testid=board-3d][data-ready="1"][data-style="cartoon"]`, { timeout: 180_000 });
+  await waitMyTurn(m);
+  const tier = await m.evaluate(() => window.__carc3d!.renderer.stats().tier);
+  if (tier !== "low") await fail(`mobile auto tier should be low, got ${tier}`);
+  const cells = await legalCells(m);
+  for (let i = 0; i < 6 && (await m.getAttribute("[data-testid=game-screen]", "data-pending")) === ""; i++) {
+    const hit = await m.evaluate(([x, y]) => {
+      const q = window.__carc3d!.project(x + 0.5, y + 0.5);
+      const cc = window.__carc3d!.renderer.pick(q.x, q.y)?.cell;
+      return cc && cc.x === x && cc.y === y ? q : null;
+    }, [cells[0]!.x, cells[0]!.y] as const);
+    if (hit) await m.touchscreen.tap(hit.x, hit.y);
+    await m.waitForTimeout(2000);
+  }
+  if ((await m.getAttribute("[data-testid=game-screen]", "data-pending")) === "") await fail("touch tap did not place the tile");
+  await frames(m, 3);
+  await m.screenshot({ path: `${OUT}/web-3d-mobile.png` });
+  console.log("  shot mobile");
+  await mctx.close();
+}
+
 if (logs.some((l) => l.startsWith("[pageerror]"))) await fail("page errors:\n" + logs.filter((l) => l.startsWith("[pageerror]")).join("\n"));
 await browser.close();

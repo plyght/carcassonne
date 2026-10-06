@@ -57,6 +57,8 @@ export interface Board3DProps {
   onCellClick?(cell: Cell, pick: PickResult, at: { x: number; y: number }): void;
   onRotate?(dir: 1 | -1): void;
   onFail?(reason: string): void;
+  /** Zoom / reframe buttons (default on). */
+  controls?: boolean;
   /** HUD panels over the board (px per side): framed cameras keep the board clear of them. */
   insets?: { top: number; right: number; bottom: number; left: number };
   ariaLabel: string;
@@ -337,6 +339,26 @@ export function Board3D(props: Board3DProps) {
       aria-label={props.ariaLabel}
     >
       <div ref={hostRef} className="absolute inset-0" />
+      {ready && props.controls !== false ? (
+        <div className="absolute bottom-14 left-3 flex gap-1.5 max-lg:right-3 max-lg:bottom-[64px] max-lg:left-auto max-lg:flex-col" data-board-controls>
+          {[
+            { label: "Zoom in", title: "Zoom in (+)", text: "+", run: (r: BoardRenderer) => r.rig.zoom(1 / 1.25) },
+            { label: "Zoom out", title: "Zoom out (−)", text: "−", run: (r: BoardRenderer) => r.rig.zoom(1.25) },
+            { label: "Fit board", title: "Reframe the board (F)", text: "⤢", run: () => props.commandsRef?.current?.fit() ?? rRef.current?.setCamera("tabletop") },
+          ].map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              aria-label={b.label}
+              title={b.title}
+              onClick={() => rRef.current && b.run(rRef.current)}
+              className="grid size-[34px] place-items-center rounded-[10px] border border-black/25 bg-[rgba(250,243,228,0.9)] text-lg font-semibold text-[#2b2117] shadow-md"
+            >
+              {b.text}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {!ready ? (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <div className="animate-pulse rounded-full bg-black/40 px-4 py-1.5 font-display text-lg text-white/90">Setting the table…</div>
@@ -347,7 +369,7 @@ export function Board3D(props: Board3DProps) {
           className="pointer-events-none absolute bottom-24 left-3 z-10 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[11px] leading-snug text-lime-200"
           data-testid="debug-overlay"
         >
-          {`${Math.round(1000 / Math.max(1, stats.intervalMs))} fps · frame ${stats.frameMs.toFixed(1)} ms
+          {`${fpsText(stats.intervalMs)} fps · frame ${stats.frameMs.toFixed(1)} ms
 ${stats.backend} · ${stats.style} · ${stats.camera} · tier ${stats.tier}
 tiles ${stats.tiles} · figures ${stats.figures}
 draws ${stats.drawCalls} · tris ${Math.round(stats.triangles)}
@@ -356,4 +378,9 @@ cache ${stats.meshCache.size} (${stats.meshCache.hits}/${stats.meshCache.misses}
       ) : null}
     </div>
   );
+}
+
+function fpsText(intervalMs: number): string {
+  const fps = 1000 / Math.max(1, intervalMs);
+  return fps < 10 ? fps.toFixed(1) : String(Math.round(fps));
 }

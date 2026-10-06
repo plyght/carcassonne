@@ -593,7 +593,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
               <Lightbulb className="size-4" /> <span className="hidden sm:inline">Hint</span>
             </button>
           ) : null}
-          {is3d ? <CameraSwitcher value={camera} onChange={chooseCamera} /> : null}
+          {is3d ? <CameraSwitcher value={camera} onChange={chooseCamera} className="hidden sm:flex" /> : null}
           <button
             type="button"
             onClick={() => setStyleOpen(true)}
@@ -699,6 +699,12 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             </div>
             <p className="mb-4 text-sm text-muted-foreground">Switches instantly, mid-game. Only you see your style.</p>
             <StyleCarousel compact />
+            {is3d ? (
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium">Camera</span>
+                <CameraSwitcher value={camera} onChange={chooseCamera} />
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

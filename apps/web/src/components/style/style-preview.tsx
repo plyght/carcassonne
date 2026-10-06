@@ -73,6 +73,7 @@ export function StylePreview({ style, className, live3d = false }: { style: Styl
           reducedMotion
           view={view as GameView}
           playerSlots={[0, 1, 2, 3]}
+          controls={false}
           ariaLabel={`${style.name} preview`}
         />
       </div>

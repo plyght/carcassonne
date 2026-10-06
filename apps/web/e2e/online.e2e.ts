@@ -154,10 +154,21 @@ async function playTurn(pages: Page[], turn: number) {
     // 3D: click the projected centre of a legal cell on the WebGL canvas
     const list = cells3d.split(";");
     const [x, y] = list[turn % list.length]!.split(",").map(Number) as [number, number];
-    const pt = await mover.evaluate(([x, y]) => window.__carc3d!.project(x + 0.5, y + 0.5), [x, y] as const);
-    await mover.mouse.move(pt.x, pt.y);
-    await mover.mouse.click(pt.x, pt.y);
-    await waitAttr(mover, "data-pending", "v !== ''", null, 15_000);
+    // the camera eases while new tiles land (slowly under SwiftShader): re-project and
+    // check the pick right before each click, retry until the tile is placed
+    for (let i = 0; i < 8 && (await attr(mover, "data-pending")) === ""; i++) {
+      const hit = await mover.evaluate(([x, y]) => {
+        const pt = window.__carc3d!.project(x + 0.5, y + 0.5);
+        const c = window.__carc3d!.renderer.pick(pt.x, pt.y)?.cell;
+        return c && c.x === x && c.y === y ? pt : null;
+      }, [x, y] as const);
+      if (hit) {
+        await mover.mouse.move(hit.x, hit.y);
+        await mover.mouse.click(hit.x, hit.y);
+      }
+      await waitAttr(mover, "data-pending", "v !== ''", null, 4_000).catch(() => {});
+    }
+    await waitAttr(mover, "data-pending", "v !== ''", null, 5_000);
     await mover.keyboard.press(turn % 3 === 0 ? "1" : "s");
     await mover.waitForTimeout(200);
     if ((await ply(mover)) === before) await mover.keyboard.press("s");

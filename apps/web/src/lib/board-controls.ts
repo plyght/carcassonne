@@ -12,7 +12,11 @@ import { getSettings, updateSettings, useSettings, type Settings } from "./setti
 
 /** Switch the board style live (keeps the camera if the new style supports it). */
 export function selectStyle(id: StyleId): void {
-  updateSettings({ style: id, camera: effectiveCamera(getStyle(id), getSettings().camera) });
+  const prev = getStyle(getSettings().style);
+  const next = getStyle(id);
+  // 2D styles lock the camera to top-down: entering 3D starts on the style's default view
+  const camera = prev.dimension === "2d" && next.dimension === "3d" ? next.defaultCamera : effectiveCamera(next, getSettings().camera);
+  updateSettings({ style: id, camera });
 }
 
 /** Persist a camera mode. */
