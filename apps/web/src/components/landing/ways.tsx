@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "reicon-react";
 
 import { PlayNowButton } from "./play-now";
 

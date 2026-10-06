@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Trophy } from "lucide-react";
+import { Loader, Trophy } from "reicon-react";
 
 import { authClient } from "@/lib/auth-client";
 import { matchmakingApi } from "@/lib/rooms-api";
@@ -72,7 +72,7 @@ export default function RankedPage() {
                   }}
                   className="carc-btn w-full"
                 >
-                  <Loader2 className="animate-spin" /> Searching… <span className="carc-num">{since}s</span> · Cancel
+                  <Loader className="animate-spin" /> Searching… <span className="carc-num">{since}s</span> · Cancel
                 </button>
               ) : (
                 <button type="button" disabled={!session || !!queue} onClick={() => join(q)} className="carc-btn w-full" data-variant="primary">

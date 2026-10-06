@@ -4,7 +4,7 @@
 // sliders under a segmented mode switch. Values map 1:1 to the server's clockSchema.
 
 import { Slider } from "dialkit";
-import { Hourglass, Infinity as InfinityIcon, Timer } from "lucide-react";
+import { Hourglass, Infinite as InfinityIcon, Timer } from "reicon-react";
 
 import { DialField, SegmentedRow } from "./primitives";
 

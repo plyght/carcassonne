@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Loader2, Swords } from "lucide-react";
+import { Loader, Target } from "reicon-react";
 
 import { SelectControl, Slider } from "dialkit";
 
@@ -125,7 +125,7 @@ export default function OnlinePage() {
           data-variant="primary"
           data-size="large"
         >
-          {busy ? <Loader2 className="animate-spin" /> : <Swords />} Create room
+          {busy ? <Loader className="animate-spin" /> : <Target />} Create room
         </button>
       </section>
     </div>

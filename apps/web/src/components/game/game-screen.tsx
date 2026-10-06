@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import Link from "next/link";
-import { ArrowLeft, BookOpen, ChevronDown, Lightbulb, SlidersHorizontal, Undo2, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, Lightbulb, Sliders, Undo, Wifi, WifiOff } from "reicon-react";
 import { toast } from "sonner";
 
 import type { EngineEvent, FigureOption, Move } from "@carcassonne/protocol";
@@ -726,7 +726,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             </button>
             {isLocal ? (
               <button type="button" onClick={() => void doUndo()} disabled={!s.canUndo} className="carc-btn" data-variant="ghost" title="Undo (U)" aria-label="Undo">
-                <Undo2 /> <span className="carc-btn-label">Undo</span>
+                <Undo /> <span className="carc-btn-label">Undo</span>
               </button>
             ) : null}
             {isLocal && settings.showHints ? (
@@ -746,7 +746,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
               aria-haspopup="dialog"
               data-testid="style-button"
             >
-              <SlidersHorizontal /> <span className="carc-btn-label carc-table-name">{style.name}</span>
+              <Sliders /> <span className="carc-btn-label carc-table-name">{style.name}</span>
               <ChevronDown className="carc-chevron" />
             </button>
           </Panel>

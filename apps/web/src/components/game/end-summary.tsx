@@ -1,6 +1,6 @@
 "use client";
 
-import { Castle, Church, Crown, Flower2, Route, Wheat } from "lucide-react";
+import { Castle, Bell, Crown, Leaf, Routing, Tree } from "reicon-react";
 
 import type { GameView } from "@carcassonne/protocol";
 import type { PlayerMeta } from "@carcassonne/game-client";
@@ -11,11 +11,11 @@ import { SeatSwatch } from "./hud-parts";
 import { playerName } from "./helpers";
 
 const COLS = [
-  { key: "road", label: "Roads", icon: Route },
+  { key: "road", label: "Roads", icon: Routing },
   { key: "city", label: "Cities", icon: Castle },
-  { key: "cloister", label: "Cloisters", icon: Church },
-  { key: "garden", label: "Gardens", icon: Flower2 },
-  { key: "field", label: "Fields", icon: Wheat },
+  { key: "cloister", label: "Cloisters", icon: Bell },
+  { key: "garden", label: "Gardens", icon: Leaf },
+  { key: "field", label: "Fields", icon: Tree },
 ] as const;
 
 export function EndSummary({

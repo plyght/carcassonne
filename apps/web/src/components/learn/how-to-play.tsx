@@ -7,7 +7,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X } from "reicon-react";
 
 
 import { SupplyChip } from "../game/hud-parts";

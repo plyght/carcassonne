@@ -5,7 +5,7 @@
 // lib/board-controls, so these are just a control surface.
 
 import { Slider, Toggle } from "dialkit";
-import { Armchair, Clapperboard, Map as MapIcon, Monitor, Moon, Rotate3d, Sun, type LucideIcon } from "lucide-react";
+import { Armchair, Clapperboard, Map as MapIcon, Monitor, Moon, ThreeDRotate, Sun, type IconComponent } from "reicon-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -17,10 +17,10 @@ import { removeKey } from "@/lib/storage";
 
 import { DialButton, DialField, DialSelect, DialSurface, Segmented, SegmentedRow, type SelectItem } from "./primitives";
 
-export const CAMERA_ICONS: Record<CameraMode, LucideIcon> = {
+export const CAMERA_ICONS: Record<CameraMode, IconComponent> = {
   "top-down": MapIcon,
   tabletop: Armchair,
-  orbit: Rotate3d,
+  orbit: ThreeDRotate,
   cinematic: Clapperboard,
 };
 

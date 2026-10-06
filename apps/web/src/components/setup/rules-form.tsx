@@ -8,7 +8,7 @@
 import { useState } from "react";
 
 import { SelectControl, Toggle } from "dialkit";
-import { ChevronDown, Dices } from "lucide-react";
+import { ChevronDown, Shuffle } from "reicon-react";
 
 import { DEFAULT_RULESET, type Ruleset } from "@carcassonne/protocol";
 import { randomSeedString } from "@carcassonne/game-client";
@@ -107,7 +107,7 @@ export function RulesForm({
                   onChange={(e) => onSeed(e.target.value.replace(/\s+/g, "-").slice(0, 40))}
                 />
                 <DialIconButton label="Re-roll seed" onClick={() => onSeed(randomSeedString())} data-testid="reroll-seed">
-                  <Dices />
+                  <Shuffle />
                 </DialIconButton>
               </div>
             </DialField>

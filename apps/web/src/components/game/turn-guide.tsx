@@ -6,7 +6,7 @@
 
 import type { ReactNode } from "react";
 
-import { X } from "lucide-react";
+import { X } from "reicon-react";
 
 import { Kbd, Panel } from "./hud-parts";
 

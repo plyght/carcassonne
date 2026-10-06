@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Users } from "reicon-react";
 
 import { HeroBoard } from "./hero-board";
 import { PlayNowButton } from "./play-now";

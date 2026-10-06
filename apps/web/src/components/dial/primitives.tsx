@@ -21,7 +21,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Check } from "lucide-react";
+import { Check } from "reicon-react";
 import { useTheme } from "next-themes";
 
 import { cn } from "@carcassonne/ui/lib/utils";

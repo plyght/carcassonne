@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { Eye } from "lucide-react";
+import { Eye } from "reicon-react";
 
 import type { PlayerMeta } from "@carcassonne/game-client";
 import { PLAYER_COLORS } from "@carcassonne/render-classic";

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Check, Copy, Loader2, Play, User } from "lucide-react";
+import { Cpu, Check, Copy, Loader, Play, User } from "reicon-react";
 
 import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
 import type { PlayerColorId } from "@carcassonne/game-client";
@@ -130,7 +130,7 @@ export default function RoomLobby() {
                     {room && i === room.mySeat ? <span className="carc-tag" data-tone="accent" data-testid="my-seat">You</span> : null}
                   </div>
                   <div className="carc-seat-meta">
-                    {s?.kind === "bot" ? <Bot aria-hidden /> : s ? <User aria-hidden /> : null}
+                    {s?.kind === "bot" ? <Cpu aria-hidden /> : s ? <User aria-hidden /> : null}
                     {s?.kind === "bot" ? `Bot · ${s.tier}` : s ? ("isGuest" in s && s.isGuest ? "Guest" : "Player") : "Waiting for a player…"}
                   </div>
                 </div>
@@ -167,7 +167,7 @@ export default function RoomLobby() {
               data-variant="primary"
               data-size="large"
             >
-              {busy ? <Loader2 className="animate-spin" /> : <Play className="fill-current" />} Start game
+              {busy ? <Loader className="animate-spin" /> : <Play weight="Filled" />} Start game
             </button>
           </div>
         ) : (

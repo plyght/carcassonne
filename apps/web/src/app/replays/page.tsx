@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import type { Route } from "next";
 import Link from "next/link";
-import { Film, Trash2 } from "lucide-react";
+import { Film, Trash2 } from "reicon-react";
 
 import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
 

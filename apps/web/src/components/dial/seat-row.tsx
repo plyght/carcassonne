@@ -4,7 +4,7 @@
 // (a human, or a bot tier). Built from DialKit surfaces plus the game's MeeplePicker
 // and DialSelect; wraps to two lines on narrow screens.
 
-import { Bot, User } from "lucide-react";
+import { Cpu, User } from "reicon-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import type { AiTier } from "@carcassonne/protocol";
@@ -33,7 +33,7 @@ export function controllerItems(allowBots: boolean): SelectItem[] {
   if (!allowBots) return [human];
   return [
     human,
-    ...TIER_INFO.map((t) => ({ value: `bot:${t.id}`, label: `${t.label} bot`, hint: t.hint, icon: <Bot className="size-4" /> })),
+    ...TIER_INFO.map((t) => ({ value: `bot:${t.id}`, label: `${t.label} bot`, hint: t.hint, icon: <Cpu className="size-4" /> })),
   ];
 }
 

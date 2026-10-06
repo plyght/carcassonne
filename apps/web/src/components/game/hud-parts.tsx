@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import { cn } from "@carcassonne/ui/lib/utils";
-import { ChevronDown, Maximize, Minus, Plus, SmilePlus, Timer } from "lucide-react";
+import { ChevronDown, Maximize, Minus, Plus, FaceSmile, Timer } from "reicon-react";
 
 import { REACTIONS, type FeatureKind, type FigureOption, type GameView, type TileId } from "@carcassonne/protocol";
 import { featureRule, type PlayerMeta, type Reaction, type TileCatalog } from "@carcassonne/game-client";
@@ -506,7 +506,7 @@ export function ReactionBar({ onReact, disabled }: { onReact(e: string): void; d
         aria-label={open ? "Fewer reactions" : `${REACTIONS.length - quick.length} more reactions`}
         title={open ? "Fewer reactions" : "More reactions"}
       >
-        {open ? <ChevronDown /> : <SmilePlus />}
+        {open ? <ChevronDown /> : <FaceSmile />}
       </button>
     </Panel>
   );

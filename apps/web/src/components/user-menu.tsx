@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@carcassonne/ui/components/dropdown-menu";
-import { ChevronDown, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, Logout2, User } from "reicon-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -44,7 +44,7 @@ export default function UserMenu({ className }: { className?: string }) {
         <DropdownMenuGroup>
           <DropdownMenuLabel>{session.user.email}</DropdownMenuLabel>
           <DropdownMenuItem render={<Link href="/profile" />}>
-            <UserRound /> Profile
+            <User /> Profile
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -59,7 +59,7 @@ export default function UserMenu({ className }: { className?: string }) {
               });
             }}
           >
-            <LogOut /> Sign out
+            <Logout2 /> Sign out
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

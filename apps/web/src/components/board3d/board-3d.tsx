@@ -15,7 +15,7 @@ import type { BoardCommands, CameraMode, Cell, StyleId } from "@carcassonne/rend
 import type { PickResult, RendererEvent, RendererStats } from "@carcassonne/render-three";
 import { withAnimTuning } from "@carcassonne/render-three/tuning";
 import { cn } from "@carcassonne/ui/lib/utils";
-import { Maximize, Minus, Plus } from "lucide-react";
+import { Maximize, Minus, Plus } from "reicon-react";
 
 import { tuneStore, useTunedPack } from "@/lib/tuning";
 

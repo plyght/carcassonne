@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Play } from "lucide-react";
+import { Play } from "reicon-react";
 
 import { createQuickGame } from "./quick-start";
 
@@ -30,7 +30,7 @@ export function PlayNowButton({ size = "large", children, className }: { size?: 
         router.push(createQuickGame() as Route);
       }}
     >
-      <Play className="fill-current" aria-hidden="true" />
+      <Play weight="Filled" aria-hidden="true" />
       {children ?? "Play now"}
     </button>
   );

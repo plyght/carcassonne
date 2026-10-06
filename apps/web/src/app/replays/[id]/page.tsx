@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { ArrowLeft, Pause, Play, SkipPrev, SkipNext } from "reicon-react";
 
 import { simulateReplay, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
 import { ClassicBoard, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle, type BoardCommands } from "@carcassonne/render-classic";
@@ -221,7 +221,7 @@ export default function ReplayViewer() {
             </div>
             <div className="carc-transport-controls">
               <button type="button" className="carc-icon-btn" onClick={() => setPly((p) => Math.max(0, p - 1))} aria-label="Step back" title="Step back (←)">
-                <SkipBack />
+                <SkipPrev />
               </button>
               <button
                 type="button"
@@ -237,7 +237,7 @@ export default function ReplayViewer() {
                 {playing ? <Pause /> : <Play />}
               </button>
               <button type="button" className="carc-icon-btn" onClick={() => setPly((p) => Math.min(total, p + 1))} aria-label="Step forward" title="Step forward (→)">
-                <SkipForward />
+                <SkipNext />
               </button>
               <input
                 type="range"

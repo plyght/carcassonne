@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight, RotateLeft } from "reicon-react";
 
 import { DEFAULT_RULESET } from "@carcassonne/protocol";
 import { explainScore, randomSeedString, TutorialClient, type PlayerMeta, type TutorialProgress } from "@carcassonne/game-client";
@@ -224,7 +224,7 @@ export default function TutorialPage() {
         </ol>
         <div className="carc-lesson-tools">
           <button type="button" className="carc-guide-link" onClick={() => client.loadChapter(progress.chapter)} title="Start this lesson again">
-            <RotateCcw aria-hidden className="size-3.5" /> Restart
+            <RotateLeft aria-hidden className="size-3.5" /> Restart
           </button>
         </div>
       </div>

@@ -8,7 +8,7 @@ import { useEffect, useRef, type RefObject } from "react";
 
 import { Folder } from "dialkit";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { X } from "lucide-react";
+import { X } from "reicon-react";
 
 import type { BoardCommands, CameraMode } from "@carcassonne/render-classic";
 

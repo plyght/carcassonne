@@ -6,7 +6,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Slider } from "dialkit";
-import { Bot, ChevronDown, Copy, Play, Users } from "lucide-react";
+import { Cpu, ChevronDown, Copy, Play, Users } from "reicon-react";
 import { toast } from "sonner";
 
 import { DEFAULT_RULESET, type Ruleset } from "@carcassonne/protocol";
@@ -122,7 +122,7 @@ export function NewGameSetup() {
           </p>
           <div className="carc-quick-actions">
             <DialButton variant="primary" data-size="large" onClick={quickStart} disabled={starting} data-testid="quick-start">
-              <Play className="fill-current" /> Quick start
+              <Play weight="Filled" /> Quick start
             </DialButton>
             <Link href={"/tutorial" as Route} className="carc-quick-link">
               Or learn first: the 3-minute tutorial
@@ -156,7 +156,7 @@ export function NewGameSetup() {
                 onChange={changeMode}
                 className="carc-seg-tabs"
                 options={[
-                  { value: "ai", label: "vs bots", icon: <Bot />, showLabel: true },
+                  { value: "ai", label: "vs bots", icon: <Cpu />, showLabel: true },
                   { value: "hotseat", label: "Hot-seat", icon: <Users />, showLabel: true },
                 ]}
               />
@@ -225,7 +225,7 @@ export function NewGameSetup() {
                 <Copy /> Copy setup link
               </DialButton>
               <DialButton variant="primary" data-size="large" onClick={start} disabled={starting} data-testid="start-game">
-                <Play className="fill-current" /> Start game
+                <Play weight="Filled" /> Start game
               </DialButton>
             </DialSurface>
           </div>
