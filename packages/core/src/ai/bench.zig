@@ -100,6 +100,8 @@ fn worker() void {
         if (job >= n_jobs) break;
         var local: Stats = .{};
         playGame(first_seed + job / 2, @intCast(job % 2), ws, &local);
+        // One line per game so interrupted runs can still be aggregated.
+        std.debug.print("game seed={d} a_seat={d} a={d} b={d}\n", .{ first_seed + job / 2, job % 2, local.points[0], local.points[1] });
         lock();
         defer stats_mutex.unlock();
         inline for (0..2) |i| {
