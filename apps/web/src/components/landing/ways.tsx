@@ -8,27 +8,27 @@ const ROWS = [
   {
     id: "ai",
     title: "Against the bots",
-    body: "Four levels, from Easy to an Expert that searches six turns ahead. They think in your browser, so there is no queue.",
+    body: "There are four levels, from Easy up to an Expert that searches six turns ahead, and they think right in your browser so you never wait in a queue.",
     chips: ["Easy", "Medium", "Hard", "Expert"],
   },
   {
     id: "hotseat",
     title: "Around one screen",
-    body: "Two to five players on a single device. Pass it along when your turn is done.",
+    body: "Two to five players share a single device and pass it along whenever a turn is done.",
     href: "/play/new?mode=hotseat",
     action: "Set up hot-seat",
   },
   {
     id: "online",
     title: "With friends, online",
-    body: "Open a room, send the invite link, fill empty seats with bots. Friends can watch, and everyone can react.",
+    body: "Open a room, send the invite link and fill any empty seats with bots, while friends can watch and everyone can react.",
     href: "/online",
     action: "Open a room",
   },
   {
     id: "ranked",
     title: "Ranked",
-    body: "Three- and four-player free-for-all, rated with Glicko-2.",
+    body: "Ranked games are three- and four-player free-for-alls with Glicko-2 ratings.",
     href: "/ranked",
     action: "Find a match",
   },
@@ -81,10 +81,10 @@ export function Ways() {
           Coming soon
         </span>
         <p>
-          A native desktop app for <strong>macOS</strong> and <strong>Linux</strong>: the same game, in its own window.
+          A native desktop app for <strong>macOS</strong> and <strong>Linux</strong> is on its way, with the same game in its own window.
         </p>
         <Link href={"/replays" as Route} className="lp-link">
-          Meanwhile, watch some replays <ArrowRight aria-hidden="true" />
+          In the meantime, you can watch some replays <ArrowRight aria-hidden="true" />
         </Link>
       </aside>
     </section>

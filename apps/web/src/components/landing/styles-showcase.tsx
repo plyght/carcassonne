@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useInView } from "./use-in-view";
 
 const STYLES = [
-  { id: "classic", name: "Classic", kind: "2D", line: "Painted tiles, like the printed game. Light enough for any phone." },
+  { id: "classic", name: "Classic", kind: "2D", line: "Painted tiles in the spirit of the printed game, light enough to run on any phone." },
   { id: "tabletop", name: "Tabletop", kind: "3D", line: "A hand-painted miniature board on a white table, with matte wooden meeples." },
   { id: "cartoon", name: "Cartoon", kind: "3D", line: "Cel-shaded and saturated, with ink outlines and bouncy score pops." },
   { id: "diorama", name: "Diorama", kind: "3D", line: "A pastel tilt-shift miniature world in soft light." },
@@ -41,7 +41,7 @@ export function StylesShowcase() {
         <h2 id="styles-h" className="lp-h2">
           Same board, four ways to look at it.
         </h2>
-        <p className="lp-section-lead">Switch any time, even halfway through a game. The painted Classic board runs anywhere; the 3D tables use your graphics card.</p>
+        <p className="lp-section-lead">You can switch at any time, even halfway through a game, and while the painted Classic board runs anywhere, the 3D tables use your graphics card.</p>
       </div>
 
       <div ref={ref} className="lp-showcase" data-active={active}>

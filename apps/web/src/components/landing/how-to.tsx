@@ -78,7 +78,7 @@ export function HowTo() {
           How to play, in thirty seconds.
         </h2>
         <p className="lp-section-lead">
-          Never played? Each turn is three small decisions, and the whole game is the same turn, over and over, until the tiles run out.
+          If you’ve never played, each turn comes down to three small decisions, and the whole game repeats that turn until the tiles run out.
         </p>
       </div>
 
@@ -98,7 +98,7 @@ export function HowTo() {
               1
             </span>
             <h3 className="lp-step-title">Draw a tile and place it so its edges match.</h3>
-            <p className="lp-step-body">Roads meet roads, cities meet cities, grass meets grass. Turn the tile until it fits.</p>
+            <p className="lp-step-body">Roads have to meet roads, cities meet cities and grass meets grass, so turn the tile until every edge lines up.</p>
           </div>
         </li>
 
@@ -122,7 +122,7 @@ export function HowTo() {
               2
             </span>
             <h3 className="lp-step-title">Put a meeple on a road, city, cloister or field to claim it.</h3>
-            <p className="lp-step-body">You have seven. Place one on the tile you just laid, but only where nobody has claimed already.</p>
+            <p className="lp-step-body">You have seven meeples, and you can put one on the tile you just laid as long as nobody has already claimed that road, city or field.</p>
           </div>
         </li>
 
@@ -148,8 +148,8 @@ export function HowTo() {
             <span className="lp-step-n" aria-hidden="true">
               3
             </span>
-            <h3 className="lp-step-title">Finished features score points; most points wins.</h3>
-            <p className="lp-step-body">Close a city or a road, or surround a cloister, and the meeple comes home with the points. Fields pay at the end.</p>
+            <h3 className="lp-step-title">Finished features score points, and the most points wins.</h3>
+            <p className="lp-step-body">When you close a city or a road or surround a cloister, your meeple comes home with the points, while farmers in the fields are paid at the end of the game.</p>
           </div>
         </li>
       </ol>

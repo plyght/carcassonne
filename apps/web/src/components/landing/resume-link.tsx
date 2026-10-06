@@ -13,7 +13,7 @@ export function HeroMeta() {
   useEffect(() => {
     setResume(listGames().find((g) => g.status === "playing" && g.moves.length > 0 && g.mode !== "tutorial") ?? null);
   }, []);
-  if (!resume) return <p className="lp-hero-meta">You against two Medium bots, standard rules. No sign-up.</p>;
+  if (!resume) return <p className="lp-hero-meta">You’ll play two Medium bots with the standard rules, and you don’t need an account.</p>;
   return (
     <p className="lp-hero-meta">
       Or{" "}

@@ -14,7 +14,7 @@ export function Hero() {
           Carcassonne is a game of <em>tiles</em>, <em>castles</em> and <em>meeples</em>.
         </h1>
         <p className="lp-hero-lead">
-          Draw a tile, grow the countryside, and drop a meeple on the city your friends were counting on. Whoever claims it best, wins.
+          Draw a tile, grow the countryside and drop a meeple on the city your friends were counting on, because whoever claims the land best wins the game.
         </p>
         <div className="lp-hero-actions">
           <PlayNowButton />
