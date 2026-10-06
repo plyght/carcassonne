@@ -158,10 +158,10 @@
   --fill: color-mix(in oklch, var(--foreground) 8%, transparent);
   --fill-hover: color-mix(in oklch, var(--foreground) 12%, transparent);
   --fill-press: color-mix(in oklch, var(--foreground) 16%, transparent);
-  --fill-active: color-mix(in oklch, var(--primary) 26%, transparent);
+  --fill-active: color-mix(in oklch, var(--foreground) 15%, transparent);
   --fill-gold: color-mix(in oklch, var(--gold) 18%, transparent);
   --fill-strong: color-mix(in oklch, var(--foreground) 14%, transparent);
-  --fill-gold-strong: color-mix(in oklch, var(--gold) 24%, var(--sheet));
+  --fill-gold-strong: color-mix(in oklch, var(--gold) 17%, var(--sheet));
   --scrim: rgba(4, 3, 2, 0.66);
   --paper-grain: none;
   --sheet-shading: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%);

@@ -1,10 +1,14 @@
 "use client";
 
+import { useRef } from "react";
+
 import { Castle, Bell, Crown, Leaf, Routing, Tree } from "reicon-react";
 
 import type { GameView } from "@carcassonne/protocol";
 import type { PlayerMeta } from "@carcassonne/game-client";
 import { PLAYER_COLORS } from "@carcassonne/render-classic";
+
+import { useReveal } from "@/components/reveal";
 
 import { SeatSwatch } from "./hud-parts";
 
@@ -33,9 +37,11 @@ export function EndSummary({
   const best = order[0]?.score ?? 0;
   const winners = order.filter((p) => p.score === best);
   const cols = COLS.filter((c) => c.key !== "garden" || view.ruleset.abbot);
+  const ref = useRef<HTMLDivElement>(null);
+  useReveal(ref);
   return (
     <div className="carc-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="end-title">
-      <div className="carc-dialog carc-end">
+      <div ref={ref} className="carc-dialog carc-end reveal">
         <div className="carc-end-banner">
           <div>
             <div className="carc-end-eyebrow">Final score</div>

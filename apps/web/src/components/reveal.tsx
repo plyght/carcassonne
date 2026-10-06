@@ -41,12 +41,21 @@ function io(): IntersectionObserver {
   return observer;
 }
 
-/** Mark a region's items pending and start watching them (once per region). */
-export function revealRegion(region: HTMLElement) {
-  if (region.dataset.revealReady !== undefined || typeof IntersectionObserver === "undefined") return;
-  region.dataset.revealReady = "";
+/** React has hydrated this element (marking it before then would be a hydration mismatch). */
+function hydrated(el: Element): boolean {
+  return Object.keys(el).some((k) => k.startsWith("__reactFiber$"));
+}
+
+/**
+ * Mark a region's items pending and start watching them (once per region). Returns
+ * false, changing nothing, while React has yet to hydrate the region or its items.
+ */
+export function revealRegion(region: HTMLElement): boolean {
+  if (region.dataset.revealReady !== undefined || typeof IntersectionObserver === "undefined") return true;
   const marked = Array.from(region.querySelectorAll<HTMLElement>("[data-reveal]")).filter((el) => el.closest(".reveal") === region);
   const items = marked.length ? marked : (Array.from(region.children) as HTMLElement[]);
+  if (!hydrated(region) || !items.every(hydrated)) return false;
+  region.dataset.revealReady = "";
   const base = Number(region.dataset.revealBase ?? 0);
   const still = reducedMotion();
   items.forEach((item, i) => {
@@ -61,10 +70,16 @@ export function revealRegion(region: HTMLElement) {
       io().observe(item);
     }
   });
+  return true;
 }
 
-function scan(root: ParentNode = document) {
-  for (const region of root.querySelectorAll<HTMLElement>(".reveal:not([data-reveal-ready])")) revealRegion(region);
+/** Prepare every region on the page; true when some are still waiting for hydration. */
+function scan(root: ParentNode = document): boolean {
+  let waiting = false;
+  for (const region of root.querySelectorAll<HTMLElement>(".reveal:not([data-reveal-ready])")) {
+    if (!revealRegion(region)) waiting = true;
+  }
+  return waiting;
 }
 
 function finish(item: HTMLElement) {
@@ -77,15 +92,19 @@ export function ProgressiveReveal() {
   const path = usePathname();
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    scan();
+    // regions that have not hydrated yet are retried each frame (for a few seconds);
     // content that renders later (client data, dialogs) is picked up on the next frame
     let raf = 0;
+    let tries = 0;
+    const tick = () => {
+      raf = 0;
+      if (scan() && ++tries < 300) raf = requestAnimationFrame(tick);
+    };
+    tick();
     const mo = new MutationObserver(() => {
       if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        scan();
-      });
+      tries = 0;
+      raf = requestAnimationFrame(tick);
     });
     mo.observe(document.body, { childList: true, subtree: true });
     return () => {

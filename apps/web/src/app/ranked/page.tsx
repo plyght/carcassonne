@@ -41,7 +41,7 @@ export default function RankedPage() {
   };
 
   return (
-    <div className="carc-page">
+    <div className="carc-page reveal">
       <h1 className="carc-page-title">Ranked</h1>
       <p className="carc-page-lead">Ranked games are a free-for-all with a fixed ruleset and clock, rated with Glicko-2, and they have no bots and no takebacks.</p>
       {!isPending && !session ? (

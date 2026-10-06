@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const settings = useSettings();
   const style = getStyle(settings.style);
   return (
-    <div className="carc-page">
+    <div className="carc-page reveal">
       <h1 className="carc-page-title">Settings</h1>
       <p className="carc-page-lead">Your settings are saved on this device, and styles switch live, even in the middle of a game.</p>
 

@@ -108,7 +108,7 @@ export function NewGameSetup() {
   const bots = seats.length - humans;
 
   return (
-    <div className="carc-page">
+    <div className="carc-page reveal">
       <h1 className="carc-page-title">New game</h1>
       <p className="carc-page-lead">If you have never played Carcassonne, use Quick start, and the game will tell you what to do on every turn.</p>
 

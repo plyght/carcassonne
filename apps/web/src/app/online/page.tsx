@@ -48,7 +48,7 @@ export default function OnlinePage() {
   };
 
   return (
-    <div className="carc-page grid items-start gap-[var(--sp-6)] md:grid-cols-[1fr_1.3fr]" data-width="wide">
+    <div className="carc-page reveal grid items-start gap-[var(--sp-6)] md:grid-cols-[1fr_1.3fr]" data-width="wide">
       <section className="carc-sheet">
         <h1 className="carc-heading">Join a room</h1>
         <p className="carc-sub">If you have an invite code, you can join here, and guests only need a nickname.</p>

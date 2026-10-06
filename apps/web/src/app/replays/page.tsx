@@ -15,7 +15,7 @@ export default function ReplaysPage() {
   useEffect(() => setGames(listGames()), []);
 
   return (
-    <div className="carc-page" data-width="wide">
+    <div className="carc-page reveal" data-width="wide">
       <h1 className="carc-page-title">Replays</h1>
       <p className="carc-page-lead">
         Every game is stored as its seed and moves, and re-simulated by the engine. Online replays appear here once the server is connected.

@@ -212,7 +212,7 @@ export default function TutorialPage() {
   const last = progress.chapter === LESSONS.length - 1;
   const scored = progress.lastEvents.flatMap((e) => (e.type === "featureScored" ? [explainScore(e, PLAYERS, 3)] : [])).filter((t): t is string => !!t);
   const card = ({ pending, canAct }: { pending: boolean; canAct: boolean }) => (
-    <Panel className="carc-lesson-card" data-testid="lesson-card" data-step={step?.id ?? "done"} data-done={progress.chapterDone || undefined}>
+    <Panel className="carc-lesson-card reveal" data-testid="lesson-card" data-step={step?.id ?? "done"} data-done={progress.chapterDone || undefined}>
       <div className="carc-lesson-top">
         <span className="carc-lesson-count carc-num">
           Lesson {progress.chapter + 1} of {LESSONS.length}
