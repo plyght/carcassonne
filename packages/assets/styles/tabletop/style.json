@@ -1,0 +1,129 @@
+{
+  "id": "tabletop",
+  "name": "Tabletop",
+  "description": "Hand-painted miniature board on a white table: thick cream tile slabs, painterly grass, walled towns with terracotta roofs, matte wooden meeples.",
+  "shading": "pbr",
+  "palette": {
+    "background": "#e6e6e4",
+    "table": "#e9eaea",
+    "grass": "#468020",
+    "grassAlt": "#6c9f2a",
+    "road": "#ecdfbd",
+    "city": "#c18d55",
+    "riverBed": "#3a5f66",
+    "water": "#4f7f99",
+    "slab": "#e3cfa6",
+    "seam": "#5a4a32",
+    "stone": "#b9ad92",
+    "stoneDark": "#857a64",
+    "roofs": [
+      "#ad452b",
+      "#9c3b24",
+      "#b94f31",
+      "#923521"
+    ],
+    "plaster": [
+      "#e6d8b8",
+      "#dccca8",
+      "#ece0c4",
+      "#d2c09a"
+    ],
+    "foliage": [
+      "#1f4a26",
+      "#26562b",
+      "#183d1f"
+    ],
+    "trunk": "#5b4129",
+    "wood": "#8a6238",
+    "dark": "#3a2a20",
+    "sheep": "#f4f1e8",
+    "cow": "#6e4c32",
+    "crop": "#a9b456",
+    "players": [
+      "#d0261c",
+      "#2650c0",
+      "#f0c419",
+      "#2d8a37",
+      "#262626",
+      "#9a4cbd"
+    ]
+  },
+  "lighting": {
+    "sun": {
+      "color": "#fff0d8",
+      "intensity": 2.2,
+      "azimuth": -145,
+      "elevation": 48
+    },
+    "hemisphere": {
+      "sky": "#f6f6f2",
+      "ground": "#7d7560",
+      "intensity": 0.9
+    },
+    "environment": 0.4,
+    "exposure": 0.92,
+    "toneMapping": "neutral",
+    "shadowSoftness": 4
+  },
+  "terrain": {
+    "grassNoise": 0.25,
+    "noiseScale": 3.5,
+    "grain": 0.22,
+    "seamWidth": 0.007,
+    "seamDarken": 0.7,
+    "tileGap": 0.0025,
+    "heightJitter": 0.005,
+    "ao": 0.6,
+    "resolution": {
+      "low": 24,
+      "medium": 40,
+      "high": 48
+    }
+  },
+  "materials": {
+    "roughness": 0.88,
+    "metalness": 0,
+    "figureRoughness": 0.72,
+    "toonSteps": 3,
+    "outline": null,
+    "stoneNoise": 0.3
+  },
+  "props": {
+    "scale": 1,
+    "houseHeight": 1,
+    "rounded": false
+  },
+  "anim": {
+    "preset": "realistic",
+    "speed": 1,
+    "squash": 0,
+    "overshoot": 0
+  },
+  "post": {
+    "tiltShift": {
+      "focus": 0.42,
+      "range": 0.32,
+      "blur": 2.5,
+      "tiers": [
+        "high"
+      ]
+    },
+    "ssao": {
+      "radius": 0.1,
+      "intensity": 1,
+      "tiers": [
+        "high"
+      ]
+    },
+    "saturation": 1.0,
+    "vignette": 0.12
+  },
+  "popups": {
+    "kind": "coin",
+    "fill": "#f3c64a",
+    "stroke": "#7a5414",
+    "text": "#4a300a",
+    "font": "700 64px Georgia, serif"
+  },
+  "fog": null
+}

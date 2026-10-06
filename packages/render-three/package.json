@@ -1,0 +1,29 @@
+{
+  "name": "@carcassonne/render-three",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles": "./src/styles.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "bun test",
+    "playground": "bun playground/serve.ts",
+    "screenshots": "node playground/shoot.mjs"
+  },
+  "dependencies": {
+    "@carcassonne/core-geo": "workspace:*",
+    "@carcassonne/protocol": "workspace:*",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@carcassonne/config": "workspace:*",
+    "@carcassonne/core-wasm": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/three": "^0.186.0",
+    "typescript": "catalog:"
+  }
+}

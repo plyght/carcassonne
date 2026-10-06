@@ -1,0 +1,133 @@
+{
+  "id": "diorama",
+  "name": "Living Diorama",
+  "description": "Pastel tilt-shift miniature world with soft light and a strong depth of field.",
+  "shading": "pbr",
+  "palette": {
+    "background": "#dfe9ef",
+    "table": "#e4e0d8",
+    "grass": "#7fb86a",
+    "grassAlt": "#9ccc84",
+    "road": "#f6ead2",
+    "city": "#e8c9a6",
+    "riverBed": "#8fb9c2",
+    "water": "#8fd0e8",
+    "slab": "#f1e3c8",
+    "seam": "#8a7a62",
+    "stone": "#e3dccd",
+    "stoneDark": "#b9b0a0",
+    "roofs": [
+      "#e07a68",
+      "#e8957c",
+      "#cf6c64",
+      "#eba98c"
+    ],
+    "plaster": [
+      "#fbf5ea",
+      "#f6ecda",
+      "#fffaf2",
+      "#efe2cc"
+    ],
+    "foliage": [
+      "#5e9e6a",
+      "#6fb07a",
+      "#4e8a5c"
+    ],
+    "trunk": "#8a6a4e",
+    "wood": "#c49a74",
+    "dark": "#6b5a5a",
+    "sheep": "#ffffff",
+    "cow": "#a07c62",
+    "crop": "#e8dc94",
+    "players": [
+      "#e8645a",
+      "#5f8ee0",
+      "#f2cf5b",
+      "#5fb06c",
+      "#5a5a66",
+      "#b484d8"
+    ]
+  },
+  "lighting": {
+    "sun": {
+      "color": "#fff4e6",
+      "intensity": 1.9,
+      "azimuth": 25,
+      "elevation": 48
+    },
+    "hemisphere": {
+      "sky": "#f2f7ff",
+      "ground": "#b8a88e",
+      "intensity": 0.85
+    },
+    "environment": 0.3,
+    "exposure": 0.85,
+    "toneMapping": "neutral",
+    "shadowSoftness": 6
+  },
+  "terrain": {
+    "grassNoise": 0.25,
+    "noiseScale": 2.2,
+    "grain": 0.05,
+    "seamWidth": 0.008,
+    "seamDarken": 0.25,
+    "tileGap": 0.006,
+    "heightJitter": 0.003,
+    "ao": 0.45,
+    "resolution": {
+      "low": 24,
+      "medium": 40,
+      "high": 48
+    }
+  },
+  "materials": {
+    "roughness": 0.92,
+    "metalness": 0,
+    "figureRoughness": 0.6,
+    "toonSteps": 3,
+    "outline": null,
+    "stoneNoise": 0.15
+  },
+  "props": {
+    "scale": 1,
+    "houseHeight": 0.95,
+    "rounded": true
+  },
+  "anim": {
+    "preset": "realistic",
+    "speed": 0.9,
+    "squash": 0.08,
+    "overshoot": 0.1
+  },
+  "post": {
+    "tiltShift": {
+      "focus": 0.45,
+      "range": 0.16,
+      "blur": 5,
+      "tiers": [
+        "medium",
+        "high"
+      ]
+    },
+    "ssao": {
+      "radius": 0.1,
+      "intensity": 0.8,
+      "tiers": [
+        "high"
+      ]
+    },
+    "saturation": 1.05,
+    "vignette": 0.18
+  },
+  "popups": {
+    "kind": "bubble",
+    "fill": "#fffaf2",
+    "stroke": "#b9a58a",
+    "text": "#6b5a4a",
+    "font": "600 60px 'Trebuchet MS', sans-serif"
+  },
+  "fog": {
+    "color": "#dfe9ef",
+    "density": 0.006
+  }
+}

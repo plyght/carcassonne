@@ -1,0 +1,119 @@
+{
+  "id": "cartoon",
+  "name": "Cartoon",
+  "description": "Saturated cel-shaded board with ink outlines, bouncy squash-and-stretch animation and comic score pops.",
+  "shading": "toon",
+  "palette": {
+    "background": "#9fd8f5",
+    "table": "#f6d9a0",
+    "grass": "#45bf34",
+    "grassAlt": "#6fd840",
+    "road": "#ffe7a3",
+    "city": "#f3a64f",
+    "riverBed": "#2b7fa6",
+    "water": "#2fb4ff",
+    "slab": "#ffd789",
+    "seam": "#3b2a1a",
+    "stone": "#c9bda2",
+    "stoneDark": "#8f8169",
+    "roofs": [
+      "#ff4b32",
+      "#ff6a2b",
+      "#e8352d",
+      "#ff8a3d"
+    ],
+    "plaster": [
+      "#fff3d6",
+      "#ffe8bf",
+      "#fff8e8",
+      "#f6dfae"
+    ],
+    "foliage": [
+      "#1f9a3c",
+      "#28b048",
+      "#178133"
+    ],
+    "trunk": "#7a4a22",
+    "wood": "#b07a3a",
+    "dark": "#2a1d33",
+    "sheep": "#ffffff",
+    "cow": "#8a5a36",
+    "crop": "#e9d24a",
+    "players": [
+      "#ff3030",
+      "#2e6bff",
+      "#ffd21f",
+      "#21c045",
+      "#333344",
+      "#b04cff"
+    ]
+  },
+  "lighting": {
+    "sun": {
+      "color": "#ffffff",
+      "intensity": 2.6,
+      "azimuth": 40,
+      "elevation": 60
+    },
+    "hemisphere": {
+      "sky": "#ffffff",
+      "ground": "#b5a27a",
+      "intensity": 1.3
+    },
+    "environment": 0,
+    "exposure": 1,
+    "toneMapping": "neutral",
+    "shadowSoftness": 1
+  },
+  "terrain": {
+    "grassNoise": 0.18,
+    "noiseScale": 2,
+    "grain": 0,
+    "seamWidth": 0.008,
+    "seamDarken": 0.85,
+    "tileGap": 0.012,
+    "heightJitter": 0,
+    "ao": 0.25,
+    "resolution": {
+      "low": 24,
+      "medium": 40,
+      "high": 48
+    }
+  },
+  "materials": {
+    "roughness": 1,
+    "metalness": 0,
+    "figureRoughness": 1,
+    "toonSteps": 3,
+    "outline": {
+      "color": "#1b1020",
+      "thickness": 0.006
+    },
+    "stoneNoise": 0.08
+  },
+  "props": {
+    "scale": 1.06,
+    "houseHeight": 1.05,
+    "rounded": true
+  },
+  "anim": {
+    "preset": "cartoon",
+    "speed": 1,
+    "squash": 0.28,
+    "overshoot": 0.25
+  },
+  "post": {
+    "tiltShift": null,
+    "ssao": null,
+    "saturation": 1.15,
+    "vignette": 0
+  },
+  "popups": {
+    "kind": "comic",
+    "fill": "#ffe03a",
+    "stroke": "#1b1020",
+    "text": "#e8252d",
+    "font": "900 64px 'Comic Sans MS', 'Bangers', Impact, sans-serif"
+  },
+  "fog": null
+}

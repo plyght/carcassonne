@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>render-three playground</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #222; font: 13px system-ui, sans-serif; overflow: hidden; }
+      #board { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+      #ui { position: fixed; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; background: rgba(20, 18, 14, 0.72); color: #f4efe4; padding: 8px 10px; border-radius: 8px; max-width: calc(100vw - 40px); }
+      #ui select, #ui button, #ui input { font: inherit; padding: 3px 6px; border-radius: 5px; border: 1px solid #6b604c; background: #2f2a22; color: #f4efe4; }
+      #ui label { display: flex; gap: 4px; align-items: center; }
+      #stats { position: fixed; bottom: 10px; left: 10px; color: #f4efe4; background: rgba(20, 18, 14, 0.72); padding: 6px 10px; border-radius: 8px; font: 12px ui-monospace, monospace; white-space: pre; }
+      body.capture #ui, body.capture #stats { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="board"></canvas>
+    <div id="ui">
+      <label>Style <select id="style"></select></label>
+      <label>Camera <select id="camera"></select></label>
+      <label>Tier <select id="tier"><option>low</option><option>medium</option><option>high</option></select></label>
+      <label><input type="checkbox" id="reduced" /> Reduced motion</label>
+      <label>Seed <input id="seed" type="number" value="7" style="width: 70px" /></label>
+      <button id="restart">New game</button>
+      <button id="step">Play move</button>
+      <button id="auto">Autoplay</button>
+      <button id="rotate" title="R">Rotate ghost</button>
+    </div>
+    <div id="stats"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
