@@ -57,7 +57,7 @@ pub const hard_config: SearchConfig = .{
 
 pub const expert_config: SearchConfig = .{
     .default_ms = 2500,
-    .max_depth = 4,
+    .max_depth = 6,
     .rollout_cycles = 0,
     .rollout_samples = 8,
     .opponent_samples = 0,
@@ -192,17 +192,14 @@ fn easy(g: *const Game, moves: []const Move, rng: *Rng) Move {
         var c = g.*;
         c.apply(m, null) catch continue;
         score += @floatFromInt(c.scores[me] - g.scores[me]);
-        switch (m.figure) {
-            .meeple => |f| if (c.figures[me][0..engine.MEEPLES_PER_PLAYER].len > 0) {
-                // Bigger features look juicier (when the meeple is still there).
-                for (c.figures[me][0..engine.MEEPLES_PER_PLAYER]) |fs| {
-                    if (fs.on_board and fs.slot == c.placed_len - 1 and fs.feature == f) {
-                        score += 0.5 * featureSize(&c, fs.slot, fs.feature);
-                        break;
-                    }
+        if (m.figure == .meeple) {
+            // Bigger features look juicier (while the meeple is still on it).
+            for (c.figures[me][0..engine.MEEPLES_PER_PLAYER]) |fs| {
+                if (fs.on_board and fs.slot == c.placed_len - 1 and fs.feature == m.figure.meeple) {
+                    score += 0.5 * featureSize(&c, fs.slot, fs.feature);
+                    break;
                 }
-            },
-            else => {},
+            }
         }
         if (score > best_score) {
             best_score = score;
