@@ -252,6 +252,33 @@ test "buffer round trip: sections parse and counts match" {
     try testing.expect(std.mem.readInt(u32, b3[8..12], .little) == b3.len);
 }
 
+test "3D: every triangle winds counter-clockwise seen from outside (agrees with its vertex normals)" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    for (registry.tiles) |*def| {
+        var L = try layout.build(testing.allocator, def);
+        defer L.deinit();
+        const m = try mesh.build(arena.allocator(), &L, .{ .resolution = 12 });
+        var k: usize = 0;
+        while (k < m.indices.items.len) : (k += 3) {
+            const va = m.verts.items[m.indices.items[k]];
+            const vb = m.verts.items[m.indices.items[k + 1]];
+            const vc = m.verts.items[m.indices.items[k + 2]];
+            const e1 = [3]f32{ vb.pos[0] - va.pos[0], vb.pos[1] - va.pos[1], vb.pos[2] - va.pos[2] };
+            const e2 = [3]f32{ vc.pos[0] - va.pos[0], vc.pos[1] - va.pos[1], vc.pos[2] - va.pos[2] };
+            const c = [3]f32{ e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0] };
+            const area = @sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+            if (area < 1e-9) continue; // degenerate (clamped at the border)
+            const n = [3]f32{ va.nrm[0] + vb.nrm[0] + vc.nrm[0], va.nrm[1] + vb.nrm[1] + vc.nrm[1], va.nrm[2] + vb.nrm[2] + vc.nrm[2] };
+            const d = (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) / area;
+            if (d <= 0) {
+                std.debug.print("tile {s}: triangle {d} winds against its normals {any} {any} {any} n {any}\n", .{ def.id, k / 3, va.pos, vb.pos, vc.pos, va.nrm });
+                return error.BadWinding;
+            }
+        }
+    }
+}
+
 /// Margin (tile units) every meeple anchor keeps from other features, roads,
 /// rivers, ponds and walls. Figures are big; a farmer must never sit on water.
 const ANCHOR_MARGIN: F = 0.035;

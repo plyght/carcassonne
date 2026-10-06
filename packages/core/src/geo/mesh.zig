@@ -354,7 +354,7 @@ fn pushQuad(a: Allocator, m: *Mesh, q: [4][3]f32, n: [3]f32, uvs: [4][2]f32, f: 
     if (c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0) {
         try m.indices.appendSlice(a, &.{ base, base + 1, base + 3, base + 1, base + 2, base + 3 });
     } else {
-        try m.indices.appendSlice(a, &.{ base, base + 3, base + 1, base + 1, base + 2, base + 3 });
+        try m.indices.appendSlice(a, &.{ base, base + 3, base + 1, base + 1, base + 3, base + 2 });
     }
 }
 
