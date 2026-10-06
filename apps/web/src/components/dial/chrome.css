@@ -5,44 +5,44 @@
 
 /* ══ header ═══════════════════════════════════════════════════════════ */
 /*
- * Wordmark left, quiet text links and one Play button right. No box around the mark,
- * no pill on the current page (ink weight and an underline instead), no rule under
- * the bar: it is plain paper, transparent over the landing hero, and gains a soft
- * shadow once the page scrolls. --header-h is the height pages can pad by.
+ * Wordmark left; quiet text links, the theme button, the account and one Play button
+ * right. Transparent at rest over the landing, a solid bar once the page scrolls: a
+ * frosted page colour in light, one surface step up in dark, with a soft shadow edge
+ * instead of a rule. --header-h is the height pages can pad by.
  */
 
 :root {
   --header-h: 64px;
+  --header-bar: color-mix(in oklch, var(--background) 86%, transparent);
+  --header-edge: 0 1px 0 color-mix(in oklch, var(--wood) 10%, transparent), 0 10px 24px -18px rgba(60, 38, 14, 0.45);
 }
 
-/* Plain paper at rest (the page's own parchment shows through), a paper bar once scrolled. */
+.dark {
+  --header-bar: color-mix(in oklch, var(--card) 88%, transparent);
+  --header-edge: 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px -18px rgba(0, 0, 0, 0.9);
+}
+
 .carc-header {
   position: relative;
   z-index: 30;
   background-color: transparent;
   transition:
     background-color var(--dur-base) ease,
-    box-shadow var(--dur-base) ease;
+    box-shadow var(--dur-base) ease,
+    backdrop-filter var(--dur-base) ease;
 }
 
 .carc-header[data-scrolled] {
-  background-color: var(--background);
-  box-shadow: 0 8px 20px -16px rgba(60, 38, 14, 0.55);
+  background-color: var(--header-bar);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: var(--header-edge);
 }
 
-.dark .carc-header[data-scrolled] {
-  box-shadow: 0 8px 20px -14px rgba(0, 0, 0, 0.8);
-}
-
-/* over the landing hero: the page shows through until it scrolls */
+/* over the landing: the page shows through until it scrolls */
 .carc-header[data-overlay] {
   position: absolute;
   inset: 0 0 auto;
-  background-color: transparent;
-}
-
-.carc-header[data-overlay][data-scrolled] {
-  background-color: var(--background);
 }
 
 .carc-header-inner {
@@ -58,14 +58,20 @@
 .carc-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 10px;
+  height: var(--h-control);
   color: var(--text-1);
   text-decoration: none;
+  border-radius: var(--r-control);
 }
 
 .carc-brand-mark {
   color: var(--primary);
   transition: transform var(--dur-base) var(--ease-out);
+}
+
+.dark .carc-brand-mark {
+  color: var(--text-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -75,14 +81,14 @@
 }
 
 .carc-brand-name {
-  font: var(--fw-heading) 24px / 1 var(--font-heading);
-  letter-spacing: -0.02em;
+  font: var(--fw-medium) 19px / 1 var(--font-heading);
+  letter-spacing: -0.025em;
 }
 
 .carc-nav {
   display: flex;
   align-items: center;
-  gap: var(--sp-5);
+  gap: var(--sp-1);
   margin-left: auto;
 }
 
@@ -91,39 +97,48 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  height: var(--h-control);
-  padding: 0;
+  height: 36px;
+  padding: 0 var(--sp-3);
   border: none;
-  background: none;
+  border-radius: var(--r-control);
+  background: transparent;
   color: var(--text-2);
-  font: var(--fw-medium) 15px / 1 var(--font-ui);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
+  letter-spacing: 0.005em;
   text-decoration: none;
   cursor: pointer;
-  transition: color var(--dur-fast) ease;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
 }
 
-.carc-nav-link:hover {
-  color: var(--text-1);
+@media (hover: hover) and (pointer: fine) {
+  .carc-nav-link:hover {
+    color: var(--text-1);
+    background: var(--fill);
+  }
 }
 
-/* the current page: ink and a 2 px underline */
+/* the current page: full ink and a short 2 px bar under the label */
 .carc-nav-link[aria-current="page"] {
   color: var(--text-1);
-  font-weight: var(--fw-strong);
 }
 
 .carc-nav-link::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 6px;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: 3px;
   height: 2px;
   border-radius: 1px;
-  background: currentColor;
+  background: var(--primary);
   transform: scaleX(0);
-  transform-origin: left;
   transition: transform var(--dur-base) var(--ease-out);
+}
+
+.dark .carc-nav-link::after {
+  background: var(--text-accent);
 }
 
 .carc-nav-link[aria-current="page"]::after {
@@ -133,86 +148,130 @@
 .carc-header-end {
   display: flex;
   align-items: center;
-  gap: var(--sp-5);
+  gap: var(--sp-2);
 }
 
 .carc-header-play {
-  padding: 0 var(--sp-5);
+  height: 36px;
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-4);
 }
 
 .carc-header-placeholder {
   display: block;
-  width: 56px;
-  height: var(--h-control);
+  width: 64px;
+  height: 36px;
 }
 
 .carc-user-initial {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--primary);
   color: var(--primary-foreground);
-  font: var(--fw-strong) var(--fs-small) / 1 var(--font-ui);
+  font: var(--fw-medium) var(--fs-small) / 1 var(--font-ui);
 }
 
 .carc-user-trigger svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .carc-user-trigger::after {
   display: none;
 }
 
-/* theme: a paper-and-ink disc that turns over */
+/* theme: a square icon button; sun and moon cross-fade with a small turn */
 .carc-theme-switch {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-2);
-  height: var(--h-control);
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   border: none;
-  background: none;
-  color: var(--text-1);
-  font: var(--fw-medium) 15px / 1 var(--font-ui);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-2);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
 }
 
-.carc-theme-disc {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: linear-gradient(90deg, var(--text-1) 50%, var(--sheet-sunk) 50%);
-  box-shadow: var(--swatch-lift);
-  transition: transform var(--dur-slow) var(--ease-in-out);
-}
-
-.carc-theme-switch[data-dark] .carc-theme-disc {
-  transform: rotate(180deg);
+.carc-theme-switch[data-labelled] {
+  height: var(--h-control);
+  padding: 0 var(--sp-3) 0 var(--sp-2);
+  background: var(--fill);
+  color: var(--text-1);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .carc-theme-switch:hover .carc-theme-disc {
-    transform: rotate(25deg);
+  .carc-theme-switch:hover {
+    color: var(--text-1);
+    background: var(--fill);
   }
+  .carc-theme-switch[data-labelled]:hover {
+    background: var(--fill-hover);
+  }
+}
 
-  .carc-theme-switch[data-dark]:hover .carc-theme-disc {
-    transform: rotate(205deg);
-  }
+.carc-theme-switch:active {
+  transform: scale(var(--press-scale));
+}
+
+.carc-theme-icons {
+  display: grid;
+  width: 20px;
+  height: 20px;
+}
+
+.carc-theme-icons > svg {
+  grid-area: 1 / 1;
+  width: 20px;
+  height: 20px;
+  transition:
+    opacity var(--dur-base) ease,
+    filter var(--dur-base) ease,
+    transform var(--dur-slow) var(--ease-out);
+}
+
+.carc-theme-sun,
+.carc-theme-switch[data-dark] .carc-theme-moon {
+  opacity: 0;
+  filter: blur(2px);
+  transform: rotate(-60deg) scale(0.8);
+}
+
+.carc-theme-switch[data-dark] .carc-theme-sun {
+  opacity: 1;
+  filter: none;
+  transform: none;
 }
 
 /* phones: wordmark, Play, and a Menu that opens a paper sheet */
 .carc-menu-button {
   display: none;
-  height: var(--h-control);
-  padding: 0;
+  height: var(--h-compact);
+  padding: 0 var(--sp-3);
   border: none;
-  background: none;
+  border-radius: var(--r-control);
+  background: var(--fill);
   color: var(--text-1);
-  font: var(--fw-strong) 15px / 1 var(--font-ui);
+  font: var(--fw-medium) var(--fs-body) / 1 var(--font-ui);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.carc-menu-button:active {
+  transform: scale(var(--press-scale));
 }
 
 .carc-menu-sheet {
@@ -220,7 +279,7 @@
   top: var(--header-h);
   left: 0;
   right: 0;
-  padding: var(--sp-2) var(--sp-5) var(--sp-6);
+  padding: var(--sp-2) var(--sp-4) var(--sp-6);
   background-color: var(--background);
   box-shadow: 0 18px 30px -20px rgba(40, 24, 8, 0.6);
   animation: carc-sheet-in var(--dur-base) var(--ease-out);
@@ -244,7 +303,7 @@
   min-height: 52px;
   color: var(--text-1);
   font: var(--fw-heading) 24px / 1.2 var(--font-heading);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.025em;
   text-decoration: none;
 }
 
@@ -258,6 +317,11 @@
   justify-content: space-between;
   gap: var(--sp-4);
   margin-top: var(--sp-4);
+}
+
+.dark .carc-menu-sheet {
+  background-color: var(--card);
+  box-shadow: 0 18px 30px -20px rgba(0, 0, 0, 0.9);
 }
 
 @media (max-width: 767px) {

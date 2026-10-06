@@ -73,21 +73,28 @@
 }
 
 :is(.carc-btn, .carc-dial-button)[data-variant="primary"] {
-  background: var(--primary);
+  /* a solid terracotta key: a lit top edge, a crisp darker rim and a short, tight
+     shadow, so it reads as a physical button rather than a glowing pill */
+  background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 88%, white) 0%, var(--primary) 100%);
   color: var(--primary-foreground);
-  font-weight: var(--fw-strong);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.005em;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 -2px 0 rgba(0, 0, 0, 0.14) inset,
-    0 8px 18px -10px color-mix(in oklch, var(--primary) 85%, black);
+    0 0 0 1px color-mix(in oklch, var(--primary) 72%, black),
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 1px 2px rgba(40, 14, 4, 0.22),
+    0 4px 10px -4px color-mix(in oklch, var(--primary) 60%, rgba(0, 0, 0, 0.5));
 }
 
 :is(.carc-btn, .carc-dial-button)[data-variant="primary"]:hover {
-  background: color-mix(in oklch, var(--primary) 90%, black);
+  background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, white) 0%, color-mix(in oklch, var(--primary) 96%, white) 100%);
 }
 
 :is(.carc-btn, .carc-dial-button)[data-variant="primary"]:active:not(:disabled) {
-  background: color-mix(in oklch, var(--primary) 84%, black);
+  background: color-mix(in oklch, var(--primary) 92%, black);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--primary) 70%, black),
+    0 1px 2px rgba(0, 0, 0, 0.22) inset;
 }
 
 :is(.carc-btn, .carc-dial-button)[data-variant="ghost"] {
@@ -126,8 +133,10 @@
 
 :is(.carc-btn, .carc-dial-button)[data-size="large"] {
   height: var(--h-large);
-  padding: 0 var(--sp-6);
+  padding: 0 22px;
+  border-radius: 12px;
   font-size: var(--fs-lead);
+  letter-spacing: -0.005em;
 }
 
 :is(.carc-btn, .carc-dial-button)[data-size="large"] svg {
