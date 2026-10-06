@@ -168,9 +168,10 @@
   animation: lp-board-in 700ms ease 60ms both;
 }
 
-/* the renderer lands the light table 2 % under the page colour (its R channel is
-   already at full); lift it so the fade into the page has no step */
-html:not(.dark) .lp-stage {
+/* the live renderer lands the light table 2 % under the page colour (its R channel is
+   already at full); lift it so the fade into the page has no step (the posters are
+   corrected when they are encoded) */
+html:not(.dark) .lp-canvas {
   filter: brightness(1.02);
 }
 
