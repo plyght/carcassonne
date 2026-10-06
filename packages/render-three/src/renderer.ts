@@ -201,6 +201,8 @@ export class BoardRenderer {
   private autoRender = true;
   private resizeObs: ResizeObserver | null = null;
   private detachInput: (() => void) | null = null;
+  private playerSlots: number[] | null = null;
+  private frameHints = false;
 
   private constructor(opts: BoardRendererOptions, created: { renderer: THREE.WebGPURenderer; backend: BackendKind; canvas: HTMLCanvasElement }) {
     this.renderer = created.renderer;
@@ -389,9 +391,34 @@ export class BoardRenderer {
     if (on) this.timeline.finish();
   }
 
+  /**
+   * Map player index -> slot in the style's `palette.players` (e.g. a seat that
+   * picked "blue" uses slot 1 whatever its index). Null = identity.
+   */
+  setPlayerSlots(slots: number[] | null): void {
+    const same = slots === this.playerSlots || (slots && this.playerSlots && slots.length === this.playerSlots.length && slots.every((v, i) => v === this.playerSlots![i]));
+    if (same) return;
+    this.playerSlots = slots ? [...slots] : null;
+    this.propsDirty = true;
+  }
+
+  /**
+   * Framing for an app with UI over the canvas: `insets` (fractions of the viewport
+   * per side) keep framed cameras clear of panels; `includeHints` widens the frame to
+   * the legal spots of the tile in hand so they are always on screen.
+   */
+  setFraming(opts: { insets?: { top: number; right: number; bottom: number; left: number }; includeHints?: boolean }): void {
+    if (opts.insets) this.rig.setInsets(opts.insets);
+    if (opts.includeHints !== undefined && opts.includeHints !== this.frameHints) {
+      this.frameHints = opts.includeHints;
+      this.boundsDirty = true;
+    }
+  }
+
   /** Legal placements for the current tile: shows cell markers and a ghost on hover. */
   setPlacementHints(hints: { tile: TileId; placements: Placement[] } | null): void {
     this.hints = hints && hints.placements.length > 0 ? hints : null;
+    if (this.frameHints) this.boundsDirty = true;
     this.rebuildLegal();
     if (!this.hints) this.setGhost(null);
   }
@@ -440,6 +467,7 @@ export class BoardRenderer {
   setPendingPlacement(placement: Placement | null, options: FigureOption[] = [], tile?: TileId): void {
     const id = tile ?? this.hints?.tile ?? this.pending?.tile;
     this.pending = placement && id ? { placement, tile: id, options } : null;
+    if (this.frameHints) this.boundsDirty = true;
     if (this.pending) this.setGhost(placement, id);
     this.setHover(null);
   }
@@ -1047,7 +1075,8 @@ export class BoardRenderer {
 
   private playerColor(i: number): THREE.Color {
     const p = this.style.palette.players;
-    return new THREE.Color(p[i % p.length]!);
+    const slot = this.playerSlots?.[i] ?? i;
+    return new THREE.Color(p[slot % p.length]!);
   }
 
   private applyStyleScene(): void {
@@ -1122,12 +1151,23 @@ export class BoardRenderer {
       maxX = Math.max(maxX, t.x + 1);
       maxZ = Math.max(maxZ, t.y + 1);
     }
+    const extra = this.frameHints ? [...(this.hints?.placements ?? []), ...(this.pending ? [this.pending.placement] : [])] : [];
+    if (extra.length)
+      for (const p of extra) {
+        minX = Math.min(minX, p.x);
+        minZ = Math.min(minZ, p.y);
+        maxX = Math.max(maxX, p.x + 1);
+        maxZ = Math.max(maxZ, p.y + 1);
+      }
     return { minX, minZ, maxX, maxZ };
   }
 
   private updateBounds(): void {
     const b = this.bounds();
-    this.rig.setBounds(b, [...this.tiles.values()].map((t) => ({ x: t.x, y: t.y })));
+    const cells = [...this.tiles.values()].map((t) => ({ x: t.x, y: t.y }));
+    if (this.frameHints && this.hints) for (const p of this.hints.placements) cells.push({ x: p.x, y: p.y });
+    if (this.frameHints && this.pending) cells.push({ x: this.pending.placement.x, y: this.pending.placement.y });
+    this.rig.setBounds(b, cells);
     const cx = (b.minX + b.maxX) / 2;
     const cz = (b.minZ + b.maxZ) / 2;
     const r = Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ) / 2 + 1.5;
@@ -1247,12 +1287,28 @@ export class BoardRenderer {
 
   private attachInput(): () => void {
     const el = this.canvas;
+    // touch: one finger orbits, two fingers pan + pinch-zoom (no page scroll / browser zoom)
+    el.style.touchAction = "none";
     let down: { x: number; y: number; button: number; moved: boolean } | null = null;
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch: { dist: number; mx: number; my: number } | null = null;
+    const pinchState = () => {
+      const [a, b] = [...touches.values()];
+      return { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y), mx: (a!.x + b!.x) / 2, my: (a!.y + b!.y) / 2 };
+    };
     const move = (e: PointerEvent) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size >= 2) {
+        const next = pinchState();
+        if (next.dist > 1 && pinch.dist > 1) this.rig.zoom(pinch.dist / next.dist);
+        this.rig.pan(next.mx - pinch.mx, next.my - pinch.my);
+        pinch = next;
+        return;
+      }
       if (down) {
         const dx = e.clientX - down.x;
         const dy = e.clientY - down.y;
-        if (Math.abs(dx) + Math.abs(dy) > 4) down.moved = true;
+        if (Math.abs(dx) + Math.abs(dy) > (e.pointerType === "touch" ? 10 : 4)) down.moved = true;
         if (down.moved) {
           if (down.button === 2 || e.shiftKey) this.rig.pan(dx, dy);
           else this.rig.orbit(dx, dy);
@@ -1261,18 +1317,35 @@ export class BoardRenderer {
           return;
         }
       }
+      if (e.pointerType === "touch") return;
       const pick = this.pick(e.clientX, e.clientY);
       this.emit({ type: "hover", pick, placement: this.hoverAt(pick) });
     };
     const pdown = (e: PointerEvent) => {
+      if (e.pointerType === "touch") {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (touches.size >= 2) {
+          pinch = pinchState();
+          down = null;
+          return;
+        }
+      }
       down = { x: e.clientX, y: e.clientY, button: e.button, moved: false };
     };
     const up = (e: PointerEvent) => {
+      const wasPinch = pinch !== null;
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = null;
       const d = down;
       down = null;
-      if (!d || d.moved) return;
+      if (wasPinch || !d || d.moved) return;
       const pick = this.pick(e.clientX, e.clientY);
       if (pick) this.emit({ type: "click", pick, placement: this.hoverAt(pick) });
+    };
+    const cancel = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = null;
+      down = null;
     };
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -1282,12 +1355,14 @@ export class BoardRenderer {
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerdown", pdown);
     el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", cancel);
     el.addEventListener("wheel", wheel, { passive: false });
     el.addEventListener("contextmenu", ctx);
     return () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerdown", pdown);
       el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", cancel);
       el.removeEventListener("wheel", wheel);
       el.removeEventListener("contextmenu", ctx);
     };

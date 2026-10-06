@@ -22,6 +22,14 @@ export interface RigState {
   fov: number;
 }
 
+/** Viewport fractions (0..0.45) covered by UI on each side; framing keeps the board in the rest. */
+export interface ViewInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface BoardBounds {
   minX: number;
   minZ: number;
@@ -77,6 +85,7 @@ export class CameraRig {
   private clock = 0;
   /** User orbit offsets (orbit mode). */
   private userZoom = 1;
+  private insets: ViewInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
   constructor() {
     this.perspective = new THREE.PerspectiveCamera(35, 1, 0.02, 200);
@@ -97,6 +106,19 @@ export class CameraRig {
   setAspect(aspect: number): void {
     this.aspect = Math.max(0.1, aspect);
     this.goal = this.mode === "orbit" ? this.goal : this.goalFor(this.mode);
+  }
+
+  /** Keep framed modes clear of UI panels (fractions of the viewport per side). */
+  setInsets(insets: ViewInsets): void {
+    const c = (v: number) => Math.max(0, Math.min(0.45, v || 0));
+    this.insets = { top: c(insets.top), right: c(insets.right), bottom: c(insets.bottom), left: c(insets.left) };
+    if (this.mode !== "orbit") this.goal = this.goalFor(this.mode);
+  }
+
+  /** Free region in NDC: centre and half sizes. */
+  private freeBox(): { cx: number; cy: number; hw: number; hh: number } {
+    const i = this.insets;
+    return { cx: i.left - i.right, cy: i.bottom - i.top, hw: Math.max(0.1, 1 - i.left - i.right), hh: Math.max(0.1, 1 - i.top - i.bottom) };
   }
 
   /** Board extent; `cells` (occupied cells) lets the tabletop framing hug irregular boards. */
@@ -133,9 +155,11 @@ export class CameraRig {
     switch (mode) {
       case "top": {
         // fit the board rectangle exactly (narrow fov ~ orthographic)
-        const halfH = Math.max(d / 2, w / 2 / this.aspect) * 1.12 + 0.3;
+        const fb = this.freeBox();
+        const halfH = Math.max(d / 2 / fb.hh, w / 2 / this.aspect / fb.hw) * 1.12 + 0.3;
         const dist = halfH / Math.tan((TOP_FOV * DEG) / 2);
-        return { tx: cx, ty: 0, tz: cz, yaw: 0, pitch: Math.PI / 2, distance: dist, fov: TOP_FOV };
+        // shift so the board sits in the free region (yaw 0: screen right = +x, up = -z)
+        return { tx: cx - fb.cx * halfH * this.aspect, ty: 0, tz: cz + fb.cy * halfH, yaw: 0, pitch: Math.PI / 2, distance: dist, fov: TOP_FOV };
       }
       case "cinematic": {
         const f = this.focus && this.focus.until > this.clock ? this.focus : null;
@@ -200,9 +224,10 @@ export class CameraRig {
         y0 = Math.min(y0, v.y);
         y1 = Math.max(y1, v.y);
       }
-      // recentre: screen right / up offsets back onto the ground plane
-      const cxn = (x0 + x1) / 2;
-      const cyn = (y0 + y1) / 2;
+      // recentre (on the free region): screen right / up offsets back onto the ground plane
+      const fb = this.freeBox();
+      const cxn = (x0 + x1) / 2 - fb.cx;
+      const cyn = (y0 + y1) / 2 - fb.cy;
       const halfH = s.distance * halfV;
       const rx = Math.cos(s.yaw);
       const rz = -Math.sin(s.yaw);
@@ -210,7 +235,7 @@ export class CameraRig {
       const fz = -Math.cos(s.yaw);
       s.tx += rx * cxn * halfH * this.aspect + (fx * cyn * halfH) / Math.sin(s.pitch);
       s.tz += rz * cxn * halfH * this.aspect + (fz * cyn * halfH) / Math.sin(s.pitch);
-      const ext = Math.max((x1 - x0) / 2, (y1 - y0) / 2) / fill;
+      const ext = Math.max((x1 - x0) / 2 / fb.hw, (y1 - y0) / 2 / fb.hh) / fill;
       s.distance = Math.max(1.2, s.distance * (0.35 + 0.65 * ext));
     }
     return s;
