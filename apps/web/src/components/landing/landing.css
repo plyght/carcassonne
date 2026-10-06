@@ -1,10 +1,12 @@
 /*
  * Landing page. Built on the design tokens (tokens.css / globals.css): parchment page,
- * walnut ink, terracotta primary, gold accent, Fraunces display + Geist UI.
+ * walnut ink, terracotta primary, gold accent, ABC Diatype throughout (Otto for the
+ * footer wordmark only).
  *
  * One grid: the header's 1280 px container with 16 px gutters; inside it a 12-column
- * grid with 24 px gaps. One bold moment: the hero is a walnut table with the live
- * board on it. Everything else is quiet paper.
+ * grid with 24 px gaps. One bold moment: the live board, straight on the page with
+ * soft edges. Everything else is quiet paper. Sections blur in as they scroll into
+ * view (components/reveal.tsx).
  */
 
 .lp {
@@ -14,12 +16,6 @@
   --lp-section: 136px;
   --lp-radius: 28px;
   --lp-radius-sm: 20px;
-
-  /* the hero table: the colour the posters were rendered on (see hero-board.tsx) */
-  --lp-table: #37240f;
-  --lp-table-ink: #f8eedc;
-  --lp-table-ink-2: #e2d0b2;
-  --lp-table-gold: #f0c66e;
 
   max-width: var(--lp-max);
   margin: 0 auto;
@@ -40,24 +36,20 @@
 
 .lp-h1 {
   font-family: var(--font-heading);
-  font-size: clamp(40px, 4.4vw, 64px);
+  font-size: clamp(40px, 4.6vw, 60px);
   font-weight: var(--fw-heading);
   line-height: 1.04;
-  letter-spacing: -0.022em;
+  letter-spacing: -0.035em;
+  color: var(--text-1);
   text-wrap: balance;
-}
-
-.lp-h1 em,
-.lp-h2 em {
-  font-style: italic;
 }
 
 .lp-h2 {
   font-family: var(--font-heading);
-  font-size: clamp(30px, 3.3vw, 46px);
+  font-size: clamp(28px, 2.8vw, 38px);
   font-weight: var(--fw-heading);
   line-height: 1.08;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--text-1);
   text-wrap: balance;
 }
@@ -80,8 +72,10 @@
 
 .lp-section-lead {
   grid-column: 8 / span 5;
-  font-size: 17px;
-  line-height: 1.55;
+  justify-self: end;
+  max-width: 26em;
+  font-size: var(--fs-lead);
+  line-height: 1.5;
   color: var(--text-2);
   text-wrap: pretty;
 }
@@ -148,24 +142,42 @@
   color: var(--text-2);
 }
 
-/* ── hero: the walnut table ──────────────────────────────────────────── */
+/* ── hero: the board on the page ─────────────────────────────────────── */
+/*
+ * No panel: the live board (or its poster, rendered on the page colour per theme) sits
+ * straight on the page and fades out at its edges through a mask, so it has no frame.
+ * The words sit on the page's left half in normal ink.
+ */
 
 .lp-hero {
   position: relative;
   isolation: isolate;
   display: flex;
-  height: clamp(580px, calc(100svh - var(--header-h, 64px) - 48px), 820px);
-  overflow: hidden;
-  border-radius: var(--lp-radius);
-  background: var(--lp-table);
-  color: var(--lp-table-ink);
-  box-shadow: var(--elev-2);
+  height: clamp(560px, calc(100svh - var(--header-h, 64px) - 32px), 780px);
 }
 
 .lp-stage {
   position: absolute;
-  inset: 0;
+  inset: -24px calc(-1 * var(--lp-gutter)) -24px 18%;
   z-index: -1;
+  /* soft edges all round, and a long fade on the left where the words are */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000 94%, transparent 100%), linear-gradient(180deg, transparent 0%, #000 12%, #000 86%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%, #000 94%, transparent 100%), linear-gradient(180deg, transparent 0%, #000 12%, #000 86%, transparent 100%);
+  mask-composite: intersect;
+  animation: lp-board-in 700ms ease 60ms both;
+}
+
+/* the renderer lands the light table 2 % under the page colour (its R channel is
+   already at full); lift it so the fade into the page has no step */
+html:not(.dark) .lp-stage {
+  filter: brightness(1.02);
+}
+
+@keyframes lp-board-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .lp-poster,
@@ -182,6 +194,16 @@
   object-position: 100% 45%;
 }
 
+/* one poster per theme */
+.lp-poster[data-theme-only="dark"],
+.dark .lp-poster[data-theme-only="light"] {
+  display: none;
+}
+
+.dark .lp-poster[data-theme-only="dark"] {
+  display: block;
+}
+
 .lp-canvas {
   display: block;
   opacity: 0;
@@ -196,40 +218,21 @@
   transition-duration: 600ms;
 }
 
-/* a pool of lamp light on the table, and shade behind the words */
-.lp-stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(28, 16, 4, 0.5) 0%, rgba(28, 16, 4, 0.22) 30%, transparent 52%),
-    radial-gradient(130% 110% at 72% 42%, transparent 55%, rgba(20, 11, 2, 0.4) 100%);
-}
-
 .lp-hero-copy {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: var(--sp-6);
-  width: min(100%, 600px);
-  padding: var(--sp-12) var(--sp-12) var(--sp-12) 56px;
-}
-
-.lp-hero-copy .lp-h1 {
-  color: var(--lp-table-ink);
-  text-shadow: 0 1px 24px rgba(20, 10, 0, 0.35);
-}
-
-.lp-hero-copy .lp-h1 em {
-  color: var(--lp-table-gold);
+  width: min(100%, 560px);
+  padding: var(--sp-8) 0 var(--sp-12) var(--sp-2);
 }
 
 .lp-hero-lead {
-  max-width: 30em;
+  max-width: 27em;
   font-size: 18px;
-  line-height: 1.55;
-  color: var(--lp-table-ink-2);
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--text-2);
   text-wrap: pretty;
 }
 
@@ -237,123 +240,106 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-3);
-  margin-top: var(--sp-2);
+  margin-top: var(--sp-1);
 }
 
-/* on the dark table: a cream primary (the brightest thing on the panel) */
-.lp-hero .lp-play[data-variant="primary"] {
+/* the two hero buttons: the solid terracotta key and a quiet filled one, same size */
+.lp-hero-actions .carc-btn {
   height: 52px;
-  padding: 0 28px;
-  background: var(--lp-table-ink);
-  color: #2a1a0a;
-  font-size: 17px;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset,
-    0 -2px 0 rgba(90, 56, 20, 0.18) inset,
-    0 14px 30px -14px rgba(0, 0, 0, 0.7);
+  padding: 0 24px 0 20px;
+  border-radius: 14px;
+  font-size: 16px;
+  gap: 10px;
 }
 
-.lp-hero .lp-play[data-variant="primary"] svg {
-  color: oklch(0.55 0.15 40);
+.lp-hero-actions .carc-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
-.lp-hero .lp-play[data-variant="primary"]:hover {
-  background: #fff6e6;
+.lp-btn-quiet {
+  background: var(--fill);
+  color: var(--text-1);
 }
 
-.lp-hero .lp-play[data-variant="primary"]:active {
-  background: #efe1c8;
+@media (hover: hover) and (pointer: fine) {
+  .lp-btn-quiet:hover {
+    background: var(--fill-hover);
+  }
 }
 
-.lp-btn-ghost {
-  height: 52px;
-  padding: 0 24px;
-  background: rgba(255, 236, 205, 0.15);
-  color: var(--lp-table-ink);
-  font-size: 17px;
-  box-shadow: 0 1px 0 rgba(255, 240, 215, 0.12) inset;
-}
-
-.lp-btn-ghost:hover {
-  background: rgba(255, 236, 205, 0.2);
-}
-
-.lp-btn-ghost:active:not(:disabled) {
-  background: rgba(255, 236, 205, 0.26);
+.lp-btn-quiet:active:not(:disabled) {
+  background: var(--fill-press);
 }
 
 .lp-hero-meta {
   font-size: var(--fs-body);
   line-height: 1.5;
-  color: var(--lp-table-ink-2);
+  color: var(--text-2);
 }
 
-.lp-link-light {
-  color: var(--lp-table-ink);
-  text-decoration-color: color-mix(in oklch, var(--lp-table-gold) 70%, transparent);
+/* the headline: letters blur in one after another (no movement) */
+.lp-word {
+  display: inline-block;
+  white-space: nowrap;
 }
 
-/* entrance: the words settle onto the table */
-.lp-hero-copy > * {
-  animation: lp-rise 640ms var(--ease-out) both;
-}
-.lp-hero-copy > :nth-child(2) {
-  animation-delay: 60ms;
-}
-.lp-hero-copy > :nth-child(3) {
-  animation-delay: 120ms;
-}
-.lp-hero-copy > :nth-child(4) {
-  animation-delay: 180ms;
+.lp-word[data-accent] {
+  color: var(--text-accent);
 }
 
-@keyframes lp-rise {
+.lp-char {
+  display: inline-block;
+  animation: lp-char-in 720ms var(--ease-reveal) both;
+  animation-delay: calc(180ms + var(--c) * 11ms);
+}
+
+@keyframes lp-char-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    filter: blur(11px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
   }
 }
 
 /* "Four bots, live": appears once the real board takes over */
 .lp-live {
   position: absolute;
-  right: 20px;
-  bottom: 20px;
+  right: 0;
+  bottom: 16px;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   height: 40px;
   padding: 0 var(--sp-2) 0 var(--sp-4);
   border-radius: 999px;
-  background: rgba(24, 14, 4, 0.62);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  backdrop-filter: blur(10px) saturate(140%);
-  color: var(--lp-table-ink);
-  font-size: 13px;
+  background-color: var(--sheet);
+  box-shadow: var(--elev-2);
+  color: var(--text-1);
+  font-size: var(--fs-small);
   font-weight: var(--fw-medium);
   opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 400ms ease,
-    transform 500ms var(--ease-out);
+  transition: opacity 400ms ease;
   pointer-events: none;
 }
 
 .lp-live[data-on] {
   opacity: 1;
-  transform: none;
 }
 
 .lp-live-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #6fd66f;
-  box-shadow: 0 0 0 3px rgba(111, 214, 111, 0.25);
+  background: #3fae4f;
+  box-shadow: 0 0 0 3px rgba(63, 174, 79, 0.22);
 }
 
 .lp-live-sep {
-  color: var(--lp-table-ink-2);
+  color: var(--text-2);
 }
 
 .lp-live-scores {
@@ -369,7 +355,7 @@
   height: 28px;
   padding: 0 8px 0 6px;
   border-radius: 999px;
-  background: rgba(255, 236, 205, 0.1);
+  background: var(--fill);
   font-variant-numeric: tabular-nums;
 }
 
@@ -379,7 +365,7 @@
   }
 }
 
-/* phones: words on top, the board poster below, one panel */
+/* phones: the words first, the board below them, fading into the page */
 @media (max-width: 767px) {
   .lp-hero {
     flex-direction: column;
@@ -389,10 +375,10 @@
     position: relative;
     inset: auto;
     z-index: 0;
+    margin: 0 calc(-1 * var(--lp-gutter));
     aspect-ratio: 1074 / 960;
-  }
-  .lp-stage::after {
-    background: linear-gradient(180deg, var(--lp-table) 0%, transparent 22%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 82%, transparent 100%), linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 82%, transparent 100%), linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
   }
   .lp-poster img {
     object-position: 50% 50%;
@@ -402,7 +388,7 @@
     z-index: 1;
     width: 100%;
     gap: var(--sp-5);
-    padding: var(--sp-8) var(--sp-5) 0;
+    padding: var(--sp-6) 0 0;
   }
   .lp-hero-lead {
     font-size: var(--fs-lead);
@@ -557,7 +543,7 @@
   left: calc(var(--cell) * 1.5);
   top: calc(var(--cell) * 0.32);
   translate: -50% -50%;
-  font: var(--fw-strong) 30px / 1 var(--font-heading);
+  font: var(--fw-medium) 30px / 1 var(--font-num);
   color: #fff6df;
   text-shadow:
     0 0 1px #6b4410,
@@ -599,32 +585,31 @@
 
 .lp-step-text {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   column-gap: var(--sp-2);
-  row-gap: var(--sp-2);
+  row-gap: var(--sp-1);
+  align-items: baseline;
   padding: 0 var(--sp-2);
 }
 
 .lp-step-n {
   grid-row: 1 / span 2;
-  font: var(--fw-heading) 30px / 1 var(--font-heading);
+  font: var(--fw-medium) var(--fs-lead) / 1 var(--font-num);
   color: var(--text-accent);
-  font-variant-numeric: lining-nums;
 }
 
 .lp-step-title {
   font-family: var(--font-heading);
-  font-size: 21px;
-  font-weight: var(--fw-medium);
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  font-size: 20px;
+  font-weight: var(--fw-heading);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   color: var(--text-1);
-  text-wrap: balance;
 }
 
 .lp-step-body {
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--text-2);
   text-wrap: pretty;
 }
@@ -937,8 +922,10 @@
 
 .lp-showcase {
   position: relative;
-  margin-top: var(--sp-12);
-  aspect-ratio: 16 / 9;
+  margin-top: var(--sp-10);
+  /* a little shorter than the 16:9 renders (cropped top and bottom), so the section
+     reads as a window onto the board rather than a full-screen image */
+  aspect-ratio: 2.1 / 1;
   overflow: hidden;
   border-radius: var(--lp-radius);
   background: #e7e3dc;
@@ -1079,8 +1066,8 @@
 /* ── ways to play ────────────────────────────────────────────────────── */
 
 .lp-ways-list {
-  margin-top: var(--sp-12);
-  padding: var(--sp-2) var(--sp-8);
+  margin-top: var(--sp-10);
+  padding: var(--sp-2) var(--sp-6);
   list-style: none;
   border-radius: var(--lp-radius);
   background-color: var(--sheet);
@@ -1092,38 +1079,31 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   column-gap: var(--lp-gap);
-  row-gap: var(--sp-3);
+  row-gap: var(--sp-2);
   align-items: center;
-  padding: var(--sp-6) 0;
+  padding: var(--sp-5) 0;
 }
 
 .lp-way + .lp-way {
-  box-shadow: 0 -2px 0 color-mix(in oklch, var(--wood) 12%, transparent);
+  box-shadow: 0 -2px 0 color-mix(in oklch, var(--text-1) 7%, transparent);
 }
 
 .lp-way-title {
   grid-column: 1 / span 4;
   font-family: var(--font-heading);
-  font-size: 26px;
+  font-size: 20px;
   font-weight: var(--fw-heading);
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   color: var(--text-1);
 }
 
 .lp-way-body {
   grid-column: 5 / span 5;
-  font-size: var(--fs-lead);
+  font-size: 15px;
   line-height: 1.5;
   color: var(--text-2);
   text-wrap: pretty;
-}
-
-.lp-way-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: var(--sp-3);
 }
 
 .lp-way-action {
@@ -1154,8 +1134,8 @@
     grid-column: 1 / -1;
     justify-self: start;
   }
-  .lp-way-title {
-    font-size: 24px;
+  .lp-way-action {
+    margin-top: var(--sp-2);
   }
 }
 
@@ -1171,11 +1151,6 @@
   color: var(--text-2);
 }
 
-.lp-desktop strong {
-  color: var(--text-1);
-  font-weight: var(--fw-medium);
-}
-
 @media (max-width: 899px) {
   .lp-desktop {
     padding: 0 var(--sp-2);
@@ -1183,49 +1158,143 @@
 }
 
 /* ── footer ──────────────────────────────────────────────────────────── */
+/*
+ * A road of painted tiles runs the full width, cloister to cloister, with the five
+ * player meeples walking it. The strip is a grid of whole square tiles (6 / 10 / 14 by
+ * width), so it always fits exactly; the meeples sit on the road's centre line.
+ */
 
 .lp-footer {
   margin-top: var(--lp-section);
-  padding-top: var(--sp-12);
+}
+
+.lp-road {
+  --n: 14;
+  position: relative;
+  border-radius: var(--lp-radius-sm);
+  overflow: hidden;
+  box-shadow: var(--elev-1);
+}
+
+.lp-road-tiles {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.lp-road-tile {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.dark .lp-road-tile {
+  filter: brightness(0.9) saturate(0.92);
+}
+
+@media (max-width: 1099px) {
+  .lp-road {
+    --n: 10;
+  }
+  .lp-road-tile[data-tier="2"] {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .lp-road {
+    --n: 6;
+  }
+  .lp-road-tile[data-tier="1"] {
+    display: none;
+  }
+}
+
+.lp-road-walkers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* a procession from the second tile on, a little more than half a tile apart */
+.lp-walker {
+  --size: clamp(26px, calc(100cqw / var(--n) * 0.46), 44px);
+  position: absolute;
+  top: 50%;
+  left: calc((1.25 + var(--i) * 0.62) / var(--n) * 100%);
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) * -0.78) 0 0 calc(var(--size) * -0.5);
+  filter: drop-shadow(0 2px 1.5px rgba(30, 14, 0, 0.45));
+}
+
+.lp-walker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.lp-road {
+  container-type: inline-size;
+}
+
+/* once the strip has blurred in, the meeples hop in turn (road.tsx replays it on hover) */
+.lp-walker {
+  animation: lp-hop 560ms var(--ease-out) calc(700ms + var(--i) * 110ms) both;
+  animation-play-state: paused;
+}
+
+.lp-road:not([data-reveal-state="pending"]) .lp-walker {
+  animation-play-state: running;
+}
+
+@keyframes lp-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  18% {
+    transform: scale(1.06, 0.92);
+  }
+  45% {
+    transform: translateY(-34%) scale(0.97, 1.04);
+  }
+  80% {
+    transform: scale(1.04, 0.96);
+  }
 }
 
 .lp-footer-top {
-  display: flex;
-  flex-wrap: wrap-reverse;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--sp-10);
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--lp-gap);
+  row-gap: var(--sp-8);
+  align-items: start;
+  margin-top: var(--sp-10);
+  padding: 0 var(--sp-2);
 }
 
-/* the signature: a 1-bit dithered tile + meeple, in ink */
-.lp-signature {
-  display: block;
-  width: 460px;
-  max-width: 100%;
-  aspect-ratio: 460 / 299;
-  background: color-mix(in oklch, var(--text-1) 82%, transparent);
-  -webkit-mask: url("/landing/signature.png") center / contain no-repeat;
-  mask: url("/landing/signature.png") center / contain no-repeat;
-  image-rendering: pixelated;
-}
-
-/* on a dark page the object is lit instead of inked */
-.dark .lp-signature {
-  background: color-mix(in oklch, var(--text-1) 80%, transparent);
-  -webkit-mask-image: url("/landing/signature-dark.png");
-  mask-image: url("/landing/signature-dark.png");
+.lp-footer-note {
+  grid-column: 1 / span 5;
+  max-width: 26em;
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
 }
 
 .lp-footer-cols {
+  grid-column: 8 / span 5;
   display: flex;
+  justify-content: flex-end;
   gap: var(--sp-16);
-  padding-right: var(--sp-2);
 }
 
 .lp-footer-h {
   margin-bottom: var(--sp-3);
   font-size: var(--fs-body);
-  font-weight: var(--fw-strong);
+  font-weight: var(--fw-medium);
   color: var(--text-1);
 }
 
@@ -1252,57 +1321,42 @@
 
 .lp-wordmark {
   margin-top: var(--sp-12);
-  font-family: var(--font-heading);
-  font-size: clamp(64px, 16.4vw, 236px);
-  font-weight: 500;
-  line-height: 0.86;
-  letter-spacing: -0.04em;
-  color: color-mix(in oklch, var(--wood) 62%, var(--background));
+  font-family: var(--font-accent);
+  /* sized so the word spans the content width exactly (Otto sets it ~5.45 em wide) */
+  font-size: calc((min(100vw, var(--lp-max)) - 2 * var(--lp-gutter)) / 5.5);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: color-mix(in oklch, var(--text-1) 24%, var(--background));
   white-space: nowrap;
   user-select: none;
 }
 
-.dark .lp-wordmark {
-  color: color-mix(in oklch, var(--text-2) 42%, var(--background));
-}
-
 .lp-credit {
-  padding: var(--sp-6) 0 var(--sp-8);
+  padding: var(--sp-6) var(--sp-2) var(--sp-8);
   font-size: var(--fs-small);
   line-height: 1.5;
   color: var(--text-2);
 }
 
 @media (max-width: 767px) {
+  .lp-footer-note,
   .lp-footer-cols {
+    grid-column: 1 / -1;
+  }
+  .lp-footer-cols {
+    justify-content: flex-start;
     gap: var(--sp-12);
   }
-  .lp-signature {
-    width: 320px;
-  }
-}
-
-/* ── scroll reveal ───────────────────────────────────────────────────── */
-
-.lp-reveal[data-reveal="waiting"] > * {
-  opacity: 0;
-  transform: translateY(18px);
-}
-
-.lp-reveal[data-reveal="in"] > * {
-  transition:
-    opacity 700ms ease,
-    transform 800ms var(--ease-out);
 }
 
 /* ── reduced motion: the stills tell the same story ──────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-hero-copy > * {
+  .lp-char,
+  .lp-stage,
+  .lp-walker {
     animation: none;
-  }
-  .lp-reveal[data-reveal="waiting"] > * {
-    transform: none;
   }
   .lp-steps :is(.lp-drawn, .lp-slot, .lp-seam, .lp-fit-chip, .lp-claim, .lp-claim-chip, .lp-city-glow, .lp-plus, .lp-scorer, .lp-score-a, .lp-score-b) {
     animation: none;
@@ -1330,12 +1384,8 @@
   }
 }
 
-html[data-reduced-motion="true"] .lp-hero-copy > * {
+html[data-reduced-motion="true"] :is(.lp-char, .lp-stage, .lp-walker) {
   animation: none;
-}
-html[data-reduced-motion="true"] .lp-reveal[data-reveal="waiting"] > * {
-  opacity: 1;
-  transform: none;
 }
 html[data-reduced-motion="true"] .lp-steps :is(.lp-drawn, .lp-slot, .lp-seam, .lp-fit-chip, .lp-claim, .lp-claim-chip, .lp-city-glow, .lp-plus, .lp-scorer, .lp-score-a, .lp-score-b) {
   animation: none;

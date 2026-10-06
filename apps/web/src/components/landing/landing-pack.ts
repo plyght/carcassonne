@@ -19,5 +19,6 @@ export function cssColorToHex(color: string): string {
 /** `base` with the page colour as backdrop and table. */
 export function landingPack(base: StylePack, pageColor: string): StylePack {
   const hex = pageColor.startsWith("#") ? pageColor : cssColorToHex(pageColor);
-  return { ...base, id: `${base.id}`, palette: { ...base.palette, background: hex, table: hex } };
+  // no vignette: its darkened corners would show as a frame around the board
+  return { ...base, id: `${base.id}`, palette: { ...base.palette, background: hex, table: hex }, post: { ...base.post, vignette: 0 } };
 }

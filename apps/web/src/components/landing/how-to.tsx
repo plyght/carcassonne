@@ -72,18 +72,16 @@ export function HowTo() {
   const ref = useRef<HTMLOListElement>(null);
   const inView = useInView(ref, { rootMargin: "0px 0px -10% 0px" });
   return (
-    <section className="lp-section lp-how" aria-labelledby="how-h">
+    <section className="lp-section lp-how reveal" aria-labelledby="how-h">
       <div className="lp-section-head">
-        <h2 id="how-h" className="lp-h2">
-          How to play, in thirty seconds.
+        <h2 id="how-h" className="lp-h2" data-reveal>
+          How to play
         </h2>
-        <p className="lp-section-lead">
-          If you’ve never played, each turn comes down to three small decisions, and the whole game repeats that turn until the tiles run out.
-        </p>
+        <p className="lp-section-lead" data-reveal>Every turn is the same three moves, repeated until the tiles run out.</p>
       </div>
 
       <ol ref={ref} className="lp-steps" data-play={inView ? "true" : undefined}>
-        <li className="lp-step" data-step="1">
+        <li className="lp-step" data-reveal data-step="1">
           <Board label="A city tile is turned around until its city edge meets the city on the tile below, then dropped into place.">
             <BaseTiles />
             <span className="lp-slot" style={{ "--x": 1, "--y": 0 } as CSSProperties} />
@@ -97,12 +95,12 @@ export function HowTo() {
             <span className="lp-step-n" aria-hidden="true">
               1
             </span>
-            <h3 className="lp-step-title">Draw a tile and place it so its edges match.</h3>
-            <p className="lp-step-body">Roads have to meet roads, cities meet cities and grass meets grass, so turn the tile until every edge lines up.</p>
+            <h3 className="lp-step-title">Place a tile</h3>
+            <p className="lp-step-body">Its edges have to match the tiles around it.</p>
           </div>
         </li>
 
-        <li className="lp-step" data-step="2">
+        <li className="lp-step" data-reveal data-step="2">
           <Board label="A meeple tries each spot on the board in turn: the city, the road, the cloister and the field.">
             <BaseTiles />
             <Tile src="E0" x={1} y={0} rot={180} />
@@ -121,12 +119,12 @@ export function HowTo() {
             <span className="lp-step-n" aria-hidden="true">
               2
             </span>
-            <h3 className="lp-step-title">Put a meeple on a road, city, cloister or field to claim it.</h3>
-            <p className="lp-step-body">You have seven meeples, and you can put one on the tile you just laid as long as nobody has already claimed that road, city or field.</p>
+            <h3 className="lp-step-title">Claim something</h3>
+            <p className="lp-step-body">Put a meeple on a road, city, cloister or field.</p>
           </div>
         </li>
 
-        <li className="lp-step" data-step="3">
+        <li className="lp-step" data-reveal data-step="3">
           <Board label="The two-tile city is complete: it scores four points and the meeple returns to its owner.">
             <BaseTiles />
             <Tile src="E0" x={1} y={0} rot={180} />
@@ -148,15 +146,15 @@ export function HowTo() {
             <span className="lp-step-n" aria-hidden="true">
               3
             </span>
-            <h3 className="lp-step-title">Finished features score points, and the most points wins.</h3>
-            <p className="lp-step-body">When you close a city or a road or surround a cloister, your meeple comes home with the points, while farmers in the fields are paid at the end of the game.</p>
+            <h3 className="lp-step-title">Score it</h3>
+            <p className="lp-step-body">Finished features pay out and your meeple comes home.</p>
           </div>
         </li>
       </ol>
 
-      <p className="lp-how-foot">
+      <p className="lp-how-foot" data-reveal>
         <Link href={"/tutorial" as Route} className="lp-link">
-          Learn by playing: the interactive tutorial <ArrowRight aria-hidden="true" />
+          Learn by playing in the tutorial <ArrowRight aria-hidden="true" />
         </Link>
       </p>
     </section>

@@ -9,10 +9,10 @@ import { useEffect, useRef, useState } from "react";
 import { useInView } from "./use-in-view";
 
 const STYLES = [
-  { id: "classic", name: "Classic", kind: "2D", line: "Painted tiles in the spirit of the printed game, light enough to run on any phone." },
-  { id: "tabletop", name: "Tabletop", kind: "3D", line: "A hand-painted miniature board on a white table, with matte wooden meeples." },
-  { id: "cartoon", name: "Cartoon", kind: "3D", line: "Cel-shaded and saturated, with ink outlines and bouncy score pops." },
-  { id: "diorama", name: "Diorama", kind: "3D", line: "A pastel tilt-shift miniature world in soft light." },
+  { id: "classic", name: "Classic", kind: "2D", line: "The painted tiles run on any phone." },
+  { id: "tabletop", name: "Tabletop", kind: "3D", line: "Wooden meeples stand on a miniature board." },
+  { id: "cartoon", name: "Cartoon", kind: "3D", line: "Everything is cel-shaded with ink outlines." },
+  { id: "diorama", name: "Diorama", kind: "3D", line: "Soft light falls on a pastel tilt-shift world." },
 ] as const;
 
 type StyleId = (typeof STYLES)[number]["id"];
@@ -36,15 +36,17 @@ export function StylesShowcase() {
   const current = STYLES.find((s) => s.id === active)!;
 
   return (
-    <section className="lp-section lp-styles" aria-labelledby="styles-h">
+    <section className="lp-section lp-styles reveal" aria-labelledby="styles-h">
       <div className="lp-section-head">
-        <h2 id="styles-h" className="lp-h2">
-          Same board, four ways to look at it.
+        <h2 id="styles-h" className="lp-h2" data-reveal>
+          One board, four looks
         </h2>
-        <p className="lp-section-lead">You can switch at any time, even halfway through a game, and while the painted Classic board runs anywhere, the 3D tables use your graphics card.</p>
+        <p className="lp-section-lead" data-reveal>
+          You can switch at any time, even halfway through a game.
+        </p>
       </div>
 
-      <div ref={ref} className="lp-showcase" data-active={active}>
+      <div ref={ref} className="lp-showcase" data-active={active} data-reveal>
         {STYLES.map((s, i) => (
           <img
             key={s.id}
@@ -70,6 +72,7 @@ export function StylesShowcase() {
                 role="radio"
                 aria-checked={s.id === active}
                 className="lp-seg-btn"
+                data-reveal
                 onClick={() => {
                   setAuto(false);
                   setActive(s.id);

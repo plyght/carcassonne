@@ -1,6 +1,8 @@
 import type { Route } from "next";
 import Link from "next/link";
 
+import { FooterRoad } from "./road";
+
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Play",
@@ -23,12 +25,16 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
 
 export function LandingFooter() {
   return (
-    <footer className="lp-footer">
+    <footer className="lp-footer reveal">
+      <FooterRoad />
+
       <div className="lp-footer-top">
-        <span className="lp-signature" role="img" aria-label="A dithered tile with a meeple standing on its city" />
+        <p className="lp-footer-note" data-reveal>
+          The road is open and there is always a free seat, so pull up a chair whenever you like.
+        </p>
         <nav className="lp-footer-cols" aria-label="Footer">
           {COLUMNS.map((c) => (
-            <div key={c.title} className="lp-footer-col">
+            <div key={c.title} className="lp-footer-col" data-reveal>
               <h2 className="lp-footer-h">{c.title}</h2>
               <ul>
                 {c.links.map((l) => (
@@ -43,10 +49,10 @@ export function LandingFooter() {
           ))}
         </nav>
       </div>
-      <p className="lp-wordmark" aria-hidden="true">
+      <p className="lp-wordmark" aria-hidden="true" data-reveal>
         Carcassonne
       </p>
-      <p className="lp-credit">
+      <p className="lp-credit" data-reveal>
         Carcassonne is a board game by Klaus-Jürgen Wrede. This is an unofficial, personal project made for playing with friends.
       </p>
     </footer>

@@ -16,8 +16,16 @@ import { probeGpu } from "@/components/board3d/capabilities";
 import { HERO_WIDE } from "./framing";
 import { useInView } from "./use-in-view";
 
-/** The panel colour the posters were rendered on (keep in sync with landing.css). */
-export const HERO_TABLE = "#342619";
+/**
+ * The table colour per theme: the page colour, pre-compensated for the renderer's
+ * lighting and grade so the table comes out matching the page (#faf2e2 / #12100e).
+ * The posters are rendered with the same values (scripts/landing/shoot.mjs, bg=…).
+ */
+export const HERO_TABLE = { light: "#fffff8", dark: "#0f1013" } as const;
+
+function pageColor(): string {
+  return document.documentElement.classList.contains("dark") ? HERO_TABLE.dark : HERO_TABLE.light;
+}
 
 const SEATS = [
   { name: "Red", fill: "#d0261c", ink: "#fff7ec", marker: "circle" as const },
@@ -75,7 +83,7 @@ export function HeroBoard() {
         if (!alive) return;
         const live = await mod.startLive({
           canvas,
-          table: HERO_TABLE,
+          table: pageColor(),
           spec: HERO_WIDE,
           tier: pickTier(),
           onFirstFrame: () => alive && setPhase("live"),
@@ -107,6 +115,13 @@ export function HeroBoard() {
     };
   }, []);
 
+  // the table follows the theme
+  useEffect(() => {
+    const mo = new MutationObserver(() => liveRef.current?.setTable(pageColor()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
+
   // only render while the hero is on screen and the tab is visible
   useEffect(() => {
     const sync = () => liveRef.current?.setVisible(inView && document.visibilityState === "visible");
@@ -120,19 +135,22 @@ export function HeroBoard() {
 
   return (
     <div ref={stageRef} className="lp-stage" data-phase={phase}>
-      <picture className="lp-poster">
-        <source media="(max-width: 767px)" srcSet="/landing/hero-narrow-716.webp 716w, /landing/hero-narrow-1074.webp 1074w" sizes="100vw" />
-        <img
-          src="/landing/hero-wide-1248.webp"
-          srcSet="/landing/hero-wide-1248.webp 1248w, /landing/hero-wide-2496.webp 2496w"
-          sizes="(min-width: 1280px) 1248px, 100vw"
-          alt="A Carcassonne board in progress: walled red-roofed cities, roads and a river across green tiles, with coloured meeples claiming them."
-          fetchPriority="high"
-          decoding="async"
-          width={2496}
-          height={1592}
-        />
-      </picture>
+      {(["light", "dark"] as const).map((t) => (
+        <picture key={t} className="lp-poster" data-theme-only={t}>
+          <source media="(max-width: 767px)" srcSet={`/landing/hero-narrow-${t}-716.webp 716w, /landing/hero-narrow-${t}-1074.webp 1074w`} sizes="100vw" />
+          <img
+            src={`/landing/hero-wide-${t}-1248.webp`}
+            srcSet={`/landing/hero-wide-${t}-1248.webp 1248w, /landing/hero-wide-${t}-2496.webp 2496w`}
+            sizes="(min-width: 1280px) 1248px, 100vw"
+            alt={t === "light" ? "A Carcassonne board in progress: walled red-roofed cities, roads and a river across green tiles, with coloured meeples claiming them." : ""}
+            loading="lazy"
+            fetchPriority="high"
+            decoding="async"
+            width={2496}
+            height={1592}
+          />
+        </picture>
+      ))}
       <canvas ref={canvasRef} className="lp-canvas" aria-hidden="true" />
       <div className="lp-live" aria-live="off" data-on={live || phase === "fading" ? "true" : undefined}>
         <span className="lp-live-dot" aria-hidden="true" />

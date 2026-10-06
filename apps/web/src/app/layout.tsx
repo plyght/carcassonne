@@ -12,6 +12,7 @@ import "@/components/dial/learn.css";
 import "@/components/dial/dial-theme.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
+import { ProgressiveReveal } from "@/components/reveal";
 
 // ABC Diatype (UI, headings), Diatype Mono (numbers, codes) and ABC Otto (a rare
 // display accent): the same faces and roles as the ditch site.
@@ -68,6 +69,7 @@ export default function RootLayout({
           <div className="bg-parchment relative flex h-svh flex-col">
             <Header />
             <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+            <ProgressiveReveal />
           </div>
         </Providers>
       </body>

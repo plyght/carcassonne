@@ -36,6 +36,8 @@ export interface LiveOptions {
 
 export interface LiveBoard {
   setVisible(on: boolean): void;
+  /** Repaint the table (the page colour) after a theme change. */
+  setTable(color: string): void;
   restart(): void;
   dispose(): void;
 }
@@ -124,6 +126,11 @@ export async function startLive(o: LiveOptions): Promise<LiveBoard> {
       visible = on;
       last = 0;
       if (on && !raf) raf = requestAnimationFrame(tick);
+    },
+    setTable(color) {
+      if (disposed) return;
+      r.setStyle(landingPack(getStylePack("tabletop"), color));
+      r.frame();
     },
     restart() {
       reset();
