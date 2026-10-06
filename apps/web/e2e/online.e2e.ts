@@ -55,6 +55,11 @@ let server: ChildProcess | null = null;
 async function startServer(env: Record<string, string> = {}) {
   if (EXTERNAL) return;
   await stopServer();
+  // A stray server on the port (e.g. left by an aborted run) would answer /healthz while ours fails
+  // with EADDRINUSE, and the steps would silently run against the wrong configuration.
+  if (await fetch(`${API}/healthz`).then(() => true, () => false)) {
+    throw new Error(`${API} is already in use by another process; stop it before running the e2e`);
+  }
   server = spawn(process.execPath, ["api/server.ts"], {
     cwd: `${ROOT}apps/server`,
     env: { ...process.env, PORT: "3000", SCHEDULER: "local", ...env },

@@ -8,9 +8,6 @@ import type { AiTier, FigureOption, GameView, Move, Placement, Ruleset } from "@
 import type { EnginePort, GameHandle } from "./engine-port";
 import { createCatalog, type TileCatalog, type TileDef } from "./tiles";
 
-/** What the AI workstream adds to EngineGame (`ai_choose`); feature-detected. */
-type AiCapable = EngineGame & { aiChoose?: (tier: AiTier, budgetMs: number, seed: bigint) => Move };
-
 /** SplitMix64, for the fallback bot. */
 function splitmix(seed: bigint) {
   let s = BigInt.asUintN(64, seed);
@@ -83,9 +80,9 @@ export class CoreEnginePort implements EnginePort {
     return this.get(h).legalFigures({ x, y, rot });
   }
   aiChoose(h: GameHandle, tier: AiTier, budgetMs: number, seed: bigint): Move {
-    const g = this.get(h) as AiCapable;
-    if (typeof g.aiChoose === "function") return g.aiChoose(tier, budgetMs, seed);
-    return randomLegalMove(g, seed, tier);
+    const g = this.get(h);
+    // core/ai answers null only once the game has ended; fall back so callers always get a move.
+    return g.aiChoose(tier, budgetMs, seed) ?? randomLegalMove(g, seed, tier);
   }
 }
 
