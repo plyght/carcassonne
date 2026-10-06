@@ -10,6 +10,7 @@ import { FigureToken, proceduralFigures, type FigureArtSource } from "./figures"
 import { PLAYER_COLORS, playerFill, type BoardPalette } from "./palette";
 import { proceduralArt } from "./procedural-art";
 import { canIllustrate, deferTilePainting, levelFor, tileImage, useTileCacheVersion } from "./illustrated/cache";
+import { PressGesture } from "@carcassonne/core-geo/gesture";
 import { PaletteDefs, TileHit, TileSvg } from "./tile";
 import { rotatePoint, TILE, type TileArtSource } from "./tile-art";
 
@@ -328,47 +329,77 @@ export function ClassicBoard(props: ClassicBoardProps) {
   }, [cellAt, zoomAt]);
 
   // ── pointers: pan (1), pinch (2), click ─────────────────────────────────
+  // Every press is tracked here on the <svg>, including presses on figure hotspots and the
+  // recall ring: those dispatch from `onPointerUp` only when the press stayed a tap, so a click
+  // on them can never start (or leave behind) a pan, and a real drag never also clicks.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const drag = useRef<{ startX: number; startY: number; moved: boolean; pinch?: { d: number; mx: number; my: number } } | null>(null);
+  const press = useRef(new PressGesture());
+  const pinch = useRef<{ d: number; mx: number; my: number } | null>(null);
+  /** What the current press went down on (hotspot / recall), resolved at press time. */
+  type PressOn = { hotspot: FigureOption } | { recall: true } | null;
+  const pressOn = useRef<PressOn>(null);
+
+  const pressTargetOf = (target: EventTarget | null): PressOn => {
+    const el = (target as Element | null)?.closest?.("[data-hotspot],[data-recall]");
+    if (!el) return null;
+    if (el.hasAttribute("data-recall")) return { recall: true };
+    const h = hotspots?.[Number(el.getAttribute("data-hotspot"))];
+    return h ? { hotspot: { type: h.type, feature: h.feature } as FigureOption } : null;
+  };
+
+  const resetPointers = () => {
+    pointers.current.clear();
+    press.current.cancel();
+    pinch.current = null;
+    pressOn.current = null;
+    setPanning(false);
+  };
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 && e.pointerType === "mouse") return;
+    // A mouse has one pointer: anything still tracked is a release we never saw.
+    if (e.pointerType === "mouse") resetPointers();
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 1) drag.current = { startX: e.clientX, startY: e.clientY, moved: false };
-    if (pointers.current.size === 2 && drag.current) {
+    if (pointers.current.size === 1) {
+      press.current.begin(e, performance.now());
+      pressOn.current = pressTargetOf(e.target);
+    } else if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
-      drag.current.moved = true;
-      drag.current.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+      press.current.cancel();
+      pressOn.current = null;
+      pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
     }
   };
 
   const onPointerMove = (e: RPointerEvent<SVGSVGElement>) => {
     const prev = pointers.current.get(e.pointerId);
-    if (prev && drag.current) {
+    if (prev && e.pointerType === "mouse" && e.buttons === 0) resetPointers(); // missed release
+    else if (prev) {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.current.size >= 2 && drag.current.pinch) {
+      const pin = pinch.current;
+      if (pin && pointers.current.size >= 2) {
         const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         const mx = (a.x + b.x) / 2;
         const my = (a.y + b.y) / 2;
-        const pin = drag.current.pinch;
         setCam((c) => ({ ...c, tx: c.tx + mx - pin.mx, ty: c.ty + my - pin.my }));
         deferTilePainting();
         if (pin.d > 0) zoomAt(mx, my, d / pin.d);
-        drag.current.pinch = { d, mx, my };
+        pinch.current = { d, mx, my };
         return;
       }
-      const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
-      if (!drag.current.moved && Math.hypot(e.clientX - drag.current.startX, e.clientY - drag.current.startY) > 5) {
-        drag.current.moved = true;
+      const phase = press.current.move(e, performance.now());
+      if (phase === "drag-start") {
+        pressOn.current = null;
         setPanning(true);
         try {
           svgRef.current?.setPointerCapture(e.pointerId);
         } catch {}
       }
-      if (drag.current.moved) {
+      if (phase === "drag-start" || phase === "drag") {
         deferTilePainting();
+        const dx = e.clientX - prev.x;
+        const dy = e.clientY - prev.y;
         setCam((c) => ({ ...c, tx: c.tx + dx, ty: c.ty + dy }));
       }
       return;
@@ -390,24 +421,40 @@ export function ClassicBoard(props: ClassicBoardProps) {
     }
   };
 
-  const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
-    pointers.current.delete(e.pointerId);
-    const d = drag.current;
-    if (pointers.current.size === 0) {
-      drag.current = null;
-      setPanning(false);
+  /** A pointer went away: how its press ended (only an un-pinched primary press can tap). */
+  const releasePointer = (e: RPointerEvent<SVGSVGElement>) => {
+    if (!pointers.current.delete(e.pointerId)) return null;
+    const wasPinch = pinch.current !== null;
+    const ended = press.current.end(e);
+    if (wasPinch && pointers.current.size < 2) {
+      pinch.current = null;
+      // The finger left after a pinch carries on panning; it never taps.
+      const [rest] = [...pointers.current.entries()];
+      if (rest) press.current.begin({ pointerId: rest[0], pointerType: e.pointerType, clientX: rest[1].x, clientY: rest[1].y }, performance.now(), true);
     }
-    if (!d || d.moved || !interactive) return;
-    if ((e.target as Element).closest?.("[data-hotspot],[data-recall]")) return;
+    if (pointers.current.size === 0) setPanning(false);
+    return wasPinch ? null : ended;
+  };
+
+  const onPointerUp = (e: RPointerEvent<SVGSVGElement>) => {
+    const on = pressOn.current;
+    if (releasePointer(e) !== "tap") return;
+    pressOn.current = null;
+    if (!interactive) return;
+    const at = on ?? pressTargetOf(e.target);
+    if (at && "hotspot" in at) return props.onHotspot?.(at.hotspot);
+    if (at) return props.onRecall?.();
     const cell = cellAt(e.clientX, e.clientY);
     if (targetKeys.has(`${cell.x},${cell.y}`)) props.onCellClick?.(cell);
   };
 
+  const onPointerCancel = (e: RPointerEvent<SVGSVGElement>) => {
+    releasePointer(e);
+    if (pointers.current.size === 0) pressOn.current = null;
+  };
+
   const onPointerLeave = () => {
-    if (!drag.current?.moved) {
-      pointers.current.clear();
-      drag.current = null;
-    }
+    if (!press.current.dragging && !pinch.current) resetPointers();
     if (hoverCell) {
       setHoverCell(null);
       props.onCellHover?.(null);
@@ -544,7 +591,8 @@ export function ClassicBoard(props: ClassicBoardProps) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onPointerCancel}
         onPointerLeave={onPointerLeave}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -694,10 +742,6 @@ export function ClassicBoard(props: ClassicBoardProps) {
             <g
               data-recall
               style={{ cursor: "pointer" }}
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                props.onRecall?.();
-              }}
             >
               <circle
                 className="cc-pulse"
@@ -755,12 +799,8 @@ export function ClassicBoard(props: ClassicBoardProps) {
                 return (
                   <g
                     key={`h${i}`}
-                    data-hotspot
+                    data-hotspot={i}
                     style={{ cursor: "pointer" }}
-                    onPointerUp={(e) => {
-                      e.stopPropagation();
-                      props.onHotspot?.({ type: h.type, feature: h.feature });
-                    }}
                   >
                     <title>{h.label ?? `${h.type} on feature ${h.feature}`}</title>
                     {/* generous hit area */}

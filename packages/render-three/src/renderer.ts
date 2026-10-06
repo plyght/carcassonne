@@ -11,6 +11,7 @@
 import * as THREE from "three/webgpu";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { AnimClip, AnimOptions, AnimTimeline, FigurePose, FigureShape, GeoFigure } from "@carcassonne/core-geo";
+import { PressGesture } from "@carcassonne/core-geo/gesture";
 import type { BoardTile, EngineEvent, FigureOption, GameView, Placement, PlacedFigure, TileId } from "@carcassonne/protocol";
 import { createRenderer, type BackendKind, type BackendPreference } from "./backend";
 import { CameraRig, type CameraMode } from "./camera";
@@ -1290,7 +1291,10 @@ export class BoardRenderer {
     const el = this.canvas;
     // touch: one finger orbits, two fingers pan + pinch-zoom (no page scroll / browser zoom)
     el.style.touchAction = "none";
-    let down: { x: number; y: number; button: number; moved: boolean } | null = null;
+    // One primary press (orbit / right-drag pan, or a click when it stays within the drag slop)
+    // plus touches for the two-finger pinch.
+    const press = new PressGesture();
+    let last: { x: number; y: number; button: number } | null = null;
     const touches = new Map<number, { x: number; y: number }>();
     let pinch: { dist: number; mx: number; my: number } | null = null;
     const pinchState = () => {
@@ -1306,17 +1310,23 @@ export class BoardRenderer {
         pinch = next;
         return;
       }
-      if (down) {
-        const dx = e.clientX - down.x;
-        const dy = e.clientY - down.y;
-        if (Math.abs(dx) + Math.abs(dy) > (e.pointerType === "touch" ? 10 : 4)) down.moved = true;
-        if (down.moved) {
-          if (down.button === 2 || e.shiftKey) this.rig.pan(dx, dy);
+      if (last) {
+        const phase = press.move(e, performance.now());
+        if (phase === "drag-start") {
+          try {
+            el.setPointerCapture(e.pointerId);
+          } catch {}
+        }
+        if (phase === "drag-start" || phase === "drag") {
+          const dx = e.clientX - last.x;
+          const dy = e.clientY - last.y;
+          if (last.button === 2 || e.shiftKey) this.rig.pan(dx, dy);
           else this.rig.orbit(dx, dy);
-          down.x = e.clientX;
-          down.y = e.clientY;
+          last = { ...last, x: e.clientX, y: e.clientY };
           return;
         }
+        if (phase === "press") return;
+        last = null; // the release was missed (e.g. it landed on an overlay): drop the press
       }
       if (e.pointerType === "touch") return;
       const pick = this.pick(e.clientX, e.clientY);
@@ -1327,26 +1337,31 @@ export class BoardRenderer {
         touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (touches.size >= 2) {
           pinch = pinchState();
-          down = null;
+          press.cancel();
+          last = null;
           return;
         }
       }
-      down = { x: e.clientX, y: e.clientY, button: e.button, moved: false };
+      press.begin(e, performance.now());
+      last = { x: e.clientX, y: e.clientY, button: e.button };
     };
     const up = (e: PointerEvent) => {
       const wasPinch = pinch !== null;
       touches.delete(e.pointerId);
       if (touches.size < 2) pinch = null;
-      const d = down;
-      down = null;
-      if (wasPinch || !d || d.moved) return;
+      const ended = press.end(e);
+      if (ended !== null) last = null;
+      if (wasPinch || ended !== "tap") return;
       const pick = this.pick(e.clientX, e.clientY);
       if (pick) this.emit({ type: "click", pick, placement: this.hoverAt(pick) });
     };
     const cancel = (e: PointerEvent) => {
       touches.delete(e.pointerId);
       if (touches.size < 2) pinch = null;
-      down = null;
+      if (press.pointerId === e.pointerId) {
+        press.cancel();
+        last = null;
+      }
     };
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -1357,6 +1372,7 @@ export class BoardRenderer {
     el.addEventListener("pointerdown", pdown);
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", cancel);
+    el.addEventListener("lostpointercapture", cancel);
     el.addEventListener("wheel", wheel, { passive: false });
     el.addEventListener("contextmenu", ctx);
     return () => {
@@ -1364,6 +1380,7 @@ export class BoardRenderer {
       el.removeEventListener("pointerdown", pdown);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", cancel);
+      el.removeEventListener("lostpointercapture", cancel);
       el.removeEventListener("wheel", wheel);
       el.removeEventListener("contextmenu", ctx);
     };
