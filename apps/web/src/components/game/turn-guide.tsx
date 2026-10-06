@@ -46,7 +46,11 @@ export function TurnGuide({
   if (phase === "place")
     body = (
       <>
-        It must touch the map, and every edge must match: road to road, city to city, field to field. <strong>Glowing spots</strong> show where it fits; rotate with <Kbd>R</Kbd> or the dial.
+        It must touch the map, and every edge must match: road to road, city to city, field to field. <strong>Glowing spots</strong> show where it fits;{" "}
+        <span className="carc-keys">
+          rotate with <Kbd>R</Kbd> or the dial.
+        </span>
+        <span className="carc-touch">tap the dial to turn it.</span>
       </>
     );
   else if (phase === "claim")

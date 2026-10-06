@@ -7,13 +7,15 @@
 import { Slider, Toggle } from "dialkit";
 import { Armchair, Clapperboard, Map as MapIcon, Monitor, Moon, Rotate3d, Sun, type LucideIcon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
 import { CAMERA_MODES, getStyle, STYLE_PACKS, type CameraMode, type StyleId } from "@carcassonne/render-classic";
 
 import { selectCamera, selectMotion, selectStyle, selectTier, setVolume } from "@/lib/board-controls";
 import { updateSettings, useSettings, type Settings, type VolumeBus } from "@/lib/settings";
+import { removeKey } from "@/lib/storage";
 
-import { DialField, DialSelect, DialSurface, Segmented, SegmentedRow, type SelectItem } from "./primitives";
+import { DialButton, DialField, DialSelect, DialSurface, Segmented, SegmentedRow, type SelectItem } from "./primitives";
 
 export const CAMERA_ICONS: Record<CameraMode, LucideIcon> = {
   "top-down": MapIcon,
@@ -194,6 +196,20 @@ export function PlaySettings() {
           { value: "fast", label: "Fast" },
         ]}
       />
+      <DialField hint="The three steps of a turn over the board: what to do now, and what just scored and why.">
+        <Toggle label="Turn guide" checked={s.showTurnGuide} onChange={(v) => set({ showTurnGuide: v })} />
+      </DialField>
+      <DialField hint="Show the first-game tips again in your next game against bots.">
+        <DialButton
+          variant="ghost"
+          onClick={() => {
+            removeKey("carc.coach.v1");
+            toast.success("Tips will show in your next game");
+          }}
+        >
+          Show first-game tips again
+        </DialButton>
+      </DialField>
       <DialField hint="Show counts of tiles left in the draw pile.">
         <Toggle label="Remaining-tiles panel" checked={s.showRemaining} onChange={(v) => set({ showRemaining: v })} />
       </DialField>

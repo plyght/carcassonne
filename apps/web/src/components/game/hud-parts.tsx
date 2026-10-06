@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import { cn } from "@carcassonne/ui/lib/utils";
 import { ChevronDown, Maximize, Minus, Plus, SmilePlus, Timer } from "lucide-react";
@@ -57,7 +57,7 @@ const TIER_LABEL: Record<string, string> = { easy: "Easy", medium: "Medium", har
 export function SeatSwatch({ color, size = 40, title }: { color: PlayerMeta["color"]; size?: number; title?: string }) {
   const app = PLAYER_COLORS[color];
   return (
-    <span className="carc-swatch" style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink, width: size, height: size }} title={title}>
+    <span className="carc-swatch" data-color={color} style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink, width: size, height: size }} title={title}>
       <FigureIcon fill={app.ink} ink={app.fill} outline="none" marker={app.marker} size={Math.round(size * 0.66)} />
     </span>
   );
@@ -81,7 +81,7 @@ export function SupplyChip({
 }) {
   const app = PLAYER_COLORS[color];
   return (
-    <span className="carc-supply" data-kind={kind} data-away={away || undefined} title={title} style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }}>
+    <span className="carc-supply" data-color={color} data-kind={kind} data-away={away || undefined} title={title} style={{ ["--seat" as string]: app.fill, ["--seat-ink" as string]: app.ink }}>
       <FigureIcon kind={kind} fill="currentColor" ink={away ? "transparent" : app.fill} outline="none" marker={app.marker} size={18} />
       {count !== undefined ? <span className="carc-supply-count carc-num">×{count}</span> : null}
       <span className="carc-supply-label">{label}</span>
@@ -94,10 +94,12 @@ function breakdownText(b: GameView["players"][number]["breakdown"], abbot: boole
   const parts = CATS.filter((c) => (c.key !== "garden" || abbot) && b[c.key] > 0);
   if (!parts.length) return "No points yet";
   return parts.map((c, i) => (
-    <span key={c.key} className="carc-score-part">
+    <Fragment key={c.key}>
       {i ? " · " : ""}
-      {c.label} <span className="carc-num">{b[c.key]}</span>
-    </span>
+      <span className="carc-score-part">
+        {c.label} <span className="carc-num">{b[c.key]}</span>
+      </span>
+    </Fragment>
   ));
 }
 
@@ -351,7 +353,10 @@ export function TileInHand({
             <>
               <p className="carc-hand-status">Place it on a glowing spot.</p>
               <p className="carc-hand-hint">
-                Rotate with <Kbd>R</Kbd> or the dial.
+                <span className="carc-keys">
+                  Rotate with <Kbd>R</Kbd> or the dial.
+                </span>
+                <span className="carc-touch">Tap the dial to turn it.</span>
               </p>
             </>
           ) : null}

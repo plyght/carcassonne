@@ -60,7 +60,11 @@ const LESSONS: { title: string; steps: Record<string, Copy>; done: ReactNode }[]
         title: "Turn the tile",
         place: (
           <>
-            This tile has a bend, and it’s facing the wrong way: its road would run into grass. Press <Kbd>R</Kbd> (or click the dial) to turn it until the road lines up, then click the glowing spot.
+            This tile has a bend, and it’s facing the wrong way: its road would run into grass.{" "}
+            <span className="carc-keys">
+              Press <Kbd>R</Kbd> (or click the dial)
+            </span>
+            <span className="carc-touch">Tap the dial</span> to turn it until the road lines up, then put it on the glowing spot.
           </>
         ),
         claim: (
@@ -266,7 +270,11 @@ export default function TutorialPage() {
             </p>
           ) : misfit && canAct && !pending ? (
             <p className="carc-lesson-note" role="status">
-              Not like that: the edges don’t match yet. Press <Kbd>R</Kbd> to turn the tile.
+              Not like that: the edges don’t match yet.{" "}
+              <span className="carc-keys">
+                Press <Kbd>R</Kbd> to turn the tile.
+              </span>
+              <span className="carc-touch">Tap the dial to turn the tile.</span>
             </p>
           ) : null}
         </>

@@ -42,8 +42,14 @@ async function humanMove(p: Page) {
   if ((await ply(p)) === before) fail("human move did not commit");
 }
 
+await ctx.addInitScript(() => {
+  try {
+    localStorage.setItem("carc.coach.v1", JSON.stringify({ done: true, seen: [] }));
+  } catch {}
+});
 await page.goto(`${WEB}/play/new`);
-await page.getByTestId("start-game").click();
+// Quick start: you vs two Medium bots with River + Abbot.
+await page.getByTestId("quick-start").click();
 await page.waitForSelector("[data-testid=game-screen]", { timeout: 60_000 });
 for (let i = 0; i < 3; i++) {
   await humanMove(page);

@@ -215,4 +215,24 @@ if (!only || only.startsWith("3")) {
   await shot("31-game-end");
 }
 
+// ── phone ───────────────────────────────────────────────────────────────────
+if (!only || only.startsWith("4")) {
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  const m = await phone.newPage();
+  await m.goto(`${BASE}/play/new`);
+  await m.getByTestId("quick-start").waitFor();
+  await m.waitForTimeout(800);
+  await shot("40-phone-setup", m);
+  await m.getByTestId("quick-start").tap();
+  await m.waitForSelector(gs, { timeout: 60_000 });
+  await waitMyTurn(m);
+  await m.waitForTimeout(1200);
+  await shot("41-phone-first-turn", m);
+  await m.goto(`${BASE}/tutorial`);
+  await m.getByTestId("lesson-card").waitFor({ timeout: 60_000 });
+  await m.waitForTimeout(1200);
+  await shot("42-phone-tutorial", m);
+  await phone.close();
+}
+
 await browser.close();

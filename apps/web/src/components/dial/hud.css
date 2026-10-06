@@ -995,3 +995,8 @@
     animation: none;
   }
 }
+
+/* dark page: the black player's solid swatch and chips lift a step so they still read */
+.dark :is(.carc-swatch, .carc-supply:not([data-away]))[data-color="black"] {
+  background: #6b655c;
+}

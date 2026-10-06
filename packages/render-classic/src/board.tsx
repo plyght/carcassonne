@@ -767,14 +767,14 @@ export function ClassicBoard(props: ClassicBoardProps) {
                     <circle cx={hx + offset} cy={hy - 4} r={20} fill="transparent" pointerEvents="all" />
                     {/* a tap target: a solid cream disc with the player's meeple standing on it */}
                     <g className="cc-hotspot">
-                      <circle cx={hx + offset} cy={hy - 4} r={17} fill={palette.highlight.stroke} opacity={0.94} />
-                      <circle cx={hx + offset} cy={hy - 4} r={17} fill="none" stroke={a.fill} strokeWidth={3} />
+                      <circle cx={hx + offset} cy={hy - 4} r={14} fill={palette.highlight.stroke} opacity={0.95} />
+                      <circle cx={hx + offset} cy={hy - 4} r={14} fill="none" stroke={a.fill} strokeWidth={3} />
+                      {/* standing, even for a farmer: a spot to tap reads as "a meeple goes here" */}
                       <FigureToken
                         x={hx + offset}
                         y={hy - 5}
-                        size={26}
+                        size={21}
                         kind={h.type}
-                        lying={catalog.get(ghost.tile)?.features[h.feature]?.kind === "field"}
                         fill={a.fill}
                         ink={a.ink}
                         marker={a.marker}

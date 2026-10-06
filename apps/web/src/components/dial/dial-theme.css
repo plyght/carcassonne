@@ -654,6 +654,11 @@ html[data-tune="3d"] .dialkit-panel:not([data-mode="inline"]) .dialkit-panel-inn
   filter: drop-shadow(0 1px 1px rgba(40, 24, 8, 0.45));
 }
 
+/* the black meeple on a dark page: a soft light halo so it stays visible */
+.dark .carc-meeple[data-color="black"] svg {
+  filter: drop-shadow(0 0 2px rgba(255, 238, 214, 0.85));
+}
+
 /* a colour another seat has: still full strength (picking it swaps the two) */
 
 /* ── player seat rows: flat (no box), aligned columns, grouped by spacing ── */

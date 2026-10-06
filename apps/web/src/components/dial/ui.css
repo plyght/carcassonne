@@ -485,3 +485,18 @@ html[data-reduced-motion="true"] {
   --dur-press: 0ms;
   --press-scale: 1;
 }
+
+/* Input-specific copy: keyboard hints on devices with a fine pointer, touch wording otherwise. */
+.carc-touch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .carc-keys {
+    display: none;
+  }
+
+  .carc-touch {
+    display: inline;
+  }
+}

@@ -61,7 +61,19 @@ async function finishMove(p: Page, before: number) {
   await p.waitForFunction((b) => Number(document.querySelector("[data-testid=game-screen]")?.getAttribute("data-ply")) > b, before, { timeout: 30_000 });
 }
 
+/** First-game coach marks are covered by e2e/newplayer.ts; keep them out of the way here. */
+const noCoach = () => {
+  try {
+    localStorage.setItem("carc.coach.v1", JSON.stringify({ done: true, seen: [] }));
+  } catch {}
+};
+/** Setup opens on Quick start; seats and rules live under Customize. */
+async function openCustomize(p: Page) {
+  await p.getByTestId("customize-toggle").click();
+}
+
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "light", acceptDownloads: true });
+await ctx.addInitScript(noCoach);
 const page = await ctx.newPage();
 page.setDefaultTimeout(90_000); // SwiftShader renders the 3D board on the CPU
 watch(page, "desktop");
@@ -71,6 +83,7 @@ await setSettings(page, { style: "classic", camera: "top-down", botSpeed: "fast"
 // ── setup ───────────────────────────────────────────────────────────────────
 await step("setup: DialKit controls", async () => {
   await page.goto(`${WEB}/play/new`);
+  await openCustomize(page);
   const seats = page.locator(".carc-seat");
   await seats.first().waitFor();
   // vs AI starts with 3 seats (wait out hydration)
@@ -92,6 +105,7 @@ await step("setup: DialKit controls", async () => {
   assert((await page.getByTestId("seat-2-player").textContent())?.includes("Hard bot"), "seat 3 is a hard bot");
   // house rules: River off, re-roll the seed
   await page.getByRole("radiogroup", { name: "The River" }).getByRole("radio", { name: "Off" }).click();
+  await page.getByTestId("advanced-toggle").click();
   const seedBox = page.getByRole("textbox", { name: "Seed" });
   const seed0 = await seedBox.inputValue();
   await page.getByTestId("reroll-seed").click();
@@ -269,6 +283,7 @@ await step("settings + online (light / dark)", async () => {
   const dark = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
   watch(dark, "dark");
   await dark.goto(`${WEB}/play/new`);
+  await openCustomize(dark);
   await dark.locator(".carc-seat").first().waitFor();
   await dark.waitForTimeout(800);
   await shot(dark, "setup-dark");
@@ -281,10 +296,12 @@ await step("settings + online (light / dark)", async () => {
 // ── phone ───────────────────────────────────────────────────────────────────
 await step("phone: setup + HUD panel", async () => {
   const m = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await m.addInitScript(noCoach);
   watch(m, "phone");
   await m.goto(`${WEB}/`);
   await setSettings(m, { style: "classic", camera: "top-down", botSpeed: "fast" });
   await m.goto(`${WEB}/play/new`);
+  await openCustomize(m);
   await m.locator(".carc-seat").first().waitFor();
   await m.waitForTimeout(600);
   await shot(m, "mobile-setup");
