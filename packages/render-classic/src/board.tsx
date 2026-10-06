@@ -60,6 +60,8 @@ export interface ClassicBoardProps {
   /** Change to re-fit the camera to the board. */
   fitSignal?: number;
   interactive?: boolean;
+  /** Built-in zoom / fit buttons (off when the host app draws its own toolbar). */
+  controls?: boolean;
   className?: string;
   ariaLabel?: string;
   onCellHover?(cell: Cell | null): void;
@@ -147,6 +149,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
     reducedMotion,
     fitSignal = 0,
     interactive = true,
+    controls = true,
     className,
     ariaLabel = "Game board",
   } = props;
@@ -804,7 +807,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
           ))}
         </g>
       </svg>
-      {interactive ? <BoardControls
+      {interactive && controls ? <BoardControls
         onZoomIn={() => zoomCenter(1.25)}
         onZoomOut={() => zoomCenter(0.8)}
         onFit={fit}
@@ -831,21 +834,21 @@ function BoardControls({
   palette: BoardPalette;
 }) {
   const btn: React.CSSProperties = {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     display: "grid",
     placeItems: "center",
-    borderRadius: 10,
-    border: `1px solid ${palette.grid ? "rgba(159,211,255,0.4)" : "rgba(43,33,23,0.25)"}`,
-    background: palette.grid ? "rgba(11,29,54,0.85)" : "rgba(250,243,228,0.9)",
+    borderRadius: 8,
+    border: "none",
+    background: palette.grid ? "rgba(11,29,54,0.88)" : "rgba(250,243,228,0.94)",
     color: palette.grid ? "#e8f3ff" : "#2b2117",
     fontSize: 18,
-    fontWeight: 600,
+    fontWeight: 500,
     cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+    boxShadow: "0 1px 0 rgba(255,255,255,0.5) inset, 0 8px 18px -10px rgba(40,24,8,0.6)",
   };
   return (
-    <div style={{ position: "absolute", right: 12, bottom: 12, display: "flex", flexDirection: "column", gap: 6 }} data-board-controls>
+    <div style={{ position: "absolute", right: 12, bottom: 12, display: "flex", flexDirection: "column", gap: 8 }} data-board-controls>
       <button type="button" style={btn} onClick={onZoomIn} aria-label="Zoom in" title="Zoom in (+)">
         +
       </button>

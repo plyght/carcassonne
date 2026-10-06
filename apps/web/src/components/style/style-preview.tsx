@@ -86,7 +86,7 @@ export function StylePreview({ style, className, live3d = false }: { style: Styl
         style={{ background: `radial-gradient(circle at 30% 20%, ${b}, ${a} 70%)` }}
       >
         <div className="absolute inset-0 opacity-40" style={{ background: `repeating-linear-gradient(45deg, transparent 0 14px, ${c}55 14px 16px)` }} />
-        <div className="relative rounded-full bg-black/55 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+        <div className="carc-board-chip relative">
           {ready3d ? "3D · plays in game" : `Coming ${style.ships}`}
         </div>
       </div>

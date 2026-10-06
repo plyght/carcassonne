@@ -15,6 +15,7 @@ import type { BoardCommands, CameraMode, Cell, StyleId } from "@carcassonne/rend
 import type { PickResult, RendererEvent, RendererStats } from "@carcassonne/render-three";
 import { withAnimTuning } from "@carcassonne/render-three/tuning";
 import { cn } from "@carcassonne/ui/lib/utils";
+import { Maximize, Minus, Plus } from "lucide-react";
 
 import { tuneStore, useTunedPack } from "@/lib/tuning";
 
@@ -349,11 +350,11 @@ export function Board3D(props: Board3DProps) {
     >
       <div ref={hostRef} className="absolute inset-0" />
       {ready && props.controls !== false ? (
-        <div className="absolute bottom-14 left-3 flex gap-1.5 max-lg:right-3 max-lg:bottom-[64px] max-lg:left-auto max-lg:flex-col" data-board-controls>
+        <div className="carc-hud-sheet carc-hud-toolbar absolute right-3 bottom-3" data-board-controls data-orientation="horizontal">
           {[
-            { label: "Zoom in", title: "Zoom in (+)", text: "+", run: (r: BoardRenderer) => r.rig.zoom(1 / 1.25) },
-            { label: "Zoom out", title: "Zoom out (−)", text: "−", run: (r: BoardRenderer) => r.rig.zoom(1.25) },
-            { label: "Fit board", title: "Reframe the board (F)", text: "⤢", run: () => props.commandsRef?.current?.fit() ?? rRef.current?.setCamera("tabletop") },
+            { label: "Zoom in", title: "Zoom in (+)", Icon: Plus, run: (r: BoardRenderer) => r.rig.zoom(1 / 1.25) },
+            { label: "Zoom out", title: "Zoom out (−)", Icon: Minus, run: (r: BoardRenderer) => r.rig.zoom(1.25) },
+            { label: "Fit board", title: "Reframe the board (F)", Icon: Maximize, run: () => props.commandsRef?.current?.fit() ?? rRef.current?.setCamera("tabletop") },
           ].map((b) => (
             <button
               key={b.label}
@@ -361,21 +362,21 @@ export function Board3D(props: Board3DProps) {
               aria-label={b.label}
               title={b.title}
               onClick={() => rRef.current && b.run(rRef.current)}
-              className="grid size-[34px] place-items-center rounded-[10px] border border-black/25 bg-[rgba(250,243,228,0.9)] text-lg font-semibold text-[#2b2117] shadow-md"
+              className="carc-icon-btn"
             >
-              {b.text}
+              <b.Icon />
             </button>
           ))}
         </div>
       ) : null}
       {!ready ? (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <div className="animate-pulse rounded-full bg-black/40 px-4 py-1.5 font-display text-lg text-white/90">Setting the table…</div>
+          <div className="carc-board-message animate-pulse">Setting the table…</div>
         </div>
       ) : null}
       {props.debug && stats ? (
         <pre
-          className="pointer-events-none absolute bottom-24 left-3 z-10 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[11px] leading-snug text-lime-200"
+          className="pointer-events-none absolute bottom-24 left-3 z-10 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[13px] leading-snug text-lime-200"
           data-testid="debug-overlay"
         >
           {`${fpsText(stats.intervalMs)} fps · frame ${stats.frameMs.toFixed(1)} ms

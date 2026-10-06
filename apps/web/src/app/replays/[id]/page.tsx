@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
 import { simulateReplay, viewAtPly, type SimulatedReplay } from "@carcassonne/game-client";
-import { ClassicBoard, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle } from "@carcassonne/render-classic";
+import { ClassicBoard, hudPalette, is3DStyle, PLAYER_COLOR_ORDER, renderableStyle, type BoardCommands } from "@carcassonne/render-classic";
 
 import { Board3D, type Board3DBatch } from "@/components/board3d/board-3d";
 import { describeEvent, playerName } from "@/components/game/helpers";
-import { Panel, ScorePanel } from "@/components/game/hud-parts";
+import { BoardToolbar, Panel, ScorePanel } from "@/components/game/hud-parts";
 import { CameraIconSwitch } from "@/components/dial/table-controls";
 import { useCore } from "@/lib/core";
 import { createEngine } from "@/lib/engine";
@@ -45,6 +45,17 @@ export default function ReplayViewer() {
   const core = useCore();
   const { camera, choose: chooseCamera, report: setCamera } = useBoardCamera(style);
   const catalog = core?.catalog;
+  const commands = useRef<BoardCommands | null>(null);
+  const [insets, setInsets] = useState({ top: 76, right: 12, bottom: 124, left: 324 });
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      setInsets(w >= 768 ? { top: 76, right: 12, bottom: 124, left: 12 + (w >= 1024 ? 304 : 280) + 8 } : { top: 128, right: 8, bottom: 180, left: 8 });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     const r = getGame(id);
@@ -103,17 +114,41 @@ export default function ReplayViewer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [total, setPly]);
 
-  if (rec === null) return <div className="p-10 text-center">Replay not found.</div>;
-  if (error) return <div className="p-10 text-center text-destructive">{error}</div>;
-  if (!rec || !rep || !view || !catalog) return <div className="grid h-full place-items-center font-display text-2xl">Re-simulating…</div>;
+  if (rec === null)
+    return (
+      <div className="carc-page">
+        <div className="carc-sheet carc-empty">
+          <h1 className="carc-heading">Replay not found</h1>
+          <p className="carc-sub">It may have been played in another browser.</p>
+          <Link href="/replays" className="carc-btn mt-[var(--sp-2)]">
+            All replays
+          </Link>
+        </div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="carc-page">
+        <p className="carc-notice" data-tone="danger" role="alert">
+          {error}
+        </p>
+      </div>
+    );
+  if (!rec || !rep || !view || !catalog)
+    return (
+      <div className="grid h-full place-items-center">
+        <div className="carc-title animate-pulse text-[var(--text-2)]">Re-simulating…</div>
+      </div>
+    );
 
   const batch = ply > 0 ? rep.plies[ply - 1]! : [];
   const placed = batch.find((e) => e.type === "tilePlaced");
   const mover = ply > 0 ? rep.movers[ply - 1]! : null;
   const deltas = prev ? view.players.map((p, i) => p.score - prev.players[i]!.score) : [];
 
+  const pct = total ? (ply / total) * 100 : 0;
   return (
-    <div className="relative h-full min-h-0">
+    <div className="carc-game">
       {is3DStyle(style) && core ? (
         <Board3D
           geo={core.geo}
@@ -127,7 +162,9 @@ export default function ReplayViewer() {
           batches={batches}
           playerSlots={playerSlots}
           onFail={fallbackToClassic}
-          insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
+          insets={insets}
+          commandsRef={commands}
+          controls={false}
           ariaLabel="Replay board (3D)"
         />
       ) : (
@@ -140,79 +177,90 @@ export default function ReplayViewer() {
           reducedMotion={reduced}
           ariaLabel="Replay board"
           autoFit
-          insets={{ top: 20, right: 20, bottom: 130, left: 330 }}
+          insets={insets}
+          commandsRef={commands}
+          controls={false}
         />
       )}
-      <div className="pointer-events-none absolute top-3 left-3 flex w-[min(300px,calc(100vw-24px))] flex-col gap-2">
-        <Panel className="flex items-center gap-2 px-3 py-2">
-          <Link href="/replays" className="grid size-8 place-items-center rounded-lg hover:bg-muted" aria-label="Back to replays">
-            <ArrowLeft className="size-4" />
+      <div className="carc-hud-top">
+        <Panel className="carc-titlebar carc-hud-bar carc-replay-bar">
+          <Link href="/replays" className="carc-icon-btn" aria-label="Back to replays" title="Back to replays">
+            <ArrowLeft />
           </Link>
-          <div className="min-w-0">
-            <div className="font-display">Replay</div>
-            <div className="truncate font-mono text-[11px] text-muted-foreground">seed {rec.seed}</div>
-          </div>
-          {is3DStyle(style) && core ? (
-            <div className="ml-auto">
-              <CameraIconSwitch value={camera} onChange={chooseCamera} />
+          <div className="carc-titlebar-text">
+            <div className="carc-titlebar-title">Replay</div>
+            <div className="carc-replay-seed">
+              Seed <span className="font-mono">{rec.seed}</span>
             </div>
-          ) : null}
+          </div>
+          {is3DStyle(style) && core ? <CameraIconSwitch value={camera} onChange={chooseCamera} /> : null}
         </Panel>
+      </div>
+      <div className="carc-hud-left carc-replay-left">
         <ScorePanel view={view} players={rec.players} localSeats={[]} reactions={[]} hideReactions thinking={false} palette={palette} />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-3">
-        <Panel className="w-[min(720px,100%)] p-3">
-          <div className="mb-2 flex min-h-5 flex-wrap items-center gap-x-3 text-xs text-muted-foreground" aria-live="polite">
-            {ply === 0 ? (
-              <span>Start of game</span>
-            ) : (
-              <>
-                <span className="font-semibold text-foreground">
-                  Turn {ply}: {playerName(rec.players, mover)}
-                </span>
-                {deltas.map((d, i) => (d ? <span key={i}>{`${playerName(rec.players, i)} +${d}`}</span> : null))}
-                {batch.map((e, i) => {
-                  const t = describeEvent(e, rec.players);
-                  return t && e.type !== "featureScored" ? <span key={i}>{t}</span> : null;
-                })}
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button type="button" className="rounded-lg p-2 hover:bg-muted" onClick={() => setPly((p) => Math.max(0, p - 1))} aria-label="Step back">
-              <SkipBack className="size-4" />
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-primary p-2 text-primary-foreground"
-              onClick={() => {
-                if (ply >= total) setPly(0);
-                setPlaying((x) => !x);
-              }}
-              aria-label={playing ? "Pause" : "Play"}
-            >
-              {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </button>
-            <button type="button" className="rounded-lg p-2 hover:bg-muted" onClick={() => setPly((p) => Math.min(total, p + 1))} aria-label="Step forward">
-              <SkipForward className="size-4" />
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={total}
-              value={ply}
-              onChange={(e) => {
-                setPlaying(false);
-                setPly(Number(e.target.value));
-              }}
-              className="flex-1 accent-[var(--primary)]"
-              aria-label="Scrub turns"
-            />
-            <span className="w-16 text-right font-mono text-xs tabular-nums">
-              {ply}/{total}
-            </span>
-          </div>
-        </Panel>
+      <div className="carc-hud-bottom carc-replay-bottom">
+        <div className="carc-hud-bottom-start" />
+        <div className="carc-hud-bottom-center">
+          <Panel className="carc-transport">
+            <div className="carc-transport-caption" aria-live="polite">
+              {ply === 0 ? (
+                <strong>Start of game</strong>
+              ) : (
+                <>
+                  <strong>
+                    Turn <span className="carc-num">{ply}</span>: {playerName(rec.players, mover)}
+                  </strong>
+                  {deltas.map((d, i) => (d ? <span key={i} className="carc-num">{`${playerName(rec.players, i)} +${d}`}</span> : null))}
+                  {batch.map((e, i) => {
+                    const t = describeEvent(e, rec.players);
+                    return t && e.type !== "featureScored" ? <span key={i}>{t}</span> : null;
+                  })}
+                </>
+              )}
+            </div>
+            <div className="carc-transport-controls">
+              <button type="button" className="carc-icon-btn" onClick={() => setPly((p) => Math.max(0, p - 1))} aria-label="Step back" title="Step back (←)">
+                <SkipBack />
+              </button>
+              <button
+                type="button"
+                className="carc-icon-btn"
+                data-variant="primary"
+                onClick={() => {
+                  if (ply >= total) setPly(0);
+                  setPlaying((x) => !x);
+                }}
+                aria-label={playing ? "Pause" : "Play"}
+                title={playing ? "Pause (Space)" : "Play (Space)"}
+              >
+                {playing ? <Pause /> : <Play />}
+              </button>
+              <button type="button" className="carc-icon-btn" onClick={() => setPly((p) => Math.min(total, p + 1))} aria-label="Step forward" title="Step forward (→)">
+                <SkipForward />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={total}
+                value={ply}
+                onChange={(e) => {
+                  setPlaying(false);
+                  setPly(Number(e.target.value));
+                }}
+                className="carc-range"
+                style={{ ["--pct" as string]: `${pct}%` }}
+                aria-label="Scrub turns"
+              />
+              <span className="carc-transport-count carc-num">
+                {ply} / {total}
+              </span>
+            </div>
+          </Panel>
+        </div>
+        <div className="carc-hud-bottom-end">
+          <BoardToolbar commands={commands} fitLabel={is3DStyle(style) ? "Reframe the board" : "Fit board"} />
+        </div>
       </div>
     </div>
   );

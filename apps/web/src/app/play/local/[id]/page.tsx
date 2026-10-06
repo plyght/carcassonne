@@ -67,18 +67,18 @@ export default function LocalGamePage() {
 
   if (rec === null) {
     return (
-      <div className="grid h-full place-items-center p-6 text-center">
-        <div>
-          <h1 className="font-display text-3xl">Game not found</h1>
-          <p className="mt-2 text-muted-foreground">It may have been played in another browser.</p>
-          <Link href="/play/new" className="mt-4 inline-block font-semibold text-primary underline">
+      <div className="grid h-full place-items-center p-[var(--sp-6)] text-center">
+        <div className="carc-sheet max-w-md">
+          <h1 className="carc-heading">Game not found</h1>
+          <p className="carc-sub">It may have been played in another browser.</p>
+          <Link href="/play/new" className="carc-btn mt-[var(--sp-4)]" data-variant="primary">
             Start a new game
           </Link>
         </div>
       </div>
     );
   }
-  if (!rec || !client) return <div className="h-full bg-[#a4743f]" />;
+  if (!rec || !client) return <div className="h-full bg-[#a4743f]" aria-busy="true" />;
 
   const again = (sameSeed: boolean) => {
     const n = createLocalGame({
@@ -91,7 +91,6 @@ export default function LocalGamePage() {
     router.push(`/play/local/${n.id}` as Route);
   };
 
-  const btn = "rounded-xl px-4 py-2 text-sm font-semibold transition-colors";
   return (
     <GameScreen
       client={client}
@@ -101,13 +100,13 @@ export default function LocalGamePage() {
       exitHref="/"
       endActions={
         <>
-          <Link href={`/replays/${rec.id}` as Route} className={`${btn} hover:bg-muted`}>
+          <Link href={`/replays/${rec.id}` as Route} className="carc-btn" data-variant="ghost">
             Watch replay
           </Link>
-          <button type="button" className={`${btn} border border-border bg-card hover:bg-muted`} onClick={() => again(true)}>
-            Rematch (same seed)
+          <button type="button" className="carc-btn" onClick={() => again(true)}>
+            Rematch, same seed
           </button>
-          <button type="button" className={`${btn} bg-primary text-primary-foreground hover:bg-primary/90`} onClick={() => again(false)}>
+          <button type="button" className="carc-btn" data-variant="primary" onClick={() => again(false)}>
             New game
           </button>
         </>

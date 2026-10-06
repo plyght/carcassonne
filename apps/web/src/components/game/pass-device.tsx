@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { Eye } from "lucide-react";
+
 import type { PlayerMeta } from "@carcassonne/game-client";
 import { FigureIcon, PLAYER_COLORS } from "@carcassonne/render-classic";
 
@@ -11,23 +13,18 @@ export function PassDevice({ player, meta, onReveal }: { player: number; meta: P
   useEffect(() => ref.current?.focus(), []);
   const app = PLAYER_COLORS[meta?.color ?? "red"];
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-[radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--wood)_85%,black),color-mix(in_oklch,var(--wood)_40%,black))] p-6" role="dialog" aria-modal="true" aria-labelledby="pass-title">
-      <div className="max-w-sm text-center text-white">
-        <div className="mx-auto mb-4 grid size-24 place-items-center rounded-3xl bg-white/10 ring-1 ring-white/20">
-          <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={64} />
-        </div>
-        <div className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60">Pass the device</div>
-        <h2 id="pass-title" className="mt-2 font-display text-4xl">
+    <div className="carc-pass" role="dialog" aria-modal="true" aria-labelledby="pass-title">
+      <div className="carc-pass-card carc-dialog">
+        <span className="carc-pass-avatar" style={{ ["--seat" as string]: app.fill }}>
+          <FigureIcon fill={app.fill} ink={app.ink} marker={app.marker} size={56} />
+        </span>
+        <div className="carc-eyebrow">Pass the device</div>
+        <h2 id="pass-title" className="carc-heading">
           {meta?.name ?? `Player ${player + 1}`}, you’re up
         </h2>
-        <p className="mt-2 text-sm text-white/70">Your tile stays hidden until you’re ready.</p>
-        <button
-          ref={ref}
-          type="button"
-          onClick={onReveal}
-          className="mt-6 rounded-2xl bg-gold px-6 py-3 font-semibold text-black shadow-lg transition-transform hover:scale-[1.03] focus-visible:ring-4 focus-visible:ring-white/50"
-        >
-          I’m ready, show my tile
+        <p className="carc-sub">Your tile stays hidden until you’re ready.</p>
+        <button ref={ref} type="button" onClick={onReveal} className="carc-btn" data-variant="primary" data-size="large">
+          <Eye /> I’m ready, show my tile
         </button>
       </div>
     </div>

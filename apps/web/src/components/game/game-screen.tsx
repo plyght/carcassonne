@@ -46,9 +46,10 @@ import { TuneMode } from "../tune/tune-mode";
 import { EndSummary } from "./end-summary";
 import { describeEvent, playerName, projectExtent, useClientState } from "./helpers";
 import {
+  BoardHelp,
+  BoardToolbar,
   FeatureInfo,
   figureChoices,
-  Kbd,
   Panel,
   ReactionBar,
   RemainingTiles,
@@ -135,12 +136,15 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
     if (!pending) setFigureMenu(null);
   }, [pending]);
 
-  // Frame the board inside the HUD panels.
-  const [insets, setInsets] = useState({ top: 72, right: 0, bottom: 72, left: 0 });
+  // Frame the board inside the HUD panels (hud.css: inset 12, bar 56, column 304 / 280, gap 8).
+  const [insets, setInsets] = useState({ top: 76, right: 0, bottom: 68, left: 0 });
+  const [dialSize, setDialSize] = useState(112);
   useEffect(() => {
     const update = () => {
-      const wide = window.innerWidth >= 900;
-      setInsets(wide ? { top: 76, right: 320, bottom: 76, left: 320 } : { top: 130, right: 8, bottom: 250, left: 8 });
+      const w = window.innerWidth;
+      const col = w >= 1024 ? 304 : 280;
+      setInsets(w >= 768 ? { top: 76, right: 12 + col + 8, bottom: 68, left: 12 + col + 8 } : { top: 128, right: 8, bottom: 200, left: 8 });
+      setDialSize(w >= 768 ? 112 : 88);
     };
     update();
     window.addEventListener("resize", update);
@@ -426,10 +430,10 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   if (s.phase === "error") {
     return (
       <div className="grid h-full place-items-center p-6">
-        <Panel className="max-w-md p-6 text-center">
-          <h2 className="font-display text-2xl">Something went wrong</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{s.error}</p>
-          <Link href={exitHref as "/"} className="mt-4 inline-block text-sm text-primary underline">
+        <Panel className="carc-sheet max-w-md text-center">
+          <h2 className="carc-heading">Something went wrong</h2>
+          <p className="carc-sub">{s.error}</p>
+          <Link href={exitHref as "/"} className="carc-btn mt-[var(--sp-4)]">
             Back to menu
           </Link>
         </Panel>
@@ -439,7 +443,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   if (!view) {
     return (
       <div className="grid h-full place-items-center" style={{ background: palette.table }}>
-        <div className="animate-pulse font-display text-2xl text-white/90">
+        <div className="carc-board-message animate-pulse">
           {s.connection === "local" ? "Shuffling tiles…" : s.connection === "polling" ? "Polling for the game…" : "Connecting…"}
         </div>
       </div>
@@ -452,7 +456,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
   const online = !isLocal;
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden" data-testid="game-screen"
+    <div className="carc-game" data-testid="game-screen"
       data-ply={view.ply}
       data-status={view.status}
       data-current={view.currentPlayer}
@@ -488,6 +492,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           onRotate={rotate}
           onFail={on3DFail}
           insets={insets}
+          controls={false}
           ariaLabel={`${title} board (3D). Use arrow keys to choose a spot, R to rotate, Enter to place.`}
         />
       ) : (
@@ -509,6 +514,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         reducedMotion={reducedMotion}
         fitSignal={fitSignal}
         insets={insets}
+        controls={false}
         autoFit
         commandsRef={commands}
         onCellHover={(c) => setHover(c)}
@@ -533,7 +539,7 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           style={{ left: figureMenu.x, top: figureMenu.y }}
           data-testid="figure-menu"
         >
-          <Panel className="flex flex-col gap-1 p-1.5" role="menu" aria-label="Figure">
+          <Panel className="carc-figure-menu" role="menu" aria-label="Figure">
             {figureMenu.choices.map((c) => (
               <button
                 key={c.key}
@@ -543,98 +549,87 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
                   setFigureMenu(null);
                   choose(c);
                 }}
-                className="rounded-lg px-3 py-1.5 text-left text-sm hover:bg-muted"
+                className="carc-figure"
+                data-skip={c.option === null || undefined}
               >
-                <span className="font-semibold">{c.label}</span>
-                {c.detail ? <span className="ml-2 text-xs text-muted-foreground">{c.detail}</span> : null}
+                <span className="carc-figure-label">{c.label}</span>
+                <span className="carc-figure-detail">{c.detail}</span>
               </button>
             ))}
           </Panel>
         </div>
       ) : null}
 
-      {/* top bar */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-        <Panel className="flex min-w-0 items-center gap-3 px-3 py-2">
-          <Link href={exitHref as "/"} className="grid size-8 place-items-center rounded-lg hover:bg-muted" aria-label="Leave game">
-            <ArrowLeft className="size-4" />
+      {/* top row: title + turn, actions */}
+      <div className="carc-hud-top">
+        <Panel className="carc-titlebar carc-hud-bar">
+          <Link href={exitHref as "/"} className="carc-icon-btn" aria-label="Leave game" title="Leave game">
+            <ArrowLeft />
           </Link>
-          <div className="min-w-0">
-            <div className="truncate font-display text-base leading-tight">{title}</div>
-            {subtitle ? <div className="hidden truncate text-[11px] sm:block text-muted-foreground">{subtitle}</div> : null}
-          </div>
-          <div className="mx-1 h-8 w-px bg-border" />
-          <div className="flex items-center gap-2" aria-live="polite">
-            {ended ? (
-              <span className="text-sm font-semibold">Game over</span>
-            ) : (
-              <>
-                <span className="size-3 rounded-full ring-2 ring-white/60" style={{ background: PLAYER_COLORS[currentColor].fill }} />
-                <span className="text-sm font-semibold whitespace-nowrap" data-testid="turn-indicator">
-                  {canAct && s.localSeats.length === 1 ? "Your turn" : `${playerName(s.players, current)}’s turn`}
-                </span>
-                <span className="hidden sm:inline"><TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} /></span>
-              </>
-            )}
+          <div className="carc-titlebar-text">
+            <div className="carc-titlebar-title">{title}</div>
+            <div className="carc-turn" aria-live="polite" data-mine={canAct || undefined}>
+              {ended ? (
+                <span className="carc-turn-who">Game over</span>
+              ) : (
+                <>
+                  <span className="carc-turn-dot" style={{ background: PLAYER_COLORS[currentColor].fill }} aria-hidden />
+                  <span className="carc-turn-who" data-testid="turn-indicator">
+                    {canAct && s.localSeats.length === 1 ? "Your turn" : `${playerName(s.players, current)}’s turn`}
+                  </span>
+                  <TurnClock startedAt={s.turnStartedAt} deadline={s.deadline} />
+                </>
+              )}
+            </div>
           </div>
           {online ? (
-            <span className="ml-1 text-muted-foreground" title={`Connection: ${s.connection}`}>
-              {s.connection === "open" ? <Wifi className="size-4" /> : s.connection === "polling" ? <Wifi className="size-4 opacity-50" /> : <WifiOff className="size-4 text-destructive" />}
+            <span className="carc-conn" data-state={s.connection === "open" ? "open" : s.connection === "polling" ? "polling" : "closed"} title={`Connection: ${s.connection}`}>
+              {s.connection === "open" ? <Wifi aria-label="Connected" /> : s.connection === "polling" ? <Wifi className="opacity-50" aria-label="Polling" /> : <WifiOff aria-label="Disconnected" />}
             </span>
           ) : null}
         </Panel>
-        <div className="relative shrink-0">
-        <Panel className="flex shrink-0 items-center gap-1 p-1.5">
-          {isLocal ? (
+        <div className="carc-actions">
+          <Panel className="carc-actions-bar carc-hud-bar">
+            {isLocal ? (
+              <button type="button" onClick={() => void doUndo()} disabled={!s.canUndo} className="carc-btn" data-variant="ghost" title="Undo (U)" aria-label="Undo">
+                <Undo2 /> <span className="carc-btn-label">Undo</span>
+              </button>
+            ) : null}
+            {isLocal && settings.showHints ? (
+              <button type="button" onClick={() => void doHint()} disabled={!canAct} className="carc-btn" data-variant="ghost" title="Hint (H)" aria-label="Hint">
+                <Lightbulb /> <span className="carc-btn-label">Hint</span>
+              </button>
+            ) : null}
             <button
+              ref={tableButton}
               type="button"
-              onClick={() => void doUndo()}
-              disabled={!s.canUndo}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted disabled:opacity-40"
-              title="Undo (U)"
+              onClick={() => setStyleOpen((o) => !o)}
+              className="carc-btn carc-table-button"
+              data-variant="ghost"
+              title="Table: style, camera, quality, sound"
+              aria-label="Table settings"
+              aria-expanded={styleOpen}
+              aria-haspopup="dialog"
+              data-testid="style-button"
             >
-              <Undo2 className="size-4" /> <span className="hidden sm:inline">Undo</span>
+              <SlidersHorizontal /> <span className="carc-btn-label carc-table-name">{style.name}</span>
+              <ChevronDown className="carc-chevron" />
             </button>
-          ) : null}
-          {isLocal && settings.showHints ? (
-            <button
-              type="button"
-              onClick={() => void doHint()}
-              disabled={!canAct}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted disabled:opacity-40"
-              title="Hint (H)"
-            >
-              <Lightbulb className="size-4" /> <span className="hidden sm:inline">Hint</span>
-            </button>
-          ) : null}
-          <button
-            ref={tableButton}
-            type="button"
-            onClick={() => setStyleOpen((o) => !o)}
-            className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm hover:bg-muted", styleOpen && "bg-muted")}
-            title="Table: style, camera, quality, sound"
-            aria-expanded={styleOpen}
-            aria-haspopup="dialog"
-            data-testid="style-button"
-          >
-            <SlidersHorizontal className="size-4" /> <span className="hidden sm:inline">{style.name}</span>
-            <ChevronDown className={cn("hidden size-3.5 opacity-60 transition-transform sm:block", styleOpen && "rotate-180")} />
-          </button>
-        </Panel>
-        <TablePanel
-          open={styleOpen}
-          onClose={closeTable}
-          camera={camera}
-          onCamera={chooseCamera}
-          is3d={is3d}
-          commands={commands}
-          anchorRef={tableButton}
-        />
+          </Panel>
+          <TablePanel
+            open={styleOpen}
+            onClose={closeTable}
+            camera={camera}
+            onCamera={chooseCamera}
+            is3d={is3d}
+            commands={commands}
+            anchorRef={tableButton}
+          />
         </div>
       </div>
 
-      {/* left: scores */}
-      <div className="pointer-events-none absolute top-[74px] right-3 left-3 flex md:right-auto md:w-[300px] flex-col gap-2">
+      {/* left column: scores, recent events */}
+      <div className="carc-hud-left">
         <ScorePanel
           view={view}
           players={s.players}
@@ -643,10 +638,11 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
           hideReactions={settings.hideReactions}
           thinking={s.thinking}
           palette={palette}
+          footer={subtitle}
         />
         {log.length ? (
-          <Panel className="hidden px-3 py-2 md:block" aria-label="Recent events">
-            <ul className="space-y-0.5 text-[12px] text-muted-foreground">
+          <Panel className="carc-log" aria-label="Recent events">
+            <ul>
               {log.map((l) => (
                 <li key={l.key}>{l.text}</li>
               ))}
@@ -655,8 +651,8 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
         ) : null}
       </div>
 
-      {/* right: tile in hand + remaining */}
-      <div className="pointer-events-none absolute right-16 bottom-[64px] left-3 flex flex-col gap-2 md:top-[74px] md:right-3 md:bottom-auto md:left-auto md:w-[300px]">
+      {/* right column: tile in hand, draw pile */}
+      <div className="carc-hud-right">
         {!ended ? (
           <TileInHand
             tile={view.currentTile}
@@ -673,36 +669,31 @@ export function GameScreen({ client, title, subtitle, hotseat, endActions, exitH
             onChoose={choose}
             onBack={() => setPending(null)}
             waitingFor={!canAct ? playerName(s.players, current) : null}
+            dialSize={dialSize}
           />
         ) : null}
-        {settings.showRemaining && !ended ? (
-          <div className="hidden md:block">
-            <RemainingTiles remaining={view.remaining} catalog={catalog} art={art} palette={palette} />
-          </div>
-        ) : null}
+        {settings.showRemaining && !ended ? <RemainingTiles remaining={view.remaining} catalog={catalog} art={art} palette={palette} /> : null}
         {s.error ? (
-          <Panel className="border-destructive/40 px-3 py-2 text-sm text-destructive" role="alert">
-            {s.error}
+          <Panel className="carc-hud-panel" role="alert">
+            <p className="carc-notice" data-tone="danger">
+              {s.error}
+            </p>
           </Panel>
         ) : null}
       </div>
 
-      {/* bottom: feature info + reactions */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-2 px-3">
-        {projection ? <FeatureInfo p={projection} players={s.players} /> : null}
-        <ReactionBar onReact={(e) => client.react(e)} />
-      </div>
-
-      <div className={cn("pointer-events-none absolute bottom-3 left-3 hidden text-[11px] lg:block", is3d ? "rounded-lg bg-black/45 px-2 py-1 text-white/90" : "text-white/80 drop-shadow")}>
-        {is3d ? (
-          <>
-            <Kbd>R</Kbd>/scroll rotate · drag to orbit · right-drag pan · <Kbd>+</Kbd> <Kbd>−</Kbd> zoom · <Kbd>F</Kbd> reframe
-          </>
-        ) : (
-          <>
-            <Kbd>+</Kbd> <Kbd>−</Kbd> zoom · <Kbd>F</Kbd> fit · <Kbd>⇧</Kbd>+<Kbd>←</Kbd> pan · drag to pan
-          </>
-        )}
+      {/* bottom row: help, feature info + reactions, board toolbar */}
+      <div className="carc-hud-bottom">
+        <div className="carc-hud-bottom-start">
+          <BoardHelp is3d={is3d} />
+        </div>
+        <div className="carc-hud-bottom-center">
+          {projection ? <FeatureInfo p={projection} players={s.players} /> : null}
+          <ReactionBar onReact={(e) => client.react(e)} />
+        </div>
+        <div className="carc-hud-bottom-end">
+          <BoardToolbar commands={commands} fitLabel={is3d ? "Reframe the board" : "Fit board"} />
+        </div>
       </div>
 
       {needsPass ? <PassDevice player={current} meta={s.players[current]} onReveal={() => setRevealedPly(view.ply)} /> : null}

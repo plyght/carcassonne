@@ -4,6 +4,10 @@ import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "../index.css";
 import "dialkit/styles.css";
 import "@/components/dial/tokens.css";
+import "@/components/dial/ui.css";
+import "@/components/dial/chrome.css";
+import "@/components/dial/hud.css";
+import "@/components/dial/screens.css";
 import "@/components/dial/dial-theme.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
@@ -42,8 +46,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${display.variable} antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${display.variable}`} suppressHydrationWarning>
+      <body className="antialiased">
         <Providers>
           <div className="bg-parchment grid h-svh grid-rows-[auto_1fr]">
             <Header />

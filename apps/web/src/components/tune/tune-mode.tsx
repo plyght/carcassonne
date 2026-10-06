@@ -222,7 +222,7 @@ function AnimTimelinePanel({ bases, config, name }: { bases: Partial<Record<Clip
   return (
     <div className="pointer-events-none fixed right-4 z-[9997]" style={{ bottom: dockTop + 24 }} data-testid="tune-stage" aria-hidden>
       <div className="carc-tune-stage" style={{ boxShadow: "0 18px 40px -20px rgba(60,35,10,0.55), 0 0 0 1px var(--border)", background: "var(--card)" }}>
-        <div className="absolute top-2 left-2.5 text-[9.5px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">Clip preview</div>
+        <div className="carc-eyebrow absolute top-2 left-3">Clip preview</div>
         <div className="absolute inset-x-0 bottom-0 h-6" style={{ background: "color-mix(in oklch, var(--wood) 30%, var(--card))" }} />
         <div
           className="absolute bottom-4 left-1/2 h-9 w-16 -translate-x-1/2 rounded-sm"
