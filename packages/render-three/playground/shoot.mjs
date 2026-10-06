@@ -60,10 +60,12 @@ async function sideBySide(file, query) {
   const tmp = `${file}.ours.png`;
   await shot(tmp, query, 1200, 900);
   const ref = resolve(here, "../../../docs/design/inspiration/tabletop-diorama-01.webp");
+  const label = (src, text) => ["(", src, "-resize", "x900", "-background", "#1d1b18", "-gravity", "south", "-splice", "0x40", "-fill", "#eeeeee", "-pointsize", "22", "-annotate", "+0+8", text, ")"];
   execFileSync("convert", [
-    "(", ref, "-resize", "x900", "-gravity", "south", "-background", "#1d1b18", "-splice", "0x40", "-fill", "#eee", "-pointsize", "22", "-annotate", "+0+8", "Reference: tabletop-diorama-01.webp", ")",
-    "(", tmp, "-gravity", "south", "-background", "#1d1b18", "-splice", "0x40", "-fill", "#eee", "-pointsize", "22", "-annotate", "+0+8", "render-three tabletop (WebGL2 / SwiftShader, high tier)", ")",
-    "-background", "#1d1b18", "-splice", "20x0", "+append", file,
+    ...label(ref, "Reference: tabletop-diorama-01.webp"),
+    "(", "-size", "20x940", "xc:#1d1b18", ")",
+    ...label(tmp, "render-three tabletop (WebGL2 / SwiftShader, high tier)"),
+    "+append", "+repage", "-depth", "8", file,
   ]);
   unlinkSync(tmp);
   console.log(file);
