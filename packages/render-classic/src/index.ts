@@ -7,3 +7,4 @@ export * from "./tile";
 export * from "./board";
 export * from "./geo-art";
 export * from "./defaults";
+export * from "./illustrated";

@@ -9,7 +9,9 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "sheet": "bun scripts/illustrated-sheet.ts",
+    "shots": "bun scripts/board-shots.ts"
   },
   "dependencies": {
     "@carcassonne/core-geo": "workspace:*",
@@ -23,6 +25,7 @@
     "@types/bun": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "playwright": "1.56.1",
     "react-dom": "catalog:",
     "typescript": "catalog:"
   }

@@ -9,7 +9,8 @@ import { installedFigureArt, installedTileArt } from "./defaults";
 import { FigureToken, proceduralFigures, type FigureArtSource } from "./figures";
 import { PLAYER_COLORS, playerFill, type BoardPalette } from "./palette";
 import { proceduralArt } from "./procedural-art";
-import { PaletteDefs, TileSvg } from "./tile";
+import { canIllustrate, levelFor, tileImage, useTileCacheVersion } from "./illustrated/cache";
+import { PaletteDefs, TileHit, TileSvg } from "./tile";
 import { rotatePoint, TILE, type TileArtSource } from "./tile-art";
 
 export interface Cell {
@@ -419,6 +420,27 @@ export function ClassicBoard(props: ClassicBoardProps) {
   const ghostDef = ghost ? catalog.get(ghost.tile) : undefined;
   const W = 400 * TILE;
 
+  // ── painted tiles: bitmap level follows the zoom once it settles ──────────
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useTileCacheVersion();
+  const [lodScale, setLodScale] = useState(cam.s);
+  useEffect(() => {
+    const t = setTimeout(() => setLodScale(cam.s), 180);
+    return () => clearTimeout(t);
+  }, [cam.s]);
+  const painted = mounted && canIllustrate(art, palette);
+  const dpr = typeof window === "undefined" ? 1 : Math.min(3, window.devicePixelRatio || 1);
+  const level = levelFor(TILE * lodScale * dpr);
+  // Visible cells (with a one-tile margin); off-screen tiles stay at a cheap level.
+  const view0 = {
+    x0: -cam.tx / cam.s / TILE - 1,
+    y0: -cam.ty / cam.s / TILE - 1,
+    x1: (size.w - cam.tx) / cam.s / TILE + 1,
+    y1: (size.h - cam.ty) / cam.s / TILE + 1,
+  };
+  const ghostUrl = painted && ghost && ghostDef ? tileImage(art, ghostDef, ghost.rot, palette, level) : null;
+
   return (
     <div
       ref={wrapRef}
@@ -476,6 +498,19 @@ export function ClassicBoard(props: ClassicBoardProps) {
             const def = catalog.get(t.tile);
             if (!def) return null;
             const isLast = lastPlaced && lastPlaced.x === t.x && lastPlaced.y === t.y;
+            const visible = t.x + 1 >= view0.x0 && t.x <= view0.x1 && t.y + 1 >= view0.y0 && t.y <= view0.y1;
+            const url = painted ? tileImage(art, def, t.rot, palette, visible ? level : Math.min(level, 256), visible) : null;
+            if (url)
+              return (
+                <g key={`${t.x},${t.y}`}>
+                  <g transform={`translate(${t.x * TILE} ${t.y * TILE})`} pointerEvents="none">
+                    <g className={isLast ? "cc-pop" : undefined}>
+                      <PaintedImage href={url} />
+                    </g>
+                  </g>
+                  {interactive ? <TileHit def={def} art={art} palette={palette} rot={t.rot} x={t.x} y={t.y} /> : null}
+                </g>
+              );
             return (
               <TileSvg
                 key={`${t.x},${t.y}`}
@@ -567,6 +602,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
                   ink={a.ink}
                   marker={a.marker}
                   outline={palette.figureOutline}
+                  wood={!!palette.illustrated}
                   figures={figures}
                   title={`${players[fig.player]?.name ?? `Player ${fig.player + 1}`}: ${fig.figure} on ${kind ?? "feature"}`}
                 />
@@ -600,15 +636,21 @@ export function ClassicBoard(props: ClassicBoardProps) {
           {/* tile in hand */}
           {ghost && ghostDef ? (
             <g pointerEvents="none" className="cc-ghost">
-              <TileSvg
-                def={ghostDef}
-                art={art}
-                palette={palette}
-                rot={ghost.rot}
-                x={ghost.x}
-                y={ghost.y}
-                opacity={ghost.pending ? 1 : 0.82}
-              />
+              {ghostUrl ? (
+                <g transform={`translate(${ghost.x * TILE} ${ghost.y * TILE})`} opacity={ghost.pending ? 1 : 0.86}>
+                  <PaintedImage href={ghostUrl} />
+                </g>
+              ) : (
+                <TileSvg
+                  def={ghostDef}
+                  art={art}
+                  palette={palette}
+                  rot={ghost.rot}
+                  x={ghost.x}
+                  y={ghost.y}
+                  opacity={ghost.pending ? 1 : 0.82}
+                />
+              )}
               <rect
                 className={ghost.pending ? "cc-pulse" : undefined}
                 x={ghost.x * TILE}
@@ -652,6 +694,7 @@ export function ClassicBoard(props: ClassicBoardProps) {
                         ink={a.ink}
                         marker={a.marker}
                         outline={palette.figureOutline}
+                  wood={!!palette.illustrated}
                         figures={figures}
                         ghost
                       />
@@ -705,6 +748,11 @@ export function ClassicBoard(props: ClassicBoardProps) {
       /> : null}
     </div>
   );
+}
+
+/** A painted tile bitmap in the 100-unit tile box (a hair oversized so seams never show a gap). */
+function PaintedImage({ href }: { href: string }) {
+  return <image href={href} x={-0.12} y={-0.12} width={TILE + 0.24} height={TILE + 0.24} preserveAspectRatio="none" />;
 }
 
 function BoardControls({

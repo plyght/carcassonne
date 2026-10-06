@@ -5,6 +5,8 @@
 import type { FeatureKind, TileId } from "@carcassonne/protocol";
 import type { TileDef } from "@carcassonne/game-client";
 
+import type { IllustratedTile } from "./illustrated/types";
+
 export type Pt = readonly [number, number];
 
 /** One feature of a tile, in canonical orientation, in a 100×100 tile box. */
@@ -51,6 +53,8 @@ export interface TileArt {
 export interface TileArtSource {
   readonly name: string;
   get(def: TileDef): TileArt;
+  /** Painter input for the illustrated (bitmap) Classic art; sources without it draw vectors. */
+  illustrated?(def: TileDef): IllustratedTile | null;
 }
 
 export const TILE = 100;

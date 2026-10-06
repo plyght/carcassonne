@@ -22,16 +22,83 @@ export interface BoardPalette {
   ink: string;
   /** Player colours may be adjusted per palette for contrast. */
   players?: Partial<Record<PlayerColorId, string>>;
+  /** Painted (bitmap) tile art; palettes without it draw vector line art. */
+  illustrated?: IllustratedPalette;
 }
+
+/**
+ * Colours of the painted Classic tiles (./illustrated). Pure data: tweak freely.
+ * Pairs are [light, dark]; lighting comes from the top-left.
+ */
+export interface IllustratedPalette {
+  /** Grass: mottling runs dark → base → light; blades and tufts use the accents. */
+  grass: { dark: string; base: string; light: string; blade: string; tuft: string; flowers: string[] };
+  /** Ochre city ground. */
+  ground: { dark: string; base: string; light: string; speck: string };
+  road: { edge: string; base: string; light: string; rut: string };
+  water: { bank: string; deep: string; base: string; light: string; ripple: string };
+  /** City wall: lit top, shaded outer face, dark mortar/crenel ticks. */
+  wall: { top: string; topLight: string; face: string; faceDark: string; tick: string; outline: string };
+  /** House walls (cream), lit and shaded faces. */
+  house: { light: string; base: string; shade: string; window: string; outline: string };
+  /** Roof tints, indexed by geo `tint` (light half, dark half). */
+  roofs: [string, string][];
+  /** Tower roofs (the blue conical / pyramid caps). */
+  towerRoof: [string, string];
+  tree: { dark: string; base: string; light: string; trunk: string };
+  bush: { dark: string; base: string; light: string };
+  crop: { a: string; b: string; edge: string };
+  hedge: { dark: string; base: string; light: string };
+  gravel: { base: string; edge: string };
+  sheep: string;
+  cow: [string, string];
+  pennant: { field: string; check: string; rim: string };
+  shadow: string;
+  /** Tile edge bevel. */
+  bevel: { light: string; dark: string };
+}
+
+export const CLASSIC_ILLUSTRATED: IllustratedPalette = {
+  grass: {
+    dark: "#5f9a24",
+    base: "#86bf35",
+    light: "#a9d653",
+    blade: "#c4e47a",
+    tuft: "#4f8a1e",
+    flowers: ["#fff6d8", "#ffe066", "#f7a8c0", "#ffffff"],
+  },
+  ground: { dark: "#c48f4a", base: "#ddb067", light: "#efcf91", speck: "#a87438" },
+  road: { edge: "#9a7a4e", base: "#efe6cc", light: "#fbf6e6", rut: "#d9cba6" },
+  water: { bank: "#4d7f3a", deep: "#5f9fcf", base: "#8cc3e6", light: "#c3e3f5", ripple: "#f2fbff" },
+  wall: { top: "#e8dcc0", topLight: "#f7f0de", face: "#bcae90", faceDark: "#97886c", tick: "#8a7a5f", outline: "#5e5142" },
+  house: { light: "#fbf3df", base: "#eadcbc", shade: "#c8b48e", window: "#5a4630", outline: "#6b5238" },
+  roofs: [
+    ["#ec6a3b", "#b8401f"],
+    ["#e2552f", "#a83418"],
+    ["#f0804a", "#c0532a"],
+    ["#d9603a", "#9c3b20"],
+  ],
+  towerRoof: ["#5f86d0", "#2f4f95"],
+  tree: { dark: "#2c5a1c", base: "#3f7a26", light: "#6aa53a", trunk: "#6b4a2a" },
+  bush: { dark: "#244d18", base: "#356c22", light: "#5a9433" },
+  crop: { a: "#e0c35c", b: "#c9a840", edge: "#a88b35" },
+  hedge: { dark: "#2a5a1d", base: "#3f7d2a", light: "#68a542" },
+  gravel: { base: "#e9dcb8", edge: "#b9a57a" },
+  sheep: "#fbfaf3",
+  cow: ["#7a4e2e", "#f3eee2"],
+  pennant: { field: "#2f5fb8", check: "#f6f3ea", rim: "#1d3a75" },
+  shadow: "rgba(28, 40, 10, 0.34)",
+  bevel: { light: "rgba(255, 255, 240, 0.2)", dark: "rgba(40, 30, 10, 0.26)" },
+};
 
 export const CLASSIC_PALETTE: BoardPalette = {
   id: "classic",
   table:
     "radial-gradient(ellipse at 50% 40%, #c79a62 0%, #a4743f 55%, #7a5129 100%)",
-  tile: { field: "#93b65a", fieldShade: "#86a94f", border: "#5f7a33", borderWidth: 0.8 },
-  city: { fill: "#e3c88f", shade: "#d4b274", wall: "#8a7356", wallWidth: 4.5, crenel: "#6d5a43" },
-  road: { casing: "#8e7a5c", fill: "#f3ead2", casingWidth: 10, fillWidth: 6.5 },
-  river: { fill: "#5aa5d6", edge: "#3f7fae", ripple: "rgba(235, 248, 255, 0.55)" },
+  tile: { field: "#86bf35", fieldShade: "#78ae2e", border: "#4f7a22", borderWidth: 0.8 },
+  city: { fill: "#d4a35a", shade: "#c08d48", wall: "#e8dcc0", wallWidth: 4.5, crenel: "#97886c" },
+  road: { casing: "#9a7a4e", fill: "#efe6cc", casingWidth: 10, fillWidth: 7.5 },
+  river: { fill: "#8cc3e6", edge: "#4d7f3a", ripple: "rgba(235, 248, 255, 0.55)" },
   garden: { fill: "#6f9c47", hedge: "#3f6a2a", bloom: "#f4d35e" },
   building: { body: "#f1e6cc", roof: "#b5523b", outline: "#5c4a35" },
   pennant: { fill: "#2f5fa8", stroke: "#f6efdc", mark: "#f6efdc" },
@@ -39,6 +106,7 @@ export const CLASSIC_PALETTE: BoardPalette = {
   highlight: { stroke: "#fff3c4", fill: "rgba(255, 236, 160, 0.45)" },
   figureOutline: "#2b2117",
   ink: "#2b2117",
+  illustrated: CLASSIC_ILLUSTRATED,
 };
 
 export const BLUEPRINT_PALETTE: BoardPalette = {

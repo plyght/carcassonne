@@ -1,5 +1,6 @@
 import type { FigureKind } from "@carcassonne/protocol";
 import { installedFigureArt } from "./defaults";
+import { shade } from "./illustrated/noise";
 
 import type { MarkerShape } from "./palette";
 
@@ -77,6 +78,8 @@ export interface FigureTokenProps {
   figures?: FigureArtSource;
   /** Translucent placement preview. */
   ghost?: boolean;
+  /** Painted wooden look (shading, darker edge, soft drop shadow) for illustrated boards. */
+  wood?: boolean;
 }
 
 function FigureBody({
@@ -89,22 +92,52 @@ function FigureBody({
   figures,
   strokeWidth,
   ghost,
+  wood,
 }: Omit<FigureTokenProps, "x" | "y" | "size" | "title" | "className"> & { strokeWidth: number }) {
   const src = figures ?? installedFigureArt() ?? proceduralFigures;
   const lyingPath = lying ? src.lyingPath?.(kind) : undefined;
   const [mx, my] = src.markerAt(kind);
+  const d = lyingPath ?? src.path(kind);
+  // Painted wooden piece: light from the top-left, a darker edge of the same colour.
+  const woodId = wood && !ghost ? `cc-wood-${fill.replace(/[^a-z0-9]/gi, "")}` : null;
+  // Lying farmers are rotated -90°, so the light direction is rotated with them.
+  const grad = lying && !lyingPath ? { x1: 0, y1: 1, x2: 1, y2: 0 } : { x1: 0, y1: 0, x2: 1, y2: 1 };
   return (
     <g transform={lying && !lyingPath ? "rotate(-90 12 13)" : undefined}>
+      {woodId ? (
+        <defs>
+          <linearGradient id={woodId + (lying ? "l" : "")} {...grad}>
+            <stop offset="0" stopColor={shade(fill, 0.32)} />
+            <stop offset="0.45" stopColor={fill} />
+            <stop offset="1" stopColor={shade(fill, -0.28)} />
+          </linearGradient>
+        </defs>
+      ) : null}
       <path
-        d={lyingPath ?? src.path(kind)}
-        fill={fill}
+        d={d}
+        fill={woodId ? `url(#${woodId + (lying ? "l" : "")})` : fill}
         fillOpacity={ghost ? 0.62 : 1}
-        stroke={outline}
+        stroke={woodId ? shade(fill, -0.55) : outline}
         strokeWidth={strokeWidth}
         strokeLinejoin="round"
         strokeDasharray={ghost ? "2 1.5" : undefined}
       />
+      {woodId ? <path d={d} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth={0.55} strokeLinejoin="round" transform="translate(-0.35 -0.35)" /> : null}
       {ghost ? null : <MarkerGlyph shape={marker} cx={mx} cy={my} r={2.6} fill={ink} />}
+    </g>
+  );
+}
+
+/** Soft drop shadow: the silhouette offset to the bottom-right, in two falloff layers. */
+function FigureShadow({ kind, lying, figures }: Pick<FigureTokenProps, "kind" | "lying" | "figures">) {
+  const src = figures ?? installedFigureArt() ?? proceduralFigures;
+  const lyingPath = lying ? src.lyingPath?.(kind) : undefined;
+  const d = lyingPath ?? src.path(kind);
+  const rot = lying && !lyingPath ? " rotate(-90 12 13)" : "";
+  return (
+    <g pointerEvents="none">
+      <path d={d} fill="rgba(20,30,5,0.16)" stroke="rgba(20,30,5,0.16)" strokeWidth={1.6} strokeLinejoin="round" transform={`translate(1.9 2.1)${rot}`} />
+      <path d={d} fill="rgba(20,30,5,0.24)" transform={`translate(1.3 1.5)${rot}`} />
     </g>
   );
 }
@@ -115,8 +148,8 @@ export function FigureToken({ x, y, size = 24, title, className, ...body }: Figu
   return (
     <g transform={`translate(${x - size / 2} ${y - size / 2}) scale(${k})`} className={className} pointerEvents="none">
       {title ? <title>{title}</title> : null}
-      {body.ghost ? null : <ellipse cx={12.6} cy={22.6} rx={9} ry={2.2} fill="rgba(0,0,0,0.28)" />}
-      <FigureBody {...body} strokeWidth={1.3} />
+      {body.ghost ? null : body.wood ? <FigureShadow {...body} /> : <ellipse cx={12.6} cy={22.6} rx={9} ry={2.2} fill="rgba(0,0,0,0.28)" />}
+      <FigureBody {...body} strokeWidth={body.wood ? 1 : 1.3} />
     </g>
   );
 }

@@ -1,7 +1,8 @@
-import { memo, type ReactNode } from "react";
+import { memo, useEffect, useState, type ReactNode } from "react";
 
 import type { TileDef } from "@carcassonne/game-client";
 
+import { levelFor, useTileImage } from "./illustrated/cache";
 import type { BoardPalette } from "./palette";
 import { rotatePoint, TILE, type Pt, type TileArt, type TileArtSource } from "./tile-art";
 
@@ -283,7 +284,17 @@ function TileSvgImpl({ def, art: source, palette: p, rot, x = 0, y = 0, hitTest,
   );
 }
 
+/** Invisible hit-test layer (data-node paths) over painted tile art. */
+function TileHitImpl(props: TileSvgProps) {
+  return (
+    <g opacity={0}>
+      <TileSvgImpl {...props} hitTest />
+    </g>
+  );
+}
+
 export const TileSvg = memo(TileSvgImpl);
+export const TileHit = memo(TileHitImpl);
 
 /** Standalone tile picture (HUD, remaining-tiles panel, previews). */
 export function TileThumb({
@@ -303,6 +314,25 @@ export function TileThumb({
   className?: string;
   title?: string;
 }) {
+  // Painted art once mounted (bitmaps are browser-only; SSR and the first client
+  // render stay vector so hydration matches). Rotation is painted, never CSS-rotated,
+  // so icons and lighting stay upright.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const dpr = typeof window === "undefined" ? 2 : Math.min(3, window.devicePixelRatio || 1);
+  const url = useTileImage(art, mounted ? def : undefined, rot, palette, levelFor(size * dpr));
+  if (url)
+    return (
+      <img
+        src={url}
+        width={size}
+        height={size}
+        alt={title ?? `Tile ${def.id}`}
+        className={className}
+        draggable={false}
+        style={{ display: "block", borderRadius: Math.max(1, size * 0.03) }}
+      />
+    );
   return (
     <svg
       width={size}

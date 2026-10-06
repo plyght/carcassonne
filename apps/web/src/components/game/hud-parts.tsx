@@ -258,9 +258,8 @@ export function TileInHand({
           style={{ background: palette.table }}
         >
           {def && !hidden ? (
-            <div className="transition-transform duration-200 ease-out" style={{ transform: `rotate(${rot * 90}deg)` }}>
-              <TileThumb def={def} art={art} palette={palette} size={92} title={`Tile ${def.id}`} />
-            </div>
+            // Rotation is painted into the art (not CSS-rotated), so the cloister, houses and lighting stay upright.
+            <TileThumb def={def} art={art} palette={palette} rot={rot} size={92} title={`Tile ${def.id}, rotated ${rot * 90}°`} className="rounded-md shadow-md" />
           ) : (
             <div className="grid size-[92px] place-items-center rounded-md bg-black/20 font-display text-3xl text-white/80">?</div>
           )}

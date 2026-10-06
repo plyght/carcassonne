@@ -7,6 +7,8 @@ import type { CoreGeo, GeoTile2D } from "@carcassonne/core-geo";
 import type { TileDef } from "@carcassonne/game-client";
 
 import type { FigureArtSource } from "./figures";
+import { illustratedFromGeo } from "./illustrated/from-geo";
+import type { IllustratedTile } from "./illustrated/types";
 import { TILE, type Pt, type TileArt, type TileArtFeature, type TileArtLayer, type TileArtSource } from "./tile-art";
 
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
@@ -68,9 +70,15 @@ export function artFromGeo(def: TileDef, g: GeoTile2D): TileArt {
   return { id: def.id, features, villages, layers };
 }
 
-/** TileArtSource backed by core.wasm geometry (cached per tile id). */
-export function createGeoArt(geo: Pick<CoreGeo, "tile2d">): TileArtSource {
+/**
+ * TileArtSource backed by core.wasm geometry (cached per tile id). With `tile3d`, it
+ * also feeds the painted Classic art: 2D regions plus the 3D prop instances (houses,
+ * towers, trees…) projected top-down, so the 2D and 3D boards share one layout.
+ */
+export function createGeoArt(geo: Pick<CoreGeo, "tile2d"> & Partial<Pick<CoreGeo, "tile3d">>): TileArtSource {
   const cache = new Map<string, TileArt>();
+  const painted = new Map<string, IllustratedTile | null>();
+  const tile3d = geo.tile3d?.bind(geo);
   return {
     name: "core-geo",
     get(def) {
@@ -81,6 +89,21 @@ export function createGeoArt(geo: Pick<CoreGeo, "tile2d">): TileArtSource {
       }
       return art;
     },
+    illustrated: tile3d
+      ? (def) => {
+          let t = painted.get(def.id);
+          if (t === undefined) {
+            try {
+              // Props do not depend on the mesh resolution; 2 keeps the call cheap.
+              t = illustratedFromGeo(geo.tile2d(def.id), tile3d(def.id, 2).props);
+            } catch {
+              t = null;
+            }
+            painted.set(def.id, t);
+          }
+          return t;
+        }
+      : undefined,
   };
 }
 
